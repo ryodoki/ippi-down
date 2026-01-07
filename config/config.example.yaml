@@ -1,0 +1,50 @@
+# ppi-file-downloader 設定ファイル例
+
+# 対象URL
+target_urls:
+  - https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4
+
+# ダウンロード条件
+download_conditions:
+  file_types:
+    - .pdf
+    - .xlsx
+    - .docx
+  keywords: []  # 空の場合はすべて
+  date_range:
+    start: null  # YYYY-MM-DD形式
+    end: null
+
+# 保存先
+save_paths:
+  local: ./downloads
+  box:
+    enabled: false
+    folder_id: null
+
+# ファイル命名規則
+# 使用可能な変数: {filename}, {file_type}, {category}, {title}, {date}, {index}
+naming_rule: "{category}_{title}_{date}_{index}"
+
+# スケジュール設定
+schedule:
+  enabled: false
+  interval: "daily"  # daily, weekly, custom
+  time: "09:00"      # HH:MM形式
+  cron: null         # cron形式（intervalがcustomの場合）
+
+# ログ設定
+logging:
+  level: INFO
+  file: ./logs/app.log
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# Box設定
+# 注意: 認証情報は環境変数から読み込むことを推奨
+box:
+  client_id: ""      # 環境変数 BOX_CLIENT_ID から読み込む
+  client_secret: ""   # 環境変数 BOX_CLIENT_SECRET から読み込む
+  access_token: ""    # OAuth認証後に保存
+  refresh_token: ""   # OAuth認証後に保存
+

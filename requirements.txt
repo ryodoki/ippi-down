@@ -1,0 +1,46 @@
+﻿# ppi-file-downloader 萓晏ｭ倬未菫・
+
+# HTML隗｣譫・
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# HTTP繧ｯ繝ｩ繧､繧｢繝ｳ繝・
+requests>=2.31.0
+
+# Box SDK
+boxsdk>=3.9.0
+
+# 繧ｹ繧ｱ繧ｸ繝･繝ｼ繝ｪ繝ｳ繧ｰ
+schedule>=1.2.0
+
+# 險ｭ螳夂ｮ｡逅・
+pyyaml>=6.0.1
+
+# 譌･莉伜・逅・
+python-dateutil>=2.8.2
+
+# 騾ｲ謐苓｡ｨ遉ｺ
+tqdm>=4.66.1
+
+# 繝ｪ繝医Λ繧､蜃ｦ逅・
+tenacity>=8.2.3
+
+# 迺ｰ蠅・､画焚邂｡逅・
+python-dotenv>=1.0.0
+
+# 證怜捷蛹厄ｼ郁ｪ崎ｨｼ諠・ｱ縺ｮ證怜捷蛹也畑・・
+cryptography>=41.0.0
+
+# 螳溯｡後ヵ繧｡繧､繝ｫ蛹厄ｼ磯幕逋ｺ逕ｨ・・
+pyinstaller>=6.0.0
+
+# Windows騾夂衍・医が繝励す繝ｧ繝ｳ・・
+win10toast>=0.9
+
+# Windows繧ｹ繧ｿ繝ｼ繝医い繝・・逋ｻ骭ｲ・医が繝励す繝ｧ繝ｳ・・
+pywin32>=306
+
+# 繝・せ繝茨ｼ磯幕逋ｺ逕ｨ・・
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
