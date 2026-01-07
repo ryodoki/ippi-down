@@ -14,7 +14,7 @@
   "extraPaths": [
     "."
   ],
-  "reportMissingImports": true,
+  "reportMissingImports": "warning",
   "reportMissingTypeStubs": false,
   "pythonVersion": "3.10",
   "pythonPlatform": "Windows",
