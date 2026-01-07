@@ -4,7 +4,7 @@ import tkinter as tk
 import tkinter.font
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 from typing import Optional, Callable
-from threading import Thread
+from threading import Thread, Event
 import platform
 from ..models.config_model import AppConfig
 from ..utils.logger import Logger
@@ -23,6 +23,10 @@ class MainWindow:
         self.config_manager = config_manager
         self.logger = logger or Logger()
         self.download_callback: Optional[Callable] = None
+        
+        # ダウンロードキャンセル用のフラグ
+        self.cancel_flag = Event()
+        self.download_thread: Optional[Thread] = None
 
         # 階層ドロップダウン用のHTTPClientとScraper（遅延初期化）
         self._http_client = None
@@ -87,6 +91,11 @@ class MainWindow:
             toolbar, text="ダウンロード開始", command=self.on_download_start
         )
         self.btn_download.pack(side=tk.LEFT, padx=(0, 5))
+
+        self.btn_cancel = ttk.Button(
+            toolbar, text="キャンセル", command=self.on_download_cancel, state="disabled"
+        )
+        self.btn_cancel.pack(side=tk.LEFT, padx=(0, 5))
 
         self.btn_clear = ttk.Button(toolbar, text="クリア", command=self.on_clear_log)
         self.btn_clear.pack(side=tk.LEFT)
@@ -686,15 +695,32 @@ class MainWindow:
             messagebox.showwarning("警告", "ダウンロード機能が設定されていません")
             return
 
-        # UIを無効化
+        # キャンセルフラグをリセット
+        self.cancel_flag.clear()
+
+        # UIを更新
         self.btn_download.config(state="disabled")
+        self.btn_cancel.config(state="normal")
         self.progress_bar["value"] = 0
         self.progress_var.set("ダウンロードを開始しています...")
 
         # 別スレッドでダウンロードを実行
-        thread = Thread(target=self._download_thread)
-        thread.daemon = True
-        thread.start()
+        self.download_thread = Thread(target=self._download_thread)
+        self.download_thread.daemon = True
+        self.download_thread.start()
+
+    def on_download_cancel(self):
+        """ダウンロードキャンセルボタンのハンドラ"""
+        if self.cancel_flag.is_set():
+            return  # 既にキャンセル済み
+        
+        self.cancel_flag.set()
+        self.logger.info("ダウンロードをキャンセルしました")
+        self.show_message("ダウンロードをキャンセルしました", "warning")
+        self.progress_var.set("キャンセル中...")
+        
+        # UIを更新
+        self.btn_cancel.config(state="disabled")
 
     def _download_thread(self):
         """ダウンロードスレッド"""
@@ -702,10 +728,18 @@ class MainWindow:
             if self.download_callback:
                 self.download_callback(self)
         except Exception as e:
-            self.logger.error(f"ダウンロードエラー: {str(e)}")
-            self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
+            if not self.cancel_flag.is_set():
+                self.logger.error(f"ダウンロードエラー: {str(e)}")
+                self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
         finally:
-            self.root.after(0, lambda: self.btn_download.config(state="normal"))
+            self.root.after(0, lambda: self._reset_download_ui())
+
+    def _reset_download_ui(self):
+        """ダウンロードUIをリセット"""
+        self.btn_download.config(state="normal")
+        self.btn_cancel.config(state="disabled")
+        if not self.cancel_flag.is_set():
+            self.progress_var.set("完了")
 
     def update_progress(self, current: int, total: int, filename: str = ""):
         """進捗を更新"""

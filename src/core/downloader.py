@@ -49,7 +49,10 @@ class Downloader:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((requests.exceptions.RequestException,)),
+        retry=retry_if_exception_type((
+            requests.exceptions.RequestException,
+            requests.exceptions.HTTPError,
+        )),
     )
     def download_files(
         self,
@@ -64,6 +67,19 @@ class Downloader:
         save_dir_path.mkdir(parents=True, exist_ok=True)
 
         for index, file_info in enumerate(file_list):
+            # キャンセルチェック（progress_callbackがFalseを返した場合）
+            if progress_callback:
+                try:
+                    # キャンセルチェック用にコールバックを呼び出し
+                    # コールバックがFalseを返すか、例外が発生した場合は中断
+                    callback_result = progress_callback(index, len(file_list), file_info.filename)
+                    if callback_result is False:
+                        self.logger.info("ダウンロードがキャンセルされました")
+                        break
+                except Exception:
+                    # コールバックで例外が発生した場合は続行
+                    pass
+            
             try:
                 # ファイル名を生成
                 filename = naming.generate_filename(file_info, file_info.metadata, index)

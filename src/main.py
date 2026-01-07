@@ -58,6 +58,12 @@ def download_files(main_window: MainWindow):
         # 各URLからファイルを取得
         all_files = []
         for url in config.target_urls:
+            # キャンセルチェック
+            if main_window.cancel_flag.is_set():
+                logger.info("ダウンロードがキャンセルされました")
+                main_window.show_message("ダウンロードがキャンセルされました", "warning")
+                return
+            
             logger.info(f"ページを解析中: {url}")
             main_window.show_message(f"ページを解析中: {url}", "info")
             
@@ -109,6 +115,12 @@ def download_files(main_window: MainWindow):
                 else:
                     main_window.show_message(f"ページの取得に失敗しました: {url}", "error")
 
+        # キャンセルチェック
+        if main_window.cancel_flag.is_set():
+            logger.info("ダウンロードがキャンセルされました")
+            main_window.show_message("ダウンロードがキャンセルされました", "warning")
+            return
+
         # フィルタリング
         filtered_files = filter_obj.filter_files(all_files)
         logger.info(f"フィルタリング後: {len(filtered_files)}件")
@@ -117,11 +129,21 @@ def download_files(main_window: MainWindow):
         if not filtered_files:
             main_window.show_message("ダウンロード対象のファイルが見つかりませんでした", "warning")
             return
+        
+        # キャンセルチェック
+        if main_window.cancel_flag.is_set():
+            logger.info("ダウンロードがキャンセルされました")
+            main_window.show_message("ダウンロードがキャンセルされました", "warning")
+            return
 
         # ダウンロード実行
         def progress_callback(current, total, filename):
+            # キャンセルチェック
+            if main_window.cancel_flag.is_set():
+                return False  # Falseを返すことでダウンロードを中断
             main_window.root.after(0, lambda: main_window.update_progress(current, total, filename))
             main_window.root.after(0, lambda: main_window.show_message(f"{filename} をダウンロード中..."))
+            return True  # 続行
 
         result = downloader.download_files(
             filtered_files,
@@ -129,6 +151,12 @@ def download_files(main_window: MainWindow):
             naming,
             progress_callback,
         )
+        
+        # キャンセルチェック
+        if main_window.cancel_flag.is_set():
+            logger.info("ダウンロードがキャンセルされました")
+            main_window.show_message("ダウンロードがキャンセルされました", "warning")
+            return
 
         # Boxにアップロード（オプション）
         if box_client and config.save_paths.box.get("enabled", False):

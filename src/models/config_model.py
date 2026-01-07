@@ -109,6 +109,29 @@ class ScheduleConfig:
     time: str = "09:00"  # HH:MM形式
     cron: Optional[str] = None  # cron形式（intervalがcustomの場合）
 
+    def __post_init__(self):
+        """初期化後の検証"""
+        if self.enabled:
+            # intervalの値チェック
+            valid_intervals = ["daily", "weekly", "monthly", "custom"]
+            if self.interval not in valid_intervals:
+                raise ValueError(f"intervalは{valid_intervals}のいずれかである必要があります: {self.interval}")
+            
+            # intervalがcustomの場合、cronが必須
+            if self.interval == "custom":
+                if not self.cron:
+                    raise ValueError("intervalがcustomの場合、cron形式を指定してください")
+            else:
+                # intervalがcustom以外の場合、timeが必須
+                if not self.time:
+                    raise ValueError(f"intervalが{self.interval}の場合、timeを指定してください")
+                
+                # timeの形式チェック（HH:MM形式）
+                time_pattern = r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+                import re
+                if not re.match(time_pattern, self.time):
+                    raise ValueError(f"timeはHH:MM形式で指定してください: {self.time}")
+
 
 @dataclass
 class LoggingConfig:

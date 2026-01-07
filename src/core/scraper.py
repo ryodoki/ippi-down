@@ -400,12 +400,108 @@ class Scraper:
         return file_links
 
     def extract_metadata(self, soup: BeautifulSoup) -> Dict[str, Any]:
-        """ページからメタデータを抽出"""
+        """ページからメタデータを抽出
+        
+        抽出する情報:
+        - title: ページタイトル
+        - hachu_kikan: 発注機関
+        - koji_name: 工事名
+        - date: 日付（公告日、開札日、契約日など）
+        - category: カテゴリ
+        """
         metadata = {}
 
+        # タイトル
         title_tag = soup.find("title")
         if title_tag:
             metadata["title"] = title_tag.get_text().strip()
+
+        # テーブルから情報を抽出（ppi.jpのページ構造に応じて）
+        # 発注機関の抽出
+        hachu_labels = ["発注機関", "発注者", "発注元"]
+        for label in hachu_labels:
+            hachu_elem = soup.find("td", string=re.compile(label))
+            if hachu_elem:
+                next_td = hachu_elem.find_next_sibling("td")
+                if next_td:
+                    hachu_text = next_td.get_text().strip()
+                    if hachu_text:
+                        metadata["hachu_kikan"] = hachu_text
+                        break
+
+        # 工事名の抽出
+        koji_labels = ["工事名", "工事名称", "案件名"]
+        for label in koji_labels:
+            koji_elem = soup.find("td", string=re.compile(label))
+            if koji_elem:
+                next_td = koji_elem.find_next_sibling("td")
+                if next_td:
+                    koji_text = next_td.get_text().strip()
+                    if koji_text:
+                        metadata["koji_name"] = koji_text
+                        break
+
+        # 日付の抽出（公告日、開札日、契約日など）
+        date_labels = ["公告日", "開札日", "契約日", "更新日", "最終更新日"]
+        for label in date_labels:
+            date_elem = soup.find("td", string=re.compile(label))
+            if date_elem:
+                next_td = date_elem.find_next_sibling("td")
+                if next_td:
+                    date_text = next_td.get_text().strip()
+                    if date_text:
+                        # 最初に見つかった日付を優先的に使用
+                        if "date" not in metadata:
+                            metadata["date"] = date_text
+                        # ラベル付きで保存
+                        metadata[f"date_{label}"] = date_text
+
+        # 日付パターンでテキスト全体から日付を抽出（上記で見つからなかった場合）
+        if "date" not in metadata:
+            date_patterns = [
+                r"(\d{4})[年/](\d{1,2})[月/](\d{1,2})[日]?",
+                r"(\d{4})-(\d{2})-(\d{2})",
+                r"(\d{4})\.(\d{2})\.(\d{2})",
+            ]
+            page_text = soup.get_text()
+            for pattern in date_patterns:
+                date_match = re.search(pattern, page_text)
+                if date_match:
+                    # 日付を正規化（YYYY-MM-DD形式）
+                    year, month, day = date_match.groups()
+                    metadata["date"] = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                    break
+
+        # カテゴリの抽出（ページ構造に応じて調整）
+        category_elem = soup.find("td", string=re.compile("カテゴリ|分類|種別"))
+        if category_elem:
+            next_td = category_elem.find_next_sibling("td")
+            if next_td:
+                category_text = next_td.get_text().strip()
+                if category_text:
+                    metadata["category"] = category_text
+
+        # 予定価格の抽出
+        price_elem = soup.find("td", string=re.compile("予定価格|予定金額"))
+        if price_elem:
+            next_td = price_elem.find_next_sibling("td")
+            if next_td:
+                price_text = next_td.get_text().strip()
+                # 数値を抽出
+                price_match = re.search(r"[\d,]+", price_text.replace(",", ""))
+                if price_match:
+                    metadata["yotei_price"] = int(price_match.group().replace(",", ""))
+
+        # 落札価格の抽出
+        rakusatsu_elem = soup.find("td", string=re.compile("落札価格|契約価格|落札金額"))
+        if rakusatsu_elem:
+            next_td = rakusatsu_elem.find_next_sibling("td")
+            if next_td:
+                rakusatsu_text = next_td.get_text().strip()
+                # 数値を抽出
+                rakusatsu_match = re.search(r"[\d,]+", rakusatsu_text.replace(",", ""))
+                if rakusatsu_match:
+                    metadata["rakusatsu_price"] = int(rakusatsu_match.group().replace(",", ""))
 
         return metadata
 
