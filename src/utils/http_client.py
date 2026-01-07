@@ -1,6 +1,8 @@
 """HTTP通信を行うクラス（セッション管理含む）"""
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import time
 from typing import Dict, Optional, Callable
 from pathlib import Path
@@ -10,13 +12,13 @@ from .logger import Logger
 class HTTPClient:
     """HTTP通信を行うクラス（セッション管理含む）"""
 
-    def __init__(self, logger: Optional[Logger] = None, timeout: int = 30, download_timeout: int = 60):
+    def __init__(self, logger: Optional[Logger] = None, timeout: int = 30, download_timeout: int = 180):
         """初期化
         
         Args:
             logger: ロガーインスタンス
-            timeout: 通常のリクエストのタイムアウト（秒）
-            download_timeout: ダウンロードのタイムアウト（秒）
+            timeout: 通常のリクエストのタイムアウト（秒、デフォルト30秒）
+            download_timeout: ダウンロードのタイムアウト（秒、デフォルト180秒）
         """
         self.logger = logger or Logger()
         self.timeout = timeout
@@ -27,6 +29,21 @@ class HTTPClient:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
         )
+        
+        # 接続プールとリトライ設定を改善
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "POST"]
+        )
+        adapter = HTTPAdapter(
+            pool_connections=10,
+            pool_maxsize=10,
+            max_retries=retry_strategy
+        )
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
     def get(self, url: str, max_retries: int = 3, **kwargs) -> requests.Response:
         """GETリクエストを送信
@@ -146,28 +163,88 @@ class HTTPClient:
 
                 total_size = int(response.headers.get("content-length", 0))
                 downloaded_size = 0
+                start_time = time.time()
+                last_progress_time = start_time
+                last_progress_size = 0
 
                 with open(save_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
                             f.write(chunk)
                             downloaded_size += len(chunk)
+                            current_time = time.time()
+                            
+                            # 進捗コールバック
                             if progress_callback and total_size > 0:
                                 progress_callback(downloaded_size, total_size)
+                            
+                            # タイムアウト前の警告（30秒以上進捗がない場合）
+                            if current_time - last_progress_time > 30:
+                                elapsed = current_time - start_time
+                                remaining_timeout = self.download_timeout - elapsed
+                                if remaining_timeout < 60:
+                                    self.logger.warning(
+                                        f"ダウンロードが遅延しています。残りタイムアウト: {remaining_timeout:.0f}秒 "
+                                        f"(進捗: {downloaded_size:,}/{total_size:,} bytes)"
+                                    )
+                                last_progress_time = current_time
+                            
+                            # 進捗がある場合は更新
+                            if downloaded_size > last_progress_size:
+                                last_progress_size = downloaded_size
+                                last_progress_time = current_time
 
                 self.logger.info(f"ファイルダウンロード完了: {save_path}")
                 return True
 
+            except requests.exceptions.Timeout as e:
+                # タイムアウトエラーの詳細な処理
+                error_type = "接続タイムアウト" if "connect" in str(e).lower() else "読み取りタイムアウト"
+                if attempt == max_retries - 1:
+                    self.logger.error(
+                        f"ファイルダウンロードタイムアウト: {url} - {error_type} "
+                        f"(タイムアウト設定: {self.download_timeout}秒)"
+                    )
+                    return False
+                # リトライ前に待機（指数バックオフ）
+                wait_time = retry_delay * (2 ** attempt)
+                self.logger.warning(
+                    f"ダウンロードタイムアウト ({error_type})。{wait_time}秒後にリトライします... "
+                    f"(試行 {attempt + 1}/{max_retries}, タイムアウト設定: {self.download_timeout}秒)"
+                )
+                time.sleep(wait_time)
+            except requests.exceptions.ConnectionError as e:
+                # 接続エラーの詳細な処理
+                if attempt == max_retries - 1:
+                    self.logger.error(
+                        f"ファイルダウンロード接続エラー: {url} - {str(e)}"
+                    )
+                    return False
+                wait_time = retry_delay * (2 ** attempt)
+                self.logger.warning(
+                    f"ダウンロード接続エラー。{wait_time}秒後にリトライします... "
+                    f"(試行 {attempt + 1}/{max_retries})"
+                )
+                time.sleep(wait_time)
             except requests.exceptions.RequestException as e:
                 if attempt == max_retries - 1:
-                    self.logger.error(f"ファイルダウンロードエラー: {url} - {str(e)}")
+                    self.logger.error(
+                        f"ファイルダウンロードエラー: {url} - {str(e)} "
+                        f"(エラータイプ: {type(e).__name__})"
+                    )
                     return False
-                # リトライ前に待機
-                wait_time = retry_delay * (attempt + 1)
-                self.logger.warning(f"ダウンロードエラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                # リトライ前に待機（指数バックオフ）
+                wait_time = retry_delay * (2 ** attempt)
+                self.logger.warning(
+                    f"ダウンロードエラー。{wait_time}秒後にリトライします... "
+                    f"(試行 {attempt + 1}/{max_retries}, エラー: {type(e).__name__})"
+                )
                 time.sleep(wait_time)
             except Exception as e:
-                self.logger.error(f"ファイル保存エラー: {save_path} - {str(e)}")
+                self.logger.error(
+                    f"ファイル保存エラー: {save_path} - {str(e)} "
+                    f"(エラータイプ: {type(e).__name__})"
+                )
                 return False
         
         return False
