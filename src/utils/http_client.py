@@ -24,9 +24,15 @@ class HTTPClient:
         self.timeout = timeout
         self.download_timeout = download_timeout
         self.session = requests.Session()
+        # デフォルトヘッダーを設定（ブラウザを模倣）
         self.session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
             }
         )
         
@@ -130,6 +136,7 @@ class HTTPClient:
         save_path: str,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         max_retries: int = 3,
+        referer: Optional[str] = None,
     ) -> bool:
         """ファイルをダウンロード
         
@@ -138,12 +145,32 @@ class HTTPClient:
             save_path: 保存先パス
             progress_callback: 進捗コールバック関数
             max_retries: 最大リトライ回数
+            referer: リファラーヘッダー（元のページURL）
         """
         retry_delay = 1
         
+        # ダウンロード用のヘッダーを準備
+        download_headers = {
+            "Accept": "application/pdf,application/octet-stream,*/*",
+            "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+        }
+        
+        # Refererが指定されている場合は追加
+        if referer:
+            download_headers["Referer"] = referer
+        
         for attempt in range(max_retries):
             try:
-                response = self.session.get(url, stream=True, timeout=self.download_timeout)
+                # 接続タイムアウトと読み取りタイムアウトを分離
+                # 接続タイムアウト: 10秒、読み取りタイムアウト: download_timeout秒
+                timeout_tuple = (10, self.download_timeout)
+                
+                response = self.session.get(
+                    url,
+                    stream=True,
+                    timeout=timeout_tuple,
+                    headers=download_headers
+                )
                 
                 # HTTPステータス429（レート制限）の処理
                 if response.status_code == 429:

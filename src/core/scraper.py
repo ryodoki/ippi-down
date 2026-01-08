@@ -1066,6 +1066,7 @@ class Scraper:
             if not result_rows:
                 # 直接ファイルリンクを抽出
                 direct_files = self.extract_file_links(soup, base_url, file_types)
+                # page_urlは既にextract_file_linksで設定されている（base_url）
                 file_links.extend(direct_files)
             else:
                 for row in result_rows:
@@ -1103,6 +1104,9 @@ class Scraper:
                 post_url = urljoin(base_url, form.get("action"))
             else:
                 post_url = base_url
+            
+            # 詳細ページのURLとして使用（page_urlに設定するため）
+            detail_url = post_url
             
             # 現在のページのhidden inputを取得
             form_data = self._get_all_hidden_inputs(current_soup)
@@ -1204,6 +1208,7 @@ class Scraper:
                                     url=absolute_url,
                                     filename=filename,
                                     file_type=file_type,
+                                    page_url=detail_url,  # 詳細ページのURLを設定（Refererヘッダーに使用）
                                     metadata={"title": document_name} if document_name else {}
                                 )
                                 files.append(file_info)

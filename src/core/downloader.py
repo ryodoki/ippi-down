@@ -30,9 +30,12 @@ class Downloader:
             save_path_obj = Path(save_path)
             save_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
+            # リファラーを設定（元のページURLから）
+            referer = file_info.page_url if file_info.page_url else None
+
             # ダウンロード実行
             success = self.http_client.download_file(
-                file_info.url, save_path, progress_callback
+                file_info.url, save_path, progress_callback, referer=referer
             )
 
             if success:
