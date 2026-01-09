@@ -729,8 +729,8 @@ class MainWindow:
                 self.download_callback(self)
         except Exception as e:
             if not self.cancel_flag.is_set():
-                self.logger.error(f"ダウンロードエラー: {str(e)}")
-                self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
+            self.logger.error(f"ダウンロードエラー: {str(e)}")
+            self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
         finally:
             self.root.after(0, lambda: self._reset_download_ui())
 

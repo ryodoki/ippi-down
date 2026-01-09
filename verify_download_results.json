@@ -1,0 +1,100 @@
+{
+  "file_url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=20",
+  "page_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4",
+  "filename": "入札公告",
+  "url_parsed": {
+    "scheme": "https",
+    "netloc": "e2ppiw01.e-bisc.go.jp",
+    "path": "/CALS/Publish/KokaiBunshoServlet",
+    "query": "AnkenKanriNo=021030002025412000000704&BunshoKanriId=20"
+  },
+  "cookies": [
+    {
+      "name": "ApplicationGatewayAffinityCORS",
+      "value": "f599b0c1bdb3870a6d46e0c31607e465",
+      "domain": "www.i-ppi.jp",
+      "path": "/"
+    },
+    {
+      "name": "ApplicationGatewayAffinity",
+      "value": "f599b0c1bdb3870a6d46e0c31607e465",
+      "domain": "www.i-ppi.jp",
+      "path": "/"
+    },
+    {
+      "name": "ASP.NET_SessionId",
+      "value": "35lapc0ptikdsqtdlzk1ytdw",
+      "domain": "www.i-ppi.jp",
+      "path": "/"
+    }
+  ],
+  "test_methods": [
+    {
+      "method": "HEAD (5s)",
+      "result": {
+        "success": false,
+        "error": "Timeout",
+        "message": "タイムアウト (5秒)"
+      }
+    },
+    {
+      "method": "HEAD (30s)",
+      "result": {
+        "success": false,
+        "error": "Timeout",
+        "message": "タイムアウト (30秒)"
+      }
+    },
+    {
+      "method": "GET (5s, no stream)",
+      "result": {
+        "success": false,
+        "error": "Timeout",
+        "message": "タイムアウト (5秒)"
+      }
+    },
+    {
+      "method": "GET (30s, stream)",
+      "result": {
+        "success": false,
+        "error": "Timeout",
+        "message": "タイムアウト (30秒)"
+      }
+    },
+    {
+      "method": "Different headers",
+      "result": {
+        "success": false,
+        "results": [
+          {
+            "name": "Minimal headers",
+            "success": false,
+            "error": "ConnectTimeout",
+            "message": "エラー: HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', "
+          },
+          {
+            "name": "With Referer",
+            "success": false,
+            "error": "ConnectTimeout",
+            "message": "エラー: HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', "
+          },
+          {
+            "name": "Full browser headers",
+            "success": false,
+            "error": "ConnectTimeout",
+            "message": "エラー: HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', "
+          }
+        ],
+        "message": "0/3 成功"
+      }
+    },
+    {
+      "method": "Redirects",
+      "result": {
+        "success": false,
+        "error": "ConnectTimeout",
+        "message": "エラー: HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', port=443): Max retries exceeded with url: /CALS/Pu"
+      }
+    }
+  ]
+}
