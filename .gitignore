@@ -69,6 +69,19 @@ test_investigate*.html
 test_shoubunrui*.html
 test_userentry_download*.html
 
+# Git履歴修正用スクリプト（作業完了後不要）
+fix_commit_*.py
+fix_commit_*.bat
+fix_commit_*.sh
+
+# 一時デバッグ・検証ファイル
+debug_request_info.json
+verify_download_results.json
+
+# 開発用ドキュメント（作業用）
+FILE_ORGANIZATION_PLAN.md
+FILE_CLEANUP_RECOMMENDATIONS.md
+
 # ダウンロードファイル
 downloads/*
 !downloads/.gitkeep

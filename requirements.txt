@@ -44,3 +44,5 @@ pywin32>=306
 pytest>=7.4.0
 pytest-cov>=4.1.0
 
+# ブラウザ自動化（調査・デバッグ用）
+selenium>=4.15.0

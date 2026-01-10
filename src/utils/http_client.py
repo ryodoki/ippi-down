@@ -151,15 +151,29 @@ class HTTPClient:
         """
         retry_delay = 1
         
-        # ダウンロード用のヘッダーを準備
+        # ダウンロード用のヘッダーを準備（ブラウザと同じヘッダーを設定）
+        from urllib.parse import urlparse
         download_headers = {
             "Accept": "application/pdf,application/octet-stream,*/*",
             "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
         }
         
-        # Refererが指定されている場合は追加
+        # RefererとOriginが指定されている場合は追加
         if referer:
             download_headers["Referer"] = referer
+            parsed_referer = urlparse(referer)
+            origin = f"{parsed_referer.scheme}://{parsed_referer.netloc}"
+            download_headers["Origin"] = origin
+            # Sec-Fetch-*ヘッダー（モダンブラウザで使用）
+            download_headers["Sec-Fetch-Site"] = "same-site" if parsed_referer.netloc.endswith(".i-ppi.jp") else "cross-site"
+            download_headers["Sec-Fetch-Mode"] = "navigate"
+            download_headers["Sec-Fetch-Dest"] = "document"
+            download_headers["Sec-Fetch-User"] = "?1"
         
         for attempt in range(max_retries):
             try:
@@ -171,7 +185,8 @@ class HTTPClient:
                     url,
                     stream=True,
                     timeout=timeout_tuple,
-                    headers=download_headers
+                    headers=download_headers,
+                    allow_redirects=True  # リダイレクトを確実に追従
                 )
                 
                 # HTTPステータス429（レート制限）の処理
