@@ -53,12 +53,14 @@ ippi-down/
 │   ├── test_file_utils.py # FileUtilsテスト
 │   ├── test_config_model.py # ConfigModelテスト
 │   └── test_http_client.py # HTTPClientテスト
-├── logs/                 # ログファイル（実行時に生成）
+├── logs/                 # ログファイル（実行時に生成、Git追跡対象外）
+├── downloads/            # ダウンロード結果ファイル（Git追跡対象外）
+├── build/                # PyInstallerビルド作業ディレクトリ（Git追跡対象外）
+├── dist/                 # PyInstaller生成物（Git追跡対象外）
+├── .venv/                # 仮想環境（Git追跡対象外）
 ├── requirements.txt      # 依存関係
 ├── pytest.ini           # pytest設定
 ├── pyrightconfig.json   # Pyright設定
-├── CODE_REVIEW.md       # コードレビュー結果
-├── NEXT_STEPS.md        # 次のステップガイド
 └── README.md             # プロジェクト概要
 ```
 
@@ -112,19 +114,26 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-5. 設定ファイルをコピー
-```bash
-# Windows (コマンドプロンプト)
-copy config\config.example.yaml config\config.yaml
+5. 設定ファイルをコピーして作成
 
-# Windows (PowerShell)
-Copy-Item config\config.example.yaml config\config.yaml
+   **重要**: Gitで管理されるのは `config/config.example.yaml` のみです。  
+   実際に使用する設定ファイル `config/config.yaml` はローカルで作成してください。
 
-# Linux/macOS
-cp config/config.example.yaml config/config.yaml
-```
+   ```bash
+   # Windows (コマンドプロンプト)
+   copy config\config.example.yaml config\config.yaml
+
+   # Windows (PowerShell)
+   Copy-Item config\config.example.yaml config\config.yaml
+
+   # Linux/macOS
+   cp config/config.example.yaml config/config.yaml
+   ```
 
 6. 設定ファイルを編集（必要に応じて）
+
+   `config/config.yaml` を開いて、必要に応じて設定を変更してください。  
+   このファイルは Git で追跡されません（ローカル専用設定）。
 
 ### 実行方法
 
@@ -305,13 +314,113 @@ Windowsのパス長制限（260文字）を超えるファイル名は自動的�
 
 ダウンロード中に「キャンセル」ボタンをクリックすると、現在のダウンロード処理が中断されます。既にダウンロード済みのファイルは保持されます。
 
+## リポジトリの管理
+
+### 設定ファイルの扱い
+
+**重要**: 
+- Gitで管理されるのは `config/config.example.yaml`（テンプレート）のみです
+- 実際に使用する `config/config.yaml` はローカルで作成し、Gitで追跡されません
+- `config/config.yaml` には機密情報（Box認証情報など）を含める可能性があるため、Gitに含めません
+
+初回セットアップ時は、`config/config.example.yaml` をコピーして `config/config.yaml` を作成してください。
+
+### 不要なファイルの追跡解除
+
+過去に誤って以下のファイルがGitに追加されてしまった場合、追跡を解除できます。
+
+詳細は [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md) を参照してください。
+
+```bash
+# 仮想環境の追跡解除
+git rm -r --cached .venv
+
+# ビルド生成物の追跡解除
+git rm -r --cached build dist
+
+# ログ・ダウンロード・キャッシュの追跡解除
+git rm -r --cached logs downloads .pytest_cache
+
+# 設定ファイルの追跡解除（ローカル設定のみ）
+git rm --cached config/config.yaml
+```
+
+### クリーンなzip配布用パッケージの作成
+
+配布用のzipファイルを作成する際は、不要なファイルを除外してください。
+
+**PowerShell（Windows）での例**:
+
+```powershell
+# 現在のディレクトリに移動
+cd C:\Users\ryout\Workspaces\ippi-down
+
+# 除外するディレクトリ・ファイルを指定
+$excludeItems = @(
+    ".venv",
+    "build",
+    "dist",
+    "logs",
+    "downloads",
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    "*.pyc",
+    "*.log",
+    "config/config.yaml"
+)
+
+# 一時的なexcludeリストファイルを作成
+$excludeList = Join-Path $env:TEMP "zip-exclude.txt"
+$excludeItems | ForEach-Object { Write-Output $_ } | Out-File -FilePath $excludeList -Encoding UTF8
+
+# クリーンなzipファイルを作成（7-Zipを使用する場合）
+# 7-Zipがインストールされている必要があります
+$zipPath = "ippi-down-clean.zip"
+$sourceDir = "."
+& "C:\Program Files\7-Zip\7z.exe" a -tzip $zipPath $sourceDir -x@"$excludeList"
+
+# または、PowerShellのCompress-Archiveを使用（除外オプションがないため、事前に除外）
+$tempDir = Join-Path $env:TEMP "ippi-down-clean"
+if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
+New-Item -ItemType Directory -Path $tempDir | Out-Null
+
+# 必要なファイルのみをコピー
+Get-ChildItem -Path . -Recurse | Where-Object {
+    $item = $_
+    $shouldExclude = $false
+    foreach ($exclude in $excludeItems) {
+        if ($item.FullName -match [regex]::Escape($exclude)) {
+            $shouldExclude = $true
+            break
+        }
+    }
+    -not $shouldExclude
+} | Copy-Item -Destination {
+    $_.FullName.Replace((Get-Location).Path, $tempDir)
+} -Recurse -Force
+
+# zipファイルを作成
+Compress-Archive -Path "$tempDir\*" -DestinationPath $zipPath -Force
+
+# 一時ディレクトリを削除
+Remove-Item $tempDir -Recurse -Force
+Remove-Item $excludeList -Force
+
+Write-Host "クリーンなzipファイルを作成しました: $zipPath"
+```
+
+**注意**: `Compress-Archive` には除外オプションがないため、一時ディレクトリに必要なファイルのみをコピーしてからzip化しています。
+
+詳細は [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md) を参照してください。
+
 ## 参考資料
 
 - [要件定義書](./docs/要件定義書.md)
 - [技術選定書](./docs/技術選定.md)
 - [システム設計書](./docs/システム設計書.md)
-- [コードレビュー結果](./CODE_REVIEW.md)
-- [次のステップガイド](./NEXT_STEPS.md)
+- [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md)
+- [Gitクリーンアップレポート](./docs/dev/GIT_CLEANUP_REPORT.md)
 
 ## ライセンス
 
