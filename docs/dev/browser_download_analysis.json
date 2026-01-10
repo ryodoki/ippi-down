@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-01-10T21:14:29.543130",
+  "test_file": {
+    "filename": "入札公告",
+    "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=20",
+    "page_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4",
+    "metadata": {
+      "title": "入札公告"
+    }
+  },
+  "parsed_url": {
+    "scheme": "https",
+    "netloc": "e2ppiw01.e-bisc.go.jp",
+    "path": "/CALS/Publish/KokaiBunshoServlet",
+    "query": "AnkenKanriNo=021030002025412000000704&BunshoKanriId=20"
+  },
+  "cookies": [
+    {
+      "name": "ApplicationGatewayAffinityCORS",
+      "domain": "www.i-ppi.jp",
+      "path": "/",
+      "secure": true
+    },
+    {
+      "name": "ApplicationGatewayAffinity",
+      "domain": "www.i-ppi.jp",
+      "path": "/",
+      "secure": false
+    },
+    {
+      "name": "ASP.NET_SessionId",
+      "domain": "www.i-ppi.jp",
+      "path": "/",
+      "secure": false
+    }
+  ],
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/pdf,application/octet-stream,*/*",
+    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Referer": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4"
+  }
+}

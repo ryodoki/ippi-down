@@ -1,0 +1,388 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html lang="ja">
+<head>
+<title>入札情報サービス 検索条件指定</title>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+<meta content="Microsoft Visual Studio .NET 7.1" name="GENERATOR"/>
+<meta content="C#" name="CODE_LANGUAGE"/>
+<meta content="JavaScript" name="vs_defaultClientScript"/>
+<meta content="http://schemas.microsoft.com/intellisense/ie5" name="vs_targetSchema"/>
+<link href="../../css/main.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript">
+            function new_win(url) {
+                selectWin = window.open(url, "subListWin", "width=800px,height=600,location=no,menubar=no,resizable=yes,scrollbars=yes,status=no,toolbar=no");
+                selectWin.focus();
+			}
+
+            //------------------------------------------------
+            //関数：setListItemSub()
+            //------------------------------------------------		
+            function setListItemSub(SEL, LIST) {
+                var SELObj = document.getElementById(SEL);
+                var selindex = SELObj.selectedIndex;
+
+                if (LIST) {
+                    for (var i = 0; LIST[i]; i++) {
+                        var OPT = document.createElement('option');
+                        //リスト情報の取得
+                        var listitem = LIST[i].split(":");
+                        //リストの値を設定
+                        OPT.value = listitem[0];
+                        //リストの表示値を設定
+                        OPT.appendChild(document.createTextNode(listitem[1]));
+                        SELObj.appendChild(OPT);
+                    }
+                }
+			}
+
+            //------------------------------------------------
+            //関数：sizeChangeTarget()
+            //------------------------------------------------	
+            function sizeChangeTarget() {
+                var arrayEle = [];
+
+                // 文字の大きさを変更する要素
+                arrayEle.push(document.getElementById('tblSearch'));
+				arrayEle.push(document.getElementById('Table3'));
+				if (document.getElementById('lblErrorMes') != null) {
+                    arrayEle.push(document.getElementById('lblErrorMes'));
+				}
+				var selectEle = document.getElementsByTagName('select');
+				Array.prototype.forEach.call(selectEle, function (ele) {
+					arrayEle.push(ele);
+				});
+				var textEle = document.querySelectorAll("input[type=text]");
+				Array.prototype.forEach.call(textEle, function (ele) {
+					arrayEle.push(ele);
+				});
+				changeFontClass(arrayEle);
+
+                // 画面のフォントサイズちらつき対策
+                document.body.style.display = 'block';
+			}
+        </script>
+</head>
+<body ms_positioning="GridLayout" onload="checkObjWin2('koji')" style="display:none;">
+<form action="./Search.aspx?tab=4" id="Form1" method="post" name="Form1" onkeydown="if(event.keyCode==13){ return false;}">
+<input id="__EVENTTARGET" name="__EVENTTARGET" type="hidden" value=""/>
+<input id="__EVENTARGUMENT" name="__EVENTARGUMENT" type="hidden" value=""/>
+<input id="__LASTFOCUS" name="__LASTFOCUS" type="hidden" value=""/>
+<input id="__VIEWSTATE" name="__VIEWSTATE" type="hidden" value="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"/>
+<script type="text/javascript">
+<!--
+var theForm = document.forms['Form1'];
+if (!theForm) {
+    theForm = document.Form1;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+// -->
+</script>
+<script src="/IPPI/SearchServices/ScriptResource.axd?d=LqrLRJqA1oL7f8MlScETIlSpXjh2465mUJYAGuA4mYX-jmzJlUbTlCrMeyoncTbwHsBUNFcgpHtOvFLb-faAuG6NQube_KZukqn2EKw5rMWuD_I51v42okjBoFt7EY-_4OuNLidpM4m995eNyOh_X-4vR2Q1&amp;t=b990ecd" type="text/javascript"></script>
+<input id="__VIEWSTATEGENERATOR" name="__VIEWSTATEGENERATOR" type="hidden" value="5E7F70DD"/>
+<div align="left">
+<div id="UpdatePanel1" style="text-align: -webkit-center;">
+<div id="cssKoji">
+<link href="../../css/koji.css" rel="stylesheet" type="text/css"/>
+</div>
+<link href="../../css/ppi_main_base.css" rel="stylesheet" type="text/css"/>
+<link href="" id="css" rel="stylesheet" type="text/css"/>
+<script language="JavaScript" src="../../js/Common.js" type="text/javascript"></script>
+<script src="../../js/Header.js" type="text/javascript"></script>
+<script type="text/javascript">
+	function new_winHelp(url) {
+		selectWin = window.open(url, "subList2Win", "width=650px,height=600,location=no,menubar=no,resizable=yes,scrollbars=yes,status=no,toolbar=no");
+		selectWin.focus();
+	}
+</script>
+<div class="print_header" id="header_div">
+<table id="header_table">
+<tr>
+<td id="header_block" rowspan="2">
+<a href="../../Index.htm" target="_top">
+<div>
+<font id="ppi_title">入札情報サービス</font><br/>
+<font id="ppi_sub">公共発注機関が公開する全国の入札情報を提供しています</font><br/>
+</div>
+</a>
+</td>
+<td id="support_frm">
+<div class="support_btn support_title">文字の<br/>大きさ</div>
+<a href="javascript:onClickLargeText()"><span class="support_btn size_color_btn">大</span></a>
+<a href="javascript:onClickMediumText()"><span class="support_btn size_color_btn">中</span></a>
+<a href="javascript:onClickSmallText()"><span class="support_btn size_color_btn" style="margin-right: 25px;">小</span></a>
+<div class="support_btn support_title">背景色と<br/>文字色</div>
+<a href="javascript:onClickBlackText()"><span class="support_btn size_color_btn color_selected">黒</span></a>
+<a href="javascript:onClickWhiteText()"><span class="support_btn size_color_btn color_w_b">白</span></a>
+<a href="javascript:onClickYellowText()"><span class="support_btn size_color_btn color_bl_y" style="margin-right: 15px;">黄</span></a>
+<div class="support_btn" style="line-height:19px; color:white; padding-right: 12px; text-align: left;">
+<a class="support_txt" href="javascript:new_winHelp('../../help_search.htm');"><span id="q_icon">？</span> ヘルプ</a><br/>
+<a class="support_txt" href="mailto:i-ppi.helpdesk@jacic.or.jp">✉ お問い合わせ</a>
+</div>
+</td>
+</tr>
+<tr>
+<td style="width:812px; min-width: 812px; vertical-align: bottom; padding: 0px;">
+<a href="../../Index.htm" target="_top"><span class="button_cls">全国</span></a>
+<a href="../../IndexArea.aspx?data1=1" target="_top"><span class="button_cls">北海道</span></a>
+<a href="../../IndexArea.aspx?data1=2" target="_top"><span class="button_cls">東北</span></a>
+<a href="../../IndexArea.aspx?data1=3" target="_top"><span class="button_cls">関東</span></a>
+<a href="../../IndexArea.aspx?data1=4" target="_top"><span class="button_cls">北陸</span></a>
+<a href="../../IndexArea.aspx?data1=5" target="_top"><span class="button_cls">中部</span></a>
+<a href="../../IndexArea.aspx?data1=6" target="_top"><span class="button_cls">近畿</span></a>
+<a href="../../IndexArea.aspx?data1=7" target="_top"><span class="button_cls">中国</span></a>
+<a href="../../IndexArea.aspx?data1=8" target="_top"><span class="button_cls">四国</span></a>
+<a href="../../IndexArea.aspx?data1=9" target="_top"><span class="button_cls">九州･沖縄</span></a>
+</td>
+</tr>
+</table>
+</div>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table1" style="border-collapse:collapse;">
+<tr>
+<td class="chuchoki tabtitle">
+<label class="tabtitletext">●</label>
+<label>中長期の検索</label>
+<label class="tabtitletext">●</label>
+</td><td class="koji tabtitle">
+<label class="tabtitletext">●●●●●●●●●●</label>
+<label>工事の検索</label>
+<label class="tabtitletext">●●●●●●●●●●</label>
+</td><td class="gyomu tabtitle">
+<label class="tabtitletext">●●●●●●●●●●</label>
+<label>業務の検索</label>
+<label class="tabtitletext">●●●●●●●●●●</label>
+</td><td class="hachu tabtitle">
+<label class="tabtitletext">●</label>
+<label>発注機関の検索</label>
+<label class="tabtitletext">●</label>
+</td>
+</tr><tr align="center" valign="bottom">
+<td class="chuchoki"><input class="tab chuchokitab" id="imgChuchokiMitoshi" language="javascript" name="imgChuchokiMitoshi" onclick="closeSearchHachuWindow();" type="submit" value="中長期発注見通し"/></td><td class="koji"><input class="tab kojitab" id="imgKojiMitoshi" language="javascript" name="imgKojiMitoshi" onclick="closeSearchHachuWindow();" type="submit" value="発注の見通し"/><input class="tab kojitab" id="imgKojiKokoku" language="javascript" name="imgKojiKokoku" onclick="closeSearchHachuWindow();" type="submit" value="入札公告等"/><div class="tab selectkojitab" id="imgKojiKeikaSelect">
+<label class="tabtext">入札の経過</label>
+</div></td><td class="gyomu"><input class="tab gyomutab" id="imgGyomuMitoshi" language="javascript" name="imgGyomuMitoshi" onclick="closeSearchHachuWindow();" type="submit" value="発注の見通し"/><input class="tab gyomutab" id="imgGyomuKokoku" language="javascript" name="imgGyomuKokoku" onclick="closeSearchHachuWindow();" type="submit" value="入札公告等"/><input class="tab gyomutab" id="imgGyomuKeika" language="javascript" name="imgGyomuKeika" onclick="closeSearchHachuWindow();" type="submit" value="入札の経過"/></td><td class="hachu"><input class="tab hachutab" id="imgHachuInf" language="javascript" name="imgHachuInf" onclick="closeSearchHachuWindow();" type="submit" value="発注機関情報"/></td>
+</tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table2" style="border-collapse:collapse;">
+<tr class="back_top">
+<td colspan="5"></td>
+</tr><tr class="title_mid">
+<td colspan="5" id="titleKojiKeika">入札の経過（工事）検索条件指定</td>
+</tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="tblSearch" style="border-collapse:collapse;">
+<tr class="even" id="trKikan">
+<td class="hdr" nowrap="">発注機関（リスト検索）</td><td colspan="2"><select id="drpTopKikanInf" name="drpTopKikanInf" onchange="createListItem1_3('drpTopKikanInf', 'drpLargeKikanInf2','drpMiddleKikanInf','drpSmallKikanInf','txtLargeKikanInf_h','txtLgKikanInf2SelIndex_h')">
+<option value="-1">▽大分類</option>
+<option selected="selected" value="0">国の機関</option>
+<option value="3">地方公共団体（都道府県）</option>
+<option value="5">地方公共団体（市区町村）</option>
+<option value="9">テスト機関</option>
+</select>  
+									<select id="drpLargeKikanInf2" language="javascript" name="drpLargeKikanInf2" onchange="createListItem2('drpLargeKikanInf2','txtLgKikanInfSelValue_h','txtLgKikanInf2SelIndex_h');setTimeout('__doPostBack(\'drpLargeKikanInf2\',\'\')', 0)">
+<option selected="selected" value="-1">▽中分類</option>
+<option value="02">内閣府沖縄総合事務局</option>
+<option value="05">防衛省</option>
+<option value="16">農林水産省</option>
+<option value="21">国土交通省</option>
+<option value="22">国土交通省北海道開発局</option>
+</select>  
+									<select id="drpMiddleKikanInf" language="javascript" name="drpMiddleKikanInf" onchange="javascript:setTimeout('__doPostBack(\'drpMiddleKikanInf\',\'\')', 0)">
+<option selected="selected" value="-1">▽小分類</option>
+</select>  
+									<select id="drpSmallKikanInf" name="drpSmallKikanInf">
+<option value="-1">▽細分類</option>
+</select></td>
+</tr><tr class="even" id="trMultiSearch">
+<td class="hdr" nowrap="">発注機関（複数選択検索）</td><td colspan="2"><input id="btn_MultiSearch" language="javascript" name="btn_MultiSearch" onclick="openSearchHachu('koji');return false;" type="submit" value="複数選択"/><a href="javascript:__doPostBack('lnk_SearchHachuCnt','')" id="lnk_SearchHachuCnt" onclick="openSearchHachuList('koji', 'on');return false;" style="font-weight:bold;"></a>
+									 ※リスト検索と複数選択検索は同時に使用できません。
+								</td>
+</tr><tr class="odd" id="trKojiNm">
+<td class="hdr">工事名（文字列検索）</td><td colspan="2"><input class="w250" id="tbxKojiNm" maxlength="100" name="tbxKojiNm" type="text"/>  ※条件の複数指定はできません。
+								</td>
+</tr><tr class="even" id="trKojiPlaceList">
+<td class="hdr">工事場所（リスト検索）</td><td colspan="3"><span onchange="RadioClick('Koji','0')"><input id="rbKojiDropList" name="KojiRadioGroup" type="radio" value="0"/></span>
+									地方
+									<select id="drpKojiDistrict" name="drpKojiDistrict" onchange="createListItem1_2('drpKojiDistrict', 'drpKojiPrefecture2','drpKojiCity','txtKojiPrefectureInf_h','txtKojiPrefecture2SelIndex_h')">
+<option selected="selected" value="-1">▽大分類</option>
+<option value="1">北海道</option>
+<option value="2">東北</option>
+<option value="3">関東</option>
+<option value="4">北陸</option>
+<option value="5">中部</option>
+<option value="6">近畿</option>
+<option value="7">中国</option>
+<option value="8">四国</option>
+<option value="9">九州・沖縄</option>
+</select>  都道府県
+									<select id="drpKojiPrefecture2" language="javascript" name="drpKojiPrefecture2" onchange="createListItem2('drpKojiPrefecture2','txtKojiPrefectureSelValue_h','txtKojiPrefecture2SelIndex_h');setTimeout('__doPostBack(\'drpKojiPrefecture2\',\'\')', 0)">
+<option selected="selected" value="-1">▽中分類</option>
+</select>  市町村
+									<select id="drpKojiCity" name="drpKojiCity">
+<option value="-1">▽小分類</option>
+</select></td>
+</tr><tr class="even" id="trKojiPlace">
+<td class="hdr">工事場所（文字列検索）</td><td colspan="3"><span onchange="RadioClick('Koji','1')"><input id="rbStrKojiPlace" name="KojiRadioGroup" type="radio" value="1"/></span><input class="w250" disabled="disabled" id="tbxKojiPlace" maxlength="75" name="tbxKojiPlace" type="text"/>  ※条件の複数指定はできません。
+								</td>
+</tr><tr class="odd" id="trKojiNyusatsu">
+<td class="hdr">入札契約方式</td><td colspan="2"><input id="chkKojiNyusatsu1" name="chkKojiNyusatsu1" type="checkbox"/><label for="chkKojiNyusatsu1">一般競争入札</label>  
+									<input id="chkKojiNyusatsu2" name="chkKojiNyusatsu2" type="checkbox"/><label for="chkKojiNyusatsu2">公募型指名競争入札</label>  
+									<input id="chkKojiNyusatsu3" name="chkKojiNyusatsu3" type="checkbox"/><label for="chkKojiNyusatsu3">指名競争入札</label>  
+									<input id="chkKojiNyusatsu4" name="chkKojiNyusatsu4" type="checkbox"/><label for="chkKojiNyusatsu4">随意契約</label>  
+									<input id="chkKojiNyusatsu5" name="chkKojiNyusatsu5" type="checkbox"/><label for="chkKojiNyusatsu5">その他方式</label></td>
+</tr><tr class="even" id="trLastUpdate">
+<td class="hdr">最終更新日</td><td colspan="2"><input id="rbtLastUpdate1" name="LastUpdate" onclick="OnClick_rbtLastUpdate1('tbxLastUpdate');" type="radio" value="rbtLastUpdate1"/><label for="rbtLastUpdate1">指定なし</label>  
+									<input id="rbtLastUpdate2" name="LastUpdate" onclick="OnClick_rbt2('tbxLastUpdate');" type="radio" value="rbtLastUpdate2"/><label for="rbtLastUpdate2">過去</label><input class="w30" disabled="disabled" id="tbxLastUpdate" maxlength="3" name="tbxLastUpdate" type="text"/>日以内
+								</td>
+</tr><tr class="odd" id="trKokokuDateKeika">
+<td class="hdr">公告日</td><td colspan="2"><input id="rbtKokokuDate1Keika" name="KokokuDateKeika" onclick="OnClick_rbtDate1('dateKokokuFromKeika','dateKokokuToKeika');" type="radio" value="rbtKokokuDate1Keika"/><label for="rbtKokokuDate1Keika">指定なし </label><input id="rbtKokokuDate2Keika" name="KokokuDateKeika" onclick="OnClick_rbtDate2('dateKokokuFromKeika','dateKokokuToKeika');" type="radio" value="rbtKokokuDate2Keika"/><label for="rbtKokokuDate2Keika">期間指定 </label><input disabled="disabled" id="dateKokokuFromKeika" max="9999-12-31" name="dateKokokuFromKeika" onchange="onChange_calendar('dateKokoku', 'tbxKokokuDate', 'Keika');" type="date"/>
+									から
+									<input disabled="disabled" id="dateKokokuToKeika" max="9999-12-31" name="dateKokokuToKeika" onchange="onChange_calendar('dateKokoku', 'tbxKokokuDate', 'Keika');" type="date" value="2026-01-07"/></td>
+</tr><tr class="even" id="trKaisatsuDate">
+<td class="hdr">開札日</td><td colspan="2"><input id="rbtKaisatsuDate1" name="KaisatsuDate" onclick="OnClick_rbtDate1('dateKaisatsuFrom','dateKaisatsuTo');" type="radio" value="rbtKaisatsuDate1"/><label for="rbtKaisatsuDate1">指定なし </label><input id="rbtKaisatsuDate2" name="KaisatsuDate" onclick="OnClick_rbtDate2('dateKaisatsuFrom','dateKaisatsuTo');" type="radio" value="rbtKaisatsuDate2"/><label for="rbtKaisatsuDate2">期間指定 </label><input disabled="disabled" id="dateKaisatsuFrom" max="9999-12-31" name="dateKaisatsuFrom" onchange="onChange_calendar('dateKaisatsu', 'tbxKaisatsuDate', '');" type="date"/>
+									から
+									<input disabled="disabled" id="dateKaisatsuTo" max="9999-12-31" name="dateKaisatsuTo" onchange="onChange_calendar('dateKaisatsu', 'tbxKaisatsuDate', '');" type="date" value="2026-01-07"/></td>
+</tr><tr class="odd" id="trKeiyakuDate">
+<td class="hdr">契約日</td><td colspan="2"><input id="rbtKeiyakuDate1" name="KeiyakuDate" onclick="OnClick_rbtDate1('dateKeiyakuFrom','dateKeiyakuTo');" type="radio" value="rbtKeiyakuDate1"/><label for="rbtKeiyakuDate1">指定なし </label><input id="rbtKeiyakuDate2" name="KeiyakuDate" onclick="OnClick_rbtDate2('dateKeiyakuFrom','dateKeiyakuTo');" type="radio" value="rbtKeiyakuDate2"/><label for="rbtKeiyakuDate2">期間指定 </label><input disabled="disabled" id="dateKeiyakuFrom" max="9999-12-31" name="dateKeiyakuFrom" onchange="onChange_calendar('dateKeiyaku', 'tbxKeiyakuDate', '');" type="date"/>
+									から
+									<input disabled="disabled" id="dateKeiyakuTo" max="9999-12-31" name="dateKeiyakuTo" onchange="onChange_calendar('dateKeiyaku', 'tbxKeiyakuDate', '');" type="date" value="2026-01-07"/></td>
+</tr><tr class="even" id="trKojiKbn">
+<td class="hdr">工事種別</td><td><select id="drpKojiKbn" name="drpKojiKbn" onchange="OnChange_drpKoji('drpKojiKbn', 'drpKojiGyosyu', 'rbtTokyuKb1', 'rbtTokyuKb2', 'drpTokyu');">
+<option value="">▽以下から選択</option>
+<option value="01">一般土木工事</option>
+<option value="02">アスファルト舗装工事</option>
+<option value="03">鋼橋上部工事</option>
+<option value="04">造園工事</option>
+<option value="05">建築工事</option>
+<option value="06">木造建築工事</option>
+<option value="07">電気設備工事</option>
+<option value="08">暖冷房衛生設備工事</option>
+<option value="09">セメント・コンクリート舗装工事</option>
+<option value="10">プレストレスト・コンクリート工事</option>
+<option value="11">法面処理工事</option>
+<option value="12">塗装工事</option>
+<option value="13">維持修繕工事</option>
+<option value="14">浚渫工事</option>
+<option value="15">グラウト工事</option>
+<option value="16">杭打工事</option>
+<option value="17">さく井工事</option>
+<option value="18">プレハブ建築工事</option>
+<option value="19">機械設備工事</option>
+<option value="20">通信設備工事</option>
+<option value="21">受変電設備工事</option>
+<option value="22">港湾土木工事</option>
+<option value="23">農林土木工事</option>
+<option value="24">農林建築工事</option>
+<option value="25">橋梁補修工事</option>
+<option value="99">その他</option>
+</select>  ※国土交通省及び内閣府沖縄総合事務局の区分。
+								</td>
+</tr><tr class="even" id="trKojiGyosyu">
+<td class="hdr">工事の業種</td><td><select id="drpKojiGyosyu" name="drpKojiGyosyu" onchange="OnChange_drpKoji('drpKojiKbn', 'drpKojiGyosyu', 'rbtTokyuKb1', 'rbtTokyuKb2', 'drpTokyu');">
+<option value="">▽以下から選択</option>
+<option value="01">土木一式工事</option>
+<option value="02">建築一式工事</option>
+<option value="03">大工工事</option>
+<option value="04">左官工事</option>
+<option value="05">とび・土工・コンクリート工事</option>
+<option value="06">石工事</option>
+<option value="07">屋根工事</option>
+<option value="08">電気工事</option>
+<option value="09">管工事</option>
+<option value="10">タイル・れんが・ブロック工事</option>
+<option value="11">鋼構造物工事</option>
+<option value="12">鉄筋工事</option>
+<option value="13">舗装工事</option>
+<option value="14">浚渫工事</option>
+<option value="15">板金工事</option>
+<option value="16">ガラス工事</option>
+<option value="17">塗装工事</option>
+<option value="18">防水工事</option>
+<option value="19">内装仕上工事</option>
+<option value="20">機械器具設置工事</option>
+<option value="21">熱絶縁工事</option>
+<option value="22">電気通信工事</option>
+<option value="23">造園工事</option>
+<option value="24">さく井工事</option>
+<option value="25">建具工事</option>
+<option value="26">水道施設工事</option>
+<option value="27">消防施設工事</option>
+<option value="28">清掃施設工事</option>
+<option value="29">解体工事</option>
+<option value="99">その他</option>
+</select>  ※建設業法（別表第一）準拠。
+								</td>
+</tr><tr class="odd" id="trYoteiPrice">
+<td class="hdr">予定価格（範囲指定）</td><td colspan="2">
+<asp:tablerow>
+<asp:tablecell>
+<input id="tbxYoteiPriceFrom" maxlength="12" name="tbxYoteiPriceFrom" type="text"/>（円）～
+											<input id="tbxYoteiPriceTo" maxlength="12" name="tbxYoteiPriceTo" type="text"/>（円）
+										</asp:tablecell>
+</asp:tablerow>
+</td>
+</tr><tr class="even" id="trRakusatsuPrice">
+<td class="hdr">落札価格／契約価格<br/>
+									（範囲指定）</td><td colspan="2"><input id="tbxRakusatsuPriceFrom" maxlength="12" name="tbxRakusatsuPriceFrom" type="text"/>（円）～
+									<input id="tbxRakusatsuPriceTo" maxlength="12" name="tbxRakusatsuPriceTo" type="text"/>（円） 
+								</td>
+</tr><tr class="odd" id="trRakusatsuNm">
+<td class="hdr">落札者名／契約者名<br/>
+									（文字列検索）</td><td colspan="2"><input class="w335" id="tbxRakusatsuNm" maxlength="90" name="tbxRakusatsuNm" type="text"/>
+									 ※条件の複数指定はできません。
+								</td>
+</tr><tr class="even" id="trElectronicNyusatsu">
+<td class="hdr">電子入札</td><td colspan="2"><input id="chkElectronicNyusatsu" name="chkElectronicNyusatsu" type="checkbox"/><label for="chkElectronicNyusatsu">対象案件のみ</label></td>
+</tr><tr class="odd" id="trKokaiBunsyo">
+<td class="hdr">公開文書</td><td colspan="2"><input id="chkKokaiBunsyo" name="chkKokaiBunsyo" type="checkbox"/><label for="chkKokaiBunsyo">公開中のみ</label></td>
+</tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table3" style="border-collapse:collapse;">
+<tr class="title_line_again">
+<td>一覧画面の表示件数 
+									<select class="w70" id="drpCount" name="drpCount">
+<option selected="selected" value="20">20件</option>
+<option value="30">30件</option>
+<option value="50">50件</option>
+<option value="100">100件</option>
+</select> 
+									<input id="btnSearch" language="javascript" name="btnSearch" onclick="closeSearchHachuWindow(); clearDisaibled();" type="submit" value="検索開始"/> 
+									<input id="btnClear" name="btnClear" type="submit" value="クリア"/></td>
+</tr><tr>
+<td>
+<br/>
+<span style="color:red;"><div style="text-align:center;"><span>※国土交通省の「公開文書」につきましては、トップページのお知らせをご確認ください。※</span></div></span>
+<br/>
+</td>
+</tr>
+</table>
+<input id="txtTabType" name="txtTabType" size="1" type="hidden" value="4"/>
+<input id="tbxKokokuDate" name="tbxKokokuDate" size="1" type="hidden" value="0001,01,01,2026,01,07"/>
+<input id="tbxKigenDate" name="tbxKigenDate" size="1" type="hidden"/>
+<input id="tbxKaisatsuDate" name="tbxKaisatsuDate" size="1" type="hidden" value="0001,01,01,2026,01,07"/>
+<input id="tbxKeiyakuDate" name="tbxKeiyakuDate" size="1" type="hidden" value="0001,01,01,2026,01,07"/>
+<input id="txtLargeKikanInf_h" name="txtLargeKikanInf_h" size="1" type="hidden" value="0,内閣府沖縄総合事務局,02:0,防衛省,05:0,農林水産省,16:0,国土交通省,21:3,岐阜県,21:0,国土交通省北海道開発局,22:5,岐阜県市町村共同,98:9,テスト用発注機関,99"/>
+<input id="txtHachuLargeKikanInf_h" name="txtHachuLargeKikanInf_h" size="1" type="hidden"/>
+<input id="txtLgKikanInfSelValue_h" name="txtLgKikanInfSelValue_h" size="1" type="hidden"/>
+<input id="txtKojiPrefectureInf_h" name="txtKojiPrefectureInf_h" size="1" type="hidden" value="1,北海道,01:2,青森県,02:2,岩手県,03:2,宮城県,04:2,秋田県,05:2,山形県,06:2,福島県,07:3,茨城県,08:3,栃木県,09:3,群馬県,10:3,埼玉県,11:3,千葉県,12:3,東京都,13:3,神奈川県,14:4,新潟県,15:4,富山県,16:4,石川県,17:6,福井県,18:3,山梨県,19:3,長野県,20:5,岐阜県,21:5,静岡県,22:5,愛知県,23:5,三重県,24:6,滋賀県,25:6,京都府,26:6,大阪府,27:6,兵庫県,28:6,奈良県,29:6,和歌山県,30:7,鳥取県,31:7,島根県,32:7,岡山県,33:7,広島県,34:7,山口県,35:8,徳島県,36:8,香川県,37:8,愛媛県,38:8,高知県,39:9,福岡県,40:9,佐賀県,41:9,長崎県,42:9,熊本県,43:9,大分県,44:9,宮崎県,45:9,鹿児島県,46:9,沖縄県,47"/>
+<input id="txtGyomuPrefectureInf_h" name="txtGyomuPrefectureInf_h" size="1" type="hidden"/>
+<input id="txtKojiPrefecture2SelIndex_h" name="txtKojiPrefecture2SelIndex_h" size="1" type="hidden"/>
+<input id="txtGyomuPrefecture2SelIndex_h" name="txtGyomuPrefecture2SelIndex_h" size="1" type="hidden"/>
+<input id="txtKojiPrefectureSelValue_h" name="txtKojiPrefectureSelValue_h" size="1" type="hidden"/>
+<input id="txtGyomuPrefectureSelValue_h" name="txtGyomuPrefectureSelValue_h" size="1" type="hidden"/>
+<input id="txtLgKikanInf2SelIndex_h" name="txtLgKikanInf2SelIndex_h" size="1" type="hidden"/>
+<input id="txtHachuLgKikanInf2SelIndex_h" name="txtHachuLgKikanInf2SelIndex_h" size="1" type="hidden"/>
+<input id="txt_ChangeTopKikan" name="txt_ChangeTopKikan" size="1" type="hidden" value="false"/>
+<input id="txt_ChangeLargeKikan" name="txt_ChangeLargeKikan" size="1" type="hidden" value="true"/>
+<input id="txt_MultiSearchFlag" name="txt_MultiSearchFlag" size="1" type="hidden" value="false"/>
+<input id="txt_ObjWin2Status" name="txt_ObjWin2Status" size="1" type="hidden" value="false"/>
+</div>
+</div>
+</form>
+</body>
+<script src="../../js/Timer.js" type="text/javascript"></script>
+</html>

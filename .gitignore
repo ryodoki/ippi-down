@@ -97,3 +97,7 @@ downloads/
 /FILE_ORGANIZATION_*.md
 /FILE_CLEANUP_*.md
 /DOWNLOAD_TEST_RESULT_FINAL.md
+
+# リリース生成物
+release/
+*.zip

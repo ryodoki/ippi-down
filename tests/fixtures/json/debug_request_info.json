@@ -1,0 +1,55 @@
+{
+  "request_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx",
+  "request_headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Encoding": "gzip, deflate",
+    "Accept": "*/*",
+    "Connection": "keep-alive",
+    "Cookie": "ApplicationGatewayAffinityCORS=f599b0c1bdb3870a6d46e0c31607e465; ApplicationGatewayAffinity=f599b0c1bdb3870a6d46e0c31607e465"
+  },
+  "response_status": 200,
+  "response_headers": {
+    "Date": "Wed, 07 Jan 2026 17:34:48 GMT",
+    "Content-Type": "text/html",
+    "Content-Length": "3250",
+    "Connection": "keep-alive",
+    "Last-Modified": "Tue, 06 Jan 2026 01:17:09 GMT",
+    "ETag": "\"2d101e2eaa7edc1:0\"",
+    "X-Content-Type-Options": "nosniff",
+    "X-FRAME-OPTIONS": "SAMEORIGIN",
+    "X-XSS-Protection": "1"
+  },
+  "cookies": [
+    {
+      "name": "ApplicationGatewayAffinityCORS",
+      "value": "f599b0c1bdb3870a6d46e0c31607e465",
+      "domain": "www.i-ppi.jp",
+      "path": "/"
+    },
+    {
+      "name": "ApplicationGatewayAffinity",
+      "value": "f599b0c1bdb3870a6d46e0c31607e465",
+      "domain": "www.i-ppi.jp",
+      "path": "/"
+    },
+    {
+      "name": "ASP.NET_SessionId",
+      "value": "rje3gmzb1vpt2yajjp55tp5o",
+      "domain": "www.i-ppi.jp",
+      "path": "/"
+    }
+  ],
+  "hidden_inputs": {},
+  "recommended_headers": {
+    "Referer": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx",
+    "Accept": "application/pdf,application/octet-stream,*/*",
+    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1"
+  }
+}

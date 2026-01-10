@@ -33,11 +33,15 @@ ippi-down/
 │   ├── models/           # データモデル
 │   └── scheduler/        # スケジューラー
 ├── docs/                  # ドキュメント
-│   ├── 要件定義書.md
-│   ├── 要件定義見直し.md
-│   ├── 技術選定.md
-│   ├── システム設計書.md
-│   └── 設定機能要件定義書.md
+│   ├── requirements.md          # 要件定義書
+│   ├── requirements_revision.md # 要件定義見直し
+│   ├── technology_selection.md  # 技術選定書
+│   ├── system_design.md         # システム設計書
+│   ├── implementation_design.md # 実装設計書
+│   ├── settings_requirements.md # 設定機能要件定義書
+│   ├── dev/                     # 開発ドキュメント
+│   ├── git/                     # Git関連ドキュメント
+│   └── test-results/            # テスト結果
 ├── config/               # 設定ファイル
 │   └── config.example.yaml
 ├── scripts/              # スクリプト
@@ -329,6 +333,8 @@ Windowsのパス長制限（260文字）を超えるファイル名は自動的�
 
 過去に誤って以下のファイルがGitに追加されてしまった場合、追跡を解除できます。
 
+**重要**: これらのコマンドはローカルファイルを削除しません。Gitの追跡から外すだけです。
+
 詳細は [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md) を参照してください。
 
 ```bash
@@ -343,82 +349,53 @@ git rm -r --cached logs downloads .pytest_cache
 
 # 設定ファイルの追跡解除（ローカル設定のみ）
 git rm --cached config/config.yaml
+
+# Pythonキャッシュの追跡解除（すべての__pycache__と*.pyc）
+git rm -r --cached **/__pycache__
+find . -name "*.pyc" -exec git rm --cached {} \;
+```
+
+**PowerShellで一括実行する場合**:
+
+```powershell
+# PowerShellで実行（一括）
+git rm -r --cached .venv, build, dist, logs, downloads, .pytest_cache -ErrorAction SilentlyContinue
+git rm --cached config/config.yaml -ErrorAction SilentlyContinue
+Get-ChildItem -Recurse -Directory -Filter "__pycache__" | ForEach-Object { git rm -r --cached $_.FullName -ErrorAction SilentlyContinue }
+Get-ChildItem -Recurse -Filter "*.pyc" | ForEach-Object { git rm --cached $_.FullName -ErrorAction SilentlyContinue }
 ```
 
 ### クリーンなzip配布用パッケージの作成
 
 配布用のzipファイルを作成する際は、不要なファイルを除外してください。
 
-**PowerShell（Windows）での例**:
+**推奨方法**: `scripts/tools/make_release_zip.ps1` スクリプトを使用します。
 
 ```powershell
-# 現在のディレクトリに移動
-cd C:\Users\ryout\Workspaces\ippi-down
-
-# 除外するディレクトリ・ファイルを指定
-$excludeItems = @(
-    ".venv",
-    "build",
-    "dist",
-    "logs",
-    "downloads",
-    ".git",
-    ".pytest_cache",
-    "__pycache__",
-    "*.pyc",
-    "*.log",
-    "config/config.yaml"
-)
-
-# 一時的なexcludeリストファイルを作成
-$excludeList = Join-Path $env:TEMP "zip-exclude.txt"
-$excludeItems | ForEach-Object { Write-Output $_ } | Out-File -FilePath $excludeList -Encoding UTF8
-
-# クリーンなzipファイルを作成（7-Zipを使用する場合）
-# 7-Zipがインストールされている必要があります
-$zipPath = "ippi-down-clean.zip"
-$sourceDir = "."
-& "C:\Program Files\7-Zip\7z.exe" a -tzip $zipPath $sourceDir -x@"$excludeList"
-
-# または、PowerShellのCompress-Archiveを使用（除外オプションがないため、事前に除外）
-$tempDir = Join-Path $env:TEMP "ippi-down-clean"
-if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
-New-Item -ItemType Directory -Path $tempDir | Out-Null
-
-# 必要なファイルのみをコピー
-Get-ChildItem -Path . -Recurse | Where-Object {
-    $item = $_
-    $shouldExclude = $false
-    foreach ($exclude in $excludeItems) {
-        if ($item.FullName -match [regex]::Escape($exclude)) {
-            $shouldExclude = $true
-            break
-        }
-    }
-    -not $shouldExclude
-} | Copy-Item -Destination {
-    $_.FullName.Replace((Get-Location).Path, $tempDir)
-} -Recurse -Force
-
-# zipファイルを作成
-Compress-Archive -Path "$tempDir\*" -DestinationPath $zipPath -Force
-
-# 一時ディレクトリを削除
-Remove-Item $tempDir -Recurse -Force
-Remove-Item $excludeList -Force
-
-Write-Host "クリーンなzipファイルを作成しました: $zipPath"
+# PowerShellで実行
+.\scripts\tools\make_release_zip.ps1
 ```
 
-**注意**: `Compress-Archive` には除外オプションがないため、一時ディレクトリに必要なファイルのみをコピーしてからzip化しています。
+このスクリプトは以下を自動的に除外します：
+- `.git/` - Gitメタ情報（配布物としては不要）
+- `.venv/` - 仮想環境
+- `__pycache__/`, `*.pyc` - Pythonキャッシュ
+- `.pytest_cache/` - pytestキャッシュ
+- `build/`, `dist/` - PyInstaller生成物
+- `logs/`, `downloads/` - 実行結果
+- `config/config.yaml` - ローカル設定
+
+生成物は `release/ippi-down-clean.zip` に出力されます。
 
 詳細は [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md) を参照してください。
 
 ## 参考資料
 
-- [要件定義書](./docs/要件定義書.md)
-- [技術選定書](./docs/技術選定.md)
-- [システム設計書](./docs/システム設計書.md)
+- [要件定義書](./docs/requirements.md)
+- [技術選定書](./docs/technology_selection.md)
+- [システム設計書](./docs/system_design.md)
+- [実装設計書](./docs/implementation_design.md)
+- [設定機能要件定義書](./docs/settings_requirements.md)
 - [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md)
 - [Gitクリーンアップレポート](./docs/dev/GIT_CLEANUP_REPORT.md)
 

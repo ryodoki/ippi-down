@@ -48,6 +48,11 @@ git rm -r --cached **/__pycache__
 # または、特定のディレクトリのみ
 git rm -r --cached src/__pycache__
 git rm -r --cached tests/__pycache__
+
+# Pythonバイトコードファイルの追跡解除（すべての*.pyc）
+find . -name "*.pyc" -exec git rm --cached {} \;
+# または、PowerShellの場合
+Get-ChildItem -Recurse -Filter "*.pyc" | ForEach-Object { git rm --cached $_.FullName }
 ```
 
 ### 一括で実行する場合（PowerShell）
@@ -57,7 +62,11 @@ git rm -r --cached tests/__pycache__
 git rm -r --cached .venv, build, dist, logs, downloads, .pytest_cache -ErrorAction SilentlyContinue
 git rm --cached config/config.yaml -ErrorAction SilentlyContinue
 Get-ChildItem -Recurse -Directory -Filter "__pycache__" | ForEach-Object { git rm -r --cached $_.FullName -ErrorAction SilentlyContinue }
+Get-ChildItem -Recurse -Filter "*.pyc" | ForEach-Object { git rm --cached $_.FullName -ErrorAction SilentlyContinue }
 ```
+
+**注意**: `.git/` ディレクトリはGitリポジトリ自体のメタ情報なので、Gitで追跡解除することはできません。  
+配布zipから除外するには、`scripts/tools/make_release_zip.ps1` スクリプトを使用してください。
 
 ### 変更をコミット
 
@@ -108,7 +117,27 @@ git ls-files | cut -d'/' -f1 | sort | uniq -c | sort -rn
 
 配布用のzipファイルを作成する際は、不要なファイルを除外してください。
 
-### PowerShell（Windows）での例
+### 推奨方法: make_release_zip.ps1 スクリプトを使用
+
+**最も簡単な方法**は、専用スクリプトを使用することです：
+
+```powershell
+# プロジェクトルートで実行
+.\scripts\tools\make_release_zip.ps1
+```
+
+このスクリプトは以下を自動的に除外します：
+- `.git/` - Gitメタ情報（配布物としては不要）
+- `.venv/` - 仮想環境
+- `__pycache__/`, `*.pyc` - Pythonキャッシュ
+- `.pytest_cache/` - pytestキャッシュ
+- `build/`, `dist/` - PyInstaller生成物
+- `logs/`, `downloads/` - 実行結果
+- `config/config.yaml` - ローカル設定
+
+生成物は `release/ippi-down-clean.zip` に出力されます。
+
+### 手動で作成する場合（PowerShell）
 
 ```powershell
 # 現在のディレクトリに移動

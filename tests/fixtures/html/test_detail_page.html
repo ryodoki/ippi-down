@@ -1,0 +1,286 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html lang="ja">
+<head>
+<title>入札情報サービス 入札の経過（工事）検索結果</title>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+<meta content="Microsoft Visual Studio .NET 7.1" name="GENERATOR"/>
+<meta content="C#" name="CODE_LANGUAGE"/>
+<meta content="JavaScript" name="vs_defaultClientScript"/>
+<meta content="http://schemas.microsoft.com/intellisense/ie5" name="vs_targetSchema"/>
+<link href="../../css/main.css" rel="stylesheet" type="text/css"/>
+<link href="../../css/koji.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript">
+            //------------------------------------------------
+            //関数：sizeChangeTarget()
+            //------------------------------------------------	
+            function sizeChangeTarget() {
+                var arrayEle = [];
+
+                // 文字の大きさを変更する要素
+                if (document.getElementById('dgrSearchList') !== null) {
+                    arrayEle.push(document.getElementById('dgrSearchList'));
+                }
+				arrayEle.push(document.getElementById('lbtBackToSearch2'));
+
+				changeFontClass(arrayEle);
+
+                // 画面のフォントサイズちらつき対策
+                document.body.style.display = 'block';
+            }
+        </script>
+<script src="../../js/jquery-3.2.1.min.js"></script>
+<script language="javascript">
+            $(document).ready(function () {
+                $("#dgrSearchList tr.dgrtitle span a")
+                  .click(function (event) {
+                      var idStr = $(this).attr('id');
+                      $('#isChecked').val(idStr);
+                  });
+            });
+        </script>
+</head>
+<body ms_positioning="GridLayout" style="display:none;">
+<form action="./List.aspx?tab=4" id="Form1" method="post" name="Form1">
+<input id="__EVENTTARGET" name="__EVENTTARGET" type="hidden" value=""/>
+<input id="__EVENTARGUMENT" name="__EVENTARGUMENT" type="hidden" value=""/>
+<input id="__VIEWSTATE" name="__VIEWSTATE" type="hidden" value="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"/>
+<script type="text/javascript">
+<!--
+var theForm = document.forms['Form1'];
+if (!theForm) {
+    theForm = document.Form1;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+// -->
+</script>
+<input id="__VIEWSTATEGENERATOR" name="__VIEWSTATEGENERATOR" type="hidden" value="982FB2C9"/>
+<input id="__EVENTVALIDATION" name="__EVENTVALIDATION" type="hidden" value="ko3Exj51ocboeVc8PJfu4R/is4zHIybj3pC/UcD9jOAoMBlAEmut040UZ1VNmK+jSGCMKNCYAHPyCevjsSnyuvBxAkGNB37gvbYV9otpkh2YuIKr2WWlTNb+C23OCThk8R6h3BLQx8S8KbRKUhhxxVEpoHVnN6DJAGiqarE327/i/1DQwJs1v5IqF8zW1YRlPdwKUQQv90TCf2T+TbybMT6s4lfhTOS9HGfjalY8JBlEDhnnDu8UMuNCr98Y6WjZRcSDJdVSZrwkI3NwphtIfJ0QmGFmCfFDDfRkPTxiOk+rwz5uSNhBHOsuXYd9xTsMIK8kuzeQCZjqJb6lWuFv6HBYeXky8XbEOq1xguRRVt3bAH+E54f0/J19e2OJQiIPrqAnKF5Y9UX521Lk4UyK5qQ70j/l3tWNzSkYOlFMhQ2DiP7WQqtxCz4NWssWJxZdjYLK7SXuoprljMXGkoVWa3qmd+MNuzpMWXfdgI+W6yWJy63nLvzofVAV5KW3JTD6aYzBgZTD4H34AQS8rpfy+7QQ4orQFExGoNAH3ePT04cDY3Gh3CdW8DYtb/XbxtnAJkDYFsPgaZaGY6R8aPVUb1l4Ku9VmlDjdS7L1vx1KHcRCGXPNH/fnebheD0hLfyCLn0bew9veWnpVb4EK4q/bBaBsCNVZ8ZcPds866aozdVnhjLcsa1oUcnxeYb+c5c5gp0J/Ju2eQJU2xz+5ItKT4xB+kioMvx1nAdQc95S6R7qJjV3vKFhLWV426TDNktX8TSBWOsQGQ+0VNHY9aKmSlUc1duLtsEqT6infTD+1R8ZCyYI/rRUHL/krUfS0LTl6ELuWX0EhLfR/nVfZ24PJNOPN7++M6ANJD9EUwPFPuMW+4wEiAfg3MGk+uwp2IrKw4CYQzkbZfY78A0Uubz2eD5ldlzBap8yyx03kkFoS8CPUFw/wHzzuDuGQDTdyodgmNQa2ZccUfLWJL35cenoWIchJbgKhlCDO3jejAmr7FY+0CTXZqJTESuK3OakXfVBB3qJYRbWlzn8STzd"/>
+<div align="left" style="text-align: -webkit-center;">
+<link href="../../css/ppi_main_base.css" rel="stylesheet" type="text/css"/>
+<link href="" id="css" rel="stylesheet" type="text/css"/>
+<script language="JavaScript" src="../../js/Common.js" type="text/javascript"></script>
+<script src="../../js/Header.js" type="text/javascript"></script>
+<script type="text/javascript">
+	function new_winHelp(url) {
+		selectWin = window.open(url, "subList2Win", "width=650px,height=600,location=no,menubar=no,resizable=yes,scrollbars=yes,status=no,toolbar=no");
+		selectWin.focus();
+	}
+</script>
+<div class="print_header" id="header_div">
+<table id="header_table">
+<tr>
+<td id="header_block" rowspan="2">
+<a href="../../Index.htm" target="_top">
+<div>
+<font id="ppi_title">入札情報サービス</font><br/>
+<font id="ppi_sub">公共発注機関が公開する全国の入札情報を提供しています</font><br/>
+</div>
+</a>
+</td>
+<td id="support_frm">
+<div class="support_btn support_title">文字の<br/>大きさ</div>
+<a href="javascript:onClickLargeText()"><span class="support_btn size_color_btn">大</span></a>
+<a href="javascript:onClickMediumText()"><span class="support_btn size_color_btn">中</span></a>
+<a href="javascript:onClickSmallText()"><span class="support_btn size_color_btn" style="margin-right: 25px;">小</span></a>
+<div class="support_btn support_title">背景色と<br/>文字色</div>
+<a href="javascript:onClickBlackText()"><span class="support_btn size_color_btn color_selected">黒</span></a>
+<a href="javascript:onClickWhiteText()"><span class="support_btn size_color_btn color_w_b">白</span></a>
+<a href="javascript:onClickYellowText()"><span class="support_btn size_color_btn color_bl_y" style="margin-right: 15px;">黄</span></a>
+<div class="support_btn" style="line-height:19px; color:white; padding-right: 12px; text-align: left;">
+<a class="support_txt" href="javascript:new_winHelp('../../help_search.htm');"><span id="q_icon">？</span> ヘルプ</a><br/>
+<a class="support_txt" href="mailto:i-ppi.helpdesk@jacic.or.jp">✉ お問い合わせ</a>
+</div>
+</td>
+</tr>
+<tr>
+<td style="width:812px; min-width: 812px; vertical-align: bottom; padding: 0px;">
+<a href="../../Index.htm" target="_top"><span class="button_cls">全国</span></a>
+<a href="../../IndexArea.aspx?data1=1" target="_top"><span class="button_cls">北海道</span></a>
+<a href="../../IndexArea.aspx?data1=2" target="_top"><span class="button_cls">東北</span></a>
+<a href="../../IndexArea.aspx?data1=3" target="_top"><span class="button_cls">関東</span></a>
+<a href="../../IndexArea.aspx?data1=4" target="_top"><span class="button_cls">北陸</span></a>
+<a href="../../IndexArea.aspx?data1=5" target="_top"><span class="button_cls">中部</span></a>
+<a href="../../IndexArea.aspx?data1=6" target="_top"><span class="button_cls">近畿</span></a>
+<a href="../../IndexArea.aspx?data1=7" target="_top"><span class="button_cls">中国</span></a>
+<a href="../../IndexArea.aspx?data1=8" target="_top"><span class="button_cls">四国</span></a>
+<a href="../../IndexArea.aspx?data1=9" target="_top"><span class="button_cls">九州･沖縄</span></a>
+</td>
+</tr>
+</table>
+</div>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table1" style="border-collapse:collapse;">
+<tr>
+<td class="chuchoki tabtitle">
+<label class="tabtitletext">●</label>
+<label>中長期の検索</label>
+<label class="tabtitletext">●</label>
+</td><td class="koji tabtitle">
+<label class="tabtitletext">●●●●●●●●●●</label>
+<label>工事の検索</label>
+<label class="tabtitletext">●●●●●●●●●●</label>
+</td><td class="gyomu tabtitle">
+<label class="tabtitletext">●●●●●●●●●●</label>
+<label>業務の検索</label>
+<label class="tabtitletext">●●●●●●●●●●</label>
+</td><td class="hachu tabtitle">
+<label class="tabtitletext">●</label>
+<label>発注機関の検索</label>
+<label class="tabtitletext">●</label>
+</td>
+</tr><tr align="center" valign="bottom">
+<td class="chuchoki"><input class="tab chuchokitab" id="imgChuchokiMitoshi" name="imgChuchokiMitoshi" type="submit" value="中長期発注見通し"/></td><td class="koji"><input class="tab kojitab" id="imgKojiMitoshi" name="imgKojiMitoshi" type="submit" value="発注の見通し"/><input class="tab kojitab" id="imgKojiKokoku" name="imgKojiKokoku" type="submit" value="入札公告等"/><input class="tab selectkojitab" id="imgKojiKeika" name="imgKojiKeika" type="submit" value="入札の経過"/></td><td class="gyomu"><input class="tab gyomutab" id="imgGyomuMitoshi" name="imgGyomuMitoshi" type="submit" value="発注の見通し"/><input class="tab gyomutab" id="imgGyomuKokoku" name="imgGyomuKokoku" type="submit" value="入札公告等"/><input class="tab gyomutab" id="imgGyomuKeika" name="imgGyomuKeika" type="submit" value="入札の経過"/></td><td class="hachu"><input class="tab hachutab" id="imgHachuInf" name="imgHachuInf" type="submit" value="発注機関情報"/></td>
+</tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table4" style="border-collapse:collapse;">
+<tr class="back_top">
+<td colspan="5"></td>
+</tr><tr class="title_mid">
+<td colspan="5">入札の経過（工事）検索結果</td>
+</tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table2">
+<tr>
+<td>  
+							<span id="lblCountStr">該当する案件が</span>
+<span class="search_count" id="lblSearchCount">31942</span>
+<span id="lblCountFrom">件あります。</span>
+<span class="search_from_to_count" id="lblCountFromTo"> 1～20 </span>
+<span id="lblCountTo">件表示しています</span>
+</td>
+</tr>
+<tr class="title_line_again">
+<td>
+<span id="lblWarnStr" style="color:White;"></span>
+<input class="csvdl" id="btnCsvDownload" language="javascript" name="btnCsvDownload" onclick="return confirm('現在画面に表示されている案件をCSVデータ形式でダウンロードします。\n画面を表示した時点とCSVデータをダウンロードする時点で、入札情報が更新され、画面表示とCSVデータに差異が発生する場合があります。');" type="submit" value="CSV出力"/>
+</td>
+</tr>
+<!--
+					<TR align="right">
+						<TD style="HEIGHT: 2px"><a id="lbtBackToSearch1" href="javascript:__doPostBack(&#39;lbtBackToSearch1&#39;,&#39;&#39;)">検索指定画面に戻る</a></TD>
+					</TR>
+					-->
+<tr align="right">
+<td>
+							 <input disabled="disabled" id="btnBack1" name="btnBack1" type="submit" value="前ページ"/>
+							 <input id="btnNext1" name="btnNext1" type="submit" value="次ページ"/>
+</td>
+</tr>
+</table>
+<!-- 2020.11.13 DEL 10月追加開発（スタイル変更）CR-L shidochi DataTextField[kenmei]:Font-Bold Delete -->
+<div>
+<table border="1" cellspacing="0" class="searchgrid back_white" id="dgrSearchList" rules="all" style="border-collapse:collapse;">
+<tr class="dgrtitle" nowrap="nowrap">
+<th align="center" scope="col" style="width:50px;">No</th><th align="center" class="nolink" scope="col" style="width:200px;"><a href="javascript:__doPostBack('dgrSearchList','Sort$hachusha_nm')">発注機関／担当部・事務所</a><span></span><span></span></th><th align="center" scope="col">工事名</th><th align="center" class="nolink" scope="col" style="width:115px;"><a href="javascript:__doPostBack('dgrSearchList','Sort$nyusatsukeiyaku_nm')">入札契約方式</a><span><br/>&amp;nbsp<a href="javascript:__doPostBack('dgrSearchList','Sort$nyusatsukeiyaku_nm')" id="nyusatsukeiyaku_asc">△</a></span><span><a href="javascript:__doPostBack('dgrSearchList','Sort$nyusatsukeiyaku_nm')" id="nyusatsukeiyaku_desc">▽</a></span></th><th align="center" class="nolink" scope="col" style="width:115px;"><a href="javascript:__doPostBack('dgrSearchList','Sort$koshugyomu_kb_nm')">工事区分</a><span><br/><a href="javascript:__doPostBack('dgrSearchList','Sort$koshugyomu_kb_nm')" id="koshugyomu_asc">△</a></span><span><a href="javascript:__doPostBack('dgrSearchList','Sort$koshugyomu_kb_nm')" id="koshugyomu_desc">▽</a></span></th><th align="center" class="nolink" scope="col" style="width:100px;"><a href="javascript:__doPostBack('dgrSearchList','Sort$kokoku_ymd')">公告日</a><span><br/><a href="javascript:__doPostBack('dgrSearchList','Sort$kokoku_ymd')" id="kokoku_asc">△</a></span><span><a href="javascript:__doPostBack('dgrSearchList','Sort$kokoku_ymd')" id="kokoku_desc">▽</a></span></th><th align="center" class="nolink" scope="col" style="width:100px;"><a href="javascript:__doPostBack('dgrSearchList','Sort$kaisatsu_ymd')">開札日</a><span><br/><a href="javascript:__doPostBack('dgrSearchList','Sort$kaisatsu_ymd')" id="kaisatsu_asc">△</a></span><span><a href="javascript:__doPostBack('dgrSearchList','Sort$kaisatsu_ymd')" id="kaisatsu_desc">▼</a></span></th><th align="center" class="nolink" scope="col" style="width:100px;"><a href="javascript:__doPostBack('dgrSearchList','Sort$keiyaku_ymd')">契約日</a><span><br/><a href="javascript:__doPostBack('dgrSearchList','Sort$keiyaku_ymd')" id="keiyaku_asc">△</a></span><span><a href="javascript:__doPostBack('dgrSearchList','Sort$keiyaku_ymd')" id="keiyaku_desc">▽</a></span></th>
+</tr><tr>
+<td>
+								1
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$0')">宮古伊良部農業水利事業　保良地下ダム（七又東部西）建設工事</a></td><td>一般競争入札（同時提出型）</td><td>農林土木工事</td><td align="center">2025/07/31</td><td align="center">2025/11/07</td><td align="center">2025/11/20</td>
+</tr><tr>
+<td>
+								2
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$1')">宮古伊良部農業水利事業　仲原地下ダム取水ポンプ（その４）製作据付工事</a></td><td>一般競争入札（標準型）</td><td>機械設備工事</td><td align="center">2025/07/31</td><td align="center">2025/11/07</td><td align="center">2025/11/20</td>
+</tr><tr>
+<td>
+								3
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$2')">令和６年度　宮古伊良部農業水利事業　保良送水路（その６?２）工事</a></td><td>一般競争入札（標準型）</td><td>一般土木工事</td><td align="center">2025/05/19</td><td align="center">2025/06/19</td><td align="center">2025/07/01</td>
+</tr><tr>
+<td>
+								4
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$3')">令和６年度　宮古伊良部農業水利事業　ミルク峰２号送水路接続他工事</a></td><td>一般競争入札（標準型）</td><td>農林土木工事</td><td align="center">2025/04/23</td><td align="center">2025/06/03</td><td align="center">2025/06/13</td>
+</tr><tr>
+<td>
+								5
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$4')">令和　７年度　宮古伊良部農業水利事業　仲原地下ダム取水施設さく井（その６）他工事</a></td><td>一般競争入札（標準型）</td><td>さく井工事</td><td align="center">2025/04/07</td><td align="center">2025/05/23</td><td align="center">2025/06/04</td>
+</tr><tr>
+<td>
+								6
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$5')">令和　７年度　宮古伊良部農業水利事業　東山３号取水路他工事</a></td><td>一般競争入札（標準型）</td><td>農林土木工事</td><td align="center">2025/03/27</td><td align="center">2025/05/02</td><td align="center">2025/05/16</td>
+</tr><tr>
+<td>
+								7
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$6')">令和６年度　宮古伊良部農業水利事業　保良地下ダム（七又東部西）ヤード造成工事</a></td><td>一般競争入札（標準型）</td><td>一般土木工事</td><td align="center">2025/03/27</td><td align="center">2025/05/02</td><td align="center">2025/05/19</td>
+</tr><tr>
+<td>
+								8
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$7')">宮古伊良部農業水利事業　保良地下ダム（七又東部北）建設工事</a></td><td>一般競争入札（同時提出型）</td><td>農林土木工事</td><td align="center">2024/09/06</td><td align="center">2024/11/29</td><td align="center"><br/></td>
+</tr><tr>
+<td>
+								9
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$8')">宮古伊良部農業水利事業　仲原地下ダム取水ポンプ他製作据付（その３）工事</a></td><td>一般競争入札（標準型）</td><td>機械設備工事</td><td align="center">2024/04/15</td><td align="center">2024/07/16</td><td align="center">2024/07/30</td>
+</tr><tr>
+<td>
+								10
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$9')">令和　６年度　宮古伊良部農業水利事業　保良送水路（その５）工事</a></td><td>一般競争入札（標準型）</td><td>一般土木工事</td><td align="center">2024/05/14</td><td align="center">2024/06/13</td><td align="center">2025/02/26</td>
+</tr><tr>
+<td>
+								11
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$10')">令和　６年度　宮古伊良部農業水利事業　保良地下ダム取水施設さく井（その１）工事</a></td><td>一般競争入札（標準型）</td><td>さく井工事</td><td align="center">2024/03/27</td><td align="center">2024/05/28</td><td align="center">2024/06/07</td>
+</tr><tr>
+<td>
+								12
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$11')">令和　６年度　宮古伊良部農業水利事業　東山３号送水路（その２）工事</a></td><td>一般競争入札（標準型）</td><td>農林土木工事</td><td align="center">2024/04/01</td><td align="center">2024/05/07</td><td align="center">2025/01/28</td>
+</tr><tr>
+<td>
+								13
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$12')">令和５年度　宮古伊良部農業水利事業　牧山送水路（その６）工事</a></td><td>一般競争入札（標準型）</td><td>農林土木工事</td><td align="center">2024/03/25</td><td align="center">2024/04/24</td><td align="center">2025/01/09</td>
+</tr><tr>
+<td>
+								14
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$13')">令和　６年度　宮古伊良部農業水利事業　仲原地下ダム（ホグタ西部・新垣南部）その２工事</a></td><td>随意契約</td><td>農林土木工事</td><td align="center"><br/></td><td align="center">2024/03/28</td><td align="center">2024/04/08</td>
+</tr><tr>
+<td>
+								15
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$14')">令和　５年度　宮古伊良部農業水利事業　牧山送水路（その４）工事</a></td><td>一般競争入札（標準型）</td><td>農林土木工事</td><td align="center">2023/12/26</td><td align="center">2024/02/06</td><td align="center">2024/11/26</td>
+</tr><tr>
+<td>
+								16
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$15')">令和　５年度　宮古伊良部農業水利事業　東山３号送水路（その４）工事</a></td><td>一般競争入札（標準型）</td><td>農林土木工事</td><td align="center">2023/12/08</td><td align="center">2024/01/23</td><td align="center">2025/01/24</td>
+</tr><tr>
+<td>
+								17
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$16')">宮古伊良部農業水利事業　保良地下ダム（七又西部西）建設工事</a></td><td>一般競争入札（同時提出型）</td><td>農林土木工事</td><td align="center">2023/08/16</td><td align="center">2023/11/22</td><td align="center">2023/12/05</td>
+</tr><tr>
+<td>
+								18
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$17')">宮古伊良部農業水利事業　保良地下ダム（七又西部東）建設工事</a></td><td>一般競争入札（同時提出型）</td><td>農林土木工事</td><td align="center">2023/03/28</td><td align="center">2023/07/04</td><td align="center">2023/07/14</td>
+</tr><tr>
+<td>
+								19
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$18')">令和　５年度　宮古伊良部農業水利事業　仲原地下ダム取水施設さく井（その５）工事</a></td><td>一般競争入札（標準型）</td><td>さく井工事</td><td align="center">2023/05/19</td><td align="center">2023/07/04</td><td align="center">2023/07/14</td>
+</tr><tr>
+<td>
+								20
+							</td><td>内閣府沖縄総合事務局農林水産部 ／ 宮古伊良部農業水利事業所</td><td><a href="javascript:__doPostBack('dgrSearchList','$19')">令和　５年度　宮古伊良部農業水利事業　東山３号送水路(その３)工事</a></td><td>一般競争入札（標準型）</td><td>農林土木工事</td><td align="center">2023/04/18</td><td align="center">2023/06/01</td><td align="center">2023/06/09</td>
+</tr>
+</table>
+</div>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table3">
+<tr align="right">
+<td>
+<input disabled="disabled" id="btnBack2" name="btnBack2" type="submit" value="前ページ"/>
+							  
+							<input id="btnNext2" name="btnNext2" type="submit" value="次ページ"/>
+</td>
+</tr>
+<tr align="center">
+<td><a class="backlink" href="javascript:__doPostBack('lbtBackToSearch2','')" id="lbtBackToSearch2">検索指定画面に戻る</a></td>
+</tr>
+</table>
+<br/>
+<!-- 2009.7.30-2009.10.9 ADD H21サーバ更改/機能追加：発注機関複数選択 -start- -->
+<!-- 2009.7.30-2009.10.9 ADD H21サーバ更改/機能追加：発注機関複数選択 -end- -->
+<!-- 2009.11.2 ADD H21サーバ更改/機能修正：発注機関複数選択 -start- -->
+<input id="txt_ObjWin2Status" name="txt_ObjWin2Status" size="1" type="hidden"/>
+<!-- 2009.11.2 ADD H21サーバ更改/機能修正：発注機関複数選択 -end- -->
+<input id="isChecked" name="isChecked" type="hidden"/>
+</div>
+</form>
+</body>
+<script src="../../js/Timer.js" type="text/javascript"></script>
+</html>

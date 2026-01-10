@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-01-10T21:15:48.100521",
+  "investigator": "ブラウザの開発者ツールを使用",
+  "steps": [
+    "1. ブラウザで https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4 にアクセス",
+    "2. 検索条件を設定（発注機関 = '国の機関'）",
+    "3. 「検索開始」をクリック",
+    "4. 検索結果から1件をクリックして詳細ページを開く",
+    "5. 詳細ページで「公告文書」または「経過文書」タブのファイルをクリック",
+    "6. 開発者ツール（F12）→ ネットワークタブを開く",
+    "7. PDFファイルのリクエストを探す",
+    "8. リクエストを右クリック → 「Copy」→ 「Copy as cURL」または「Copy request headers」"
+  ],
+  "request_info": {
+    "url": "最終的なダウンロードURL（リダイレクト後）をここに貼り付け",
+    "method": "GET",
+    "request_headers": {
+      "User-Agent": "ブラウザのUser-Agentをここに貼り付け",
+      "Accept": "ブラウザのAcceptヘッダーをここに貼り付け",
+      "Accept-Language": "ブラウザのAccept-Languageヘッダーをここに貼り付け",
+      "Accept-Encoding": "ブラウザのAccept-Encodingヘッダーをここに貼り付け",
+      "Referer": "ブラウザのRefererヘッダーをここに貼り付け（重要）",
+      "Cookie": "ブラウザのCookieヘッダーをここに貼り付け（すべて）",
+      "Origin": "ブラウザのOriginヘッダーをここに貼り付け（もしあれば）",
+      "Sec-Fetch-Site": "ブラウザのSec-Fetch-Siteヘッダーをここに貼り付け（もしあれば）",
+      "Sec-Fetch-Mode": "ブラウザのSec-Fetch-Modeヘッダーをここに貼り付け（もしあれば）",
+      "Sec-Fetch-Dest": "ブラウザのSec-Fetch-Destヘッダーをここに貼り付け（もしあれば）",
+      "その他のヘッダー": "その他の重要なヘッダーがあれば追加"
+    },
+    "query_parameters": {
+      "AnkenKanriNo": "クエリパラメータの値をここに貼り付け",
+      "BunshoKanriId": "クエリパラメータの値をここに貼り付け",
+      "その他のパラメータ": "その他のパラメータがあれば追加"
+    },
+    "cookies": [
+      {
+        "name": "Cookie名",
+        "value": "Cookie値",
+        "domain": "Cookieのドメイン",
+        "path": "Cookieのパス",
+        "secure": true,
+        "httpOnly": true
+      }
+    ],
+    "redirects": [
+      "最初のURL（リダイレクト前）",
+      "中間URL（もしあれば）",
+      "最終URL（リダイレクト後）"
+    ],
+    "response_headers": {
+      "Content-Type": "レスポンスのContent-Typeをここに貼り付け",
+      "Content-Length": "レスポンスのContent-Lengthをここに貼り付け",
+      "Location": "レスポンスのLocationヘッダーをここに貼り付け（リダイレクトの場合）",
+      "その他のヘッダー": "その他の重要なヘッダーがあれば追加"
+    }
+  },
+  "findings": {
+    "download_url_source": "ダウンロードURLの生成元（HTMLのリンク、JavaScript、リダイレクト等）",
+    "session_management": "セッション管理の方法（Cookie、URLパラメータ、ヘッダー等）",
+    "required_headers": [
+      "必須のヘッダーリスト"
+    ],
+    "required_cookies": [
+      "必須のCookieリスト"
+    ],
+    "redirect_flow": "リダイレクトの流れ（詳細）"
+  },
+  "code_comparison": {
+    "differences": [
+      "コードとの差異1",
+      "コードとの差異2"
+    ],
+    "missing_elements": [
+      "不足している要素1",
+      "不足している要素2"
+    ]
+  }
+}

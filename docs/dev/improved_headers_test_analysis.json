@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-01-10T21:47:21.974719",
+  "file_info": {
+    "filename": "入札公告",
+    "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=20",
+    "page_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4",
+    "metadata": {
+      "title": "入札公告"
+    }
+  },
+  "session_info": {
+    "cookies": [
+      {
+        "name": "ApplicationGatewayAffinityCORS",
+        "domain": "www.i-ppi.jp",
+        "path": "/",
+        "secure": true
+      },
+      {
+        "name": "ApplicationGatewayAffinity",
+        "domain": "www.i-ppi.jp",
+        "path": "/",
+        "secure": false
+      },
+      {
+        "name": "ASP.NET_SessionId",
+        "domain": "www.i-ppi.jp",
+        "path": "/",
+        "secure": false
+      }
+    ]
+  },
+  "recommendation": "ブラウザの開発者ツールで実際のリクエストを確認してください"
+}
