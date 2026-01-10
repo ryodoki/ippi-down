@@ -12,13 +12,13 @@ from .logger import Logger
 class HTTPClient:
     """HTTP通信を行うクラス（セッション管理含む）"""
 
-    def __init__(self, logger: Optional[Logger] = None, timeout: int = 30, download_timeout: int = 180):
+    def __init__(self, logger: Optional[Logger] = None, timeout: int = 30, download_timeout: int = 300):
         """初期化
         
         Args:
             logger: ロガーインスタンス
             timeout: 通常のリクエストのタイムアウト（秒、デフォルト30秒）
-            download_timeout: ダウンロードのタイムアウト（秒、デフォルト180秒）
+            download_timeout: ダウンロードの読み取りタイムアウト（秒、デフォルト300秒=5分）
         """
         self.logger = logger or Logger()
         self.timeout = timeout
@@ -37,11 +37,13 @@ class HTTPClient:
         )
         
         # 接続プールとリトライ設定を改善
+        # 指数バックオフ: 1秒, 2秒, 4秒
         retry_strategy = Retry(
             total=3,
-            backoff_factor=1,
+            backoff_factor=2,  # 指数バックオフ: 2^0, 2^1, 2^2 = 1, 2, 4秒
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "POST"]
+            allowed_methods=["GET", "POST"],
+            raise_on_status=False  # ステータスコードエラーでもリトライを続ける
         )
         adapter = HTTPAdapter(
             pool_connections=10,
