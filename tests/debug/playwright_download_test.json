@@ -1,0 +1,10 @@
+{
+  "playwright_available": true,
+  "download_success": false,
+  "download_info": {
+    "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=20",
+    "link_text": "公開中"
+  },
+  "network_requests": [],
+  "error": "Timeout 60000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================"
+}
