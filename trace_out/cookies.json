@@ -1,0 +1,32 @@
+[
+  {
+    "name": "ApplicationGatewayAffinityCORS",
+    "value": "97fffe7f19b7653c84016730f745ddf0",
+    "domain": "www.i-ppi.jp",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "ApplicationGatewayAffinity",
+    "value": "97fffe7f19b7653c84016730f745ddf0",
+    "domain": "www.i-ppi.jp",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "ASP.NET_SessionId",
+    "value": "l33bjkstzt5s4gujdty1c0xv",
+    "domain": "www.i-ppi.jp",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": true,
+    "secure": false,
+    "sameSite": "Lax"
+  }
+]

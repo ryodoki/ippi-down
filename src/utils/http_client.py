@@ -30,7 +30,7 @@ class HTTPClient:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
                 "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-                "Accept-Encoding": "gzip, deflate, br",
+                "Accept-Encoding": "gzip, deflate",  # brを削除（brotli解凍の問題回避）
                 "Connection": "keep-alive",
                 "Upgrade-Insecure-Requests": "1",
             }
@@ -201,6 +201,17 @@ class HTTPClient:
                 else:
                     response.raise_for_status()
 
+                # Content-Typeをチェック（HTMLの場合は失敗扱い）
+                content_type = response.headers.get("Content-Type", "").lower()
+                if "text/html" in content_type:
+                    self.logger.warning(f"ダウンロードしたファイルがHTMLです: {url} (Content-Type: {content_type})")
+                    if attempt == max_retries - 1:
+                        return False
+                    wait_time = retry_delay * (2 ** attempt)
+                    self.logger.warning(f"HTMLレスポンス。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+
                 # 保存先ディレクトリを作成
                 save_path_obj = Path(save_path)
                 save_path_obj.parent.mkdir(parents=True, exist_ok=True)
@@ -211,9 +222,22 @@ class HTTPClient:
                 last_progress_time = start_time
                 last_progress_size = 0
 
+                # 先頭数バイトをチェック（HTMLの場合は失敗扱い）
+                first_chunk_received = False
+                html_detected = False
                 with open(save_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
+                            # 最初のチャンクでHTML判定
+                            if not first_chunk_received:
+                                first_chunk_received = True
+                                if chunk.startswith(b"<html") or chunk.startswith(b"<!DOCTYPE") or chunk.startswith(b"<HTML"):
+                                    self.logger.warning(f"ダウンロードしたファイルがHTMLです（先頭バイト判定）: {url}")
+                                    f.close()
+                                    save_path_obj.unlink(missing_ok=True)  # ファイルを削除
+                                    html_detected = True
+                                    break  # リトライループに戻る
+                            
                             f.write(chunk)
                             downloaded_size += len(chunk)
                             current_time = time.time()
@@ -237,6 +261,15 @@ class HTTPClient:
                             if downloaded_size > last_progress_size:
                                 last_progress_size = downloaded_size
                                 last_progress_time = current_time
+                
+                # HTML判定で中断された場合はリトライループに戻る
+                if html_detected:
+                    if attempt == max_retries - 1:
+                        return False
+                    wait_time = retry_delay * (2 ** attempt)
+                    self.logger.warning(f"HTMLレスポンス（先頭バイト）。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
 
                 self.logger.info(f"ファイルダウンロード完了: {save_path}")
                 return True

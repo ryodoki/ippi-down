@@ -1,0 +1,22 @@
+{
+  "playwright_available": true,
+  "search_page": {
+    "table_found": true,
+    "row_count": 21
+  },
+  "detail_page": {
+    "html_saved": true,
+    "ankenkanri_no": "021030002025412000000704",
+    "hachusha_id": "02103000",
+    "dgrKokoku_found": true,
+    "dgrKeika_found": true,
+    "dgrKokoku_row_count": 1,
+    "dgrKeika_row_count": 1
+  },
+  "userentry_download": {
+    "url": "https://www.i-ppi.jp/IPPI/DownloadServices/Web/UserEntry_Download.aspx?data1=021030002025412000000704&data2=02103000",
+    "html_saved": true,
+    "dgrKokoku_found": false,
+    "dgrKeika_found": false
+  }
+}

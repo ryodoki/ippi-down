@@ -1,0 +1,61 @@
+{
+  "search_results": {
+    "url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4",
+    "soup_obtained": true,
+    "tables": [
+      {
+        "id": "header_table",
+        "class": [],
+        "row_count": 2
+      },
+      {
+        "id": "Table1",
+        "class": [
+          "search"
+        ],
+        "row_count": 2
+      },
+      {
+        "id": "Table2",
+        "class": [
+          "search"
+        ],
+        "row_count": 2
+      },
+      {
+        "id": "tblSearch",
+        "class": [
+          "search"
+        ],
+        "row_count": 17
+      },
+      {
+        "id": "Table3",
+        "class": [
+          "search"
+        ],
+        "row_count": 2
+      }
+    ],
+    "file_links": [],
+    "detail_links": []
+  },
+  "detail_page": {
+    "soup_obtained": false,
+    "tables": [],
+    "file_links": [
+      {
+        "filename": "入札公告",
+        "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=20",
+        "file_type": ".pdf"
+      },
+      {
+        "filename": "電子入札システム停止期間中の入札契約手続について",
+        "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=18",
+        "file_type": ".pdf"
+      }
+    ],
+    "ankenkanri_no": null,
+    "hachusha_id": null
+  }
+}

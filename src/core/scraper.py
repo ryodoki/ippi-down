@@ -505,6 +505,98 @@ class Scraper:
 
         return metadata
 
+    def _extract_files_from_tables(
+        self, soup: BeautifulSoup, base_url: str, file_types: List[str]
+    ) -> List[FileInfo]:
+        """dgrKokoku/dgrKeikaテーブルからファイルリンクを抽出（再利用可能なメソッド）
+        
+        Args:
+            soup: BeautifulSoupオブジェクト
+            base_url: ベースURL（page_urlに設定される）
+            file_types: 対象ファイルタイプのリスト
+        
+        Returns:
+            抽出されたFileInfoのリスト
+        """
+        files = []
+        
+        # dgrKokokuとdgrKeikaテーブル内のリンクを抽出
+        for table_id in ["dgrKokoku", "dgrKeika"]:
+            table = soup.find("table", id=table_id)
+            if not table:
+                self.logger.debug(f"テーブルが見つかりません: {table_id}")
+                continue
+            
+            self.logger.debug(f"テーブルを発見: {table_id}")
+            
+            # テーブル内のすべての行を取得（ヘッダー行を除く）
+            rows = table.find_all("tr")[1:]  # 最初の行はヘッダー
+            
+            for row in rows:
+                cells = row.find_all("td")
+                if len(cells) < 2:
+                    continue
+                
+                # 文書名称（最初のセル）
+                document_name = cells[0].get_text(strip=True)
+                
+                # 公開状況セル（2番目のセル）内のリンクを探す
+                status_cell = cells[1]
+                link = status_cell.find("a", href=True)
+                
+                if link:
+                    href = link.get("href")
+                    if href:
+                        # 相対URLを絶対URLに変換
+                        absolute_url = urljoin(base_url, href)
+                        
+                        # ファイルタイプをチェック（URLに拡張子が含まれている場合）
+                        # または、KokaiBunshoServletのようなファイルダウンロードURLの場合
+                        is_file_link = False
+                        if any(href.lower().endswith(ext) for ext in file_types):
+                            is_file_link = True
+                        elif "KokaiBunshoServlet" in href or "Publish" in href or "Download" in href:
+                            # ファイルダウンロードURLの可能性が高い
+                            is_file_link = True
+                        
+                        if is_file_link:
+                            # ファイル名をURLから抽出（拡張子がある場合）
+                            filename = absolute_url.split("/")[-1].split("?")[0]
+                            if not filename or "." not in filename:
+                                # 拡張子がない場合、文書名称から推測
+                                filename = document_name
+                            
+                            # ファイルタイプを抽出
+                            # URLに拡張子が含まれている場合はそれを使用
+                            file_type = ""
+                            url_path = absolute_url.split("?")[0]
+                            # URLパスの最後の部分から拡張子を抽出（例: /path/to/file.pdf）
+                            path_parts = url_path.split("/")
+                            if path_parts:
+                                last_part = path_parts[-1]
+                                if "." in last_part:
+                                    # 拡張子を抽出（例: file.pdf -> .pdf）
+                                    ext = "." + last_part.split(".")[-1].lower()
+                                    # 有効な拡張子かチェック（短すぎる場合は無視）
+                                    if len(ext) <= 6:  # .pdf, .xlsx, .docx など
+                                        file_type = ext
+                            
+                            # 拡張子がない場合、デフォルトで.pdfを設定（KokaiBunshoServletは通常PDFを返す）
+                            if not file_type:
+                                file_type = ".pdf"
+                            
+                            file_info = FileInfo(
+                                url=absolute_url,
+                                filename=filename,
+                                file_type=file_type,
+                                page_url=base_url,  # ベースURLを設定（Refererヘッダーに使用）
+                                metadata={"title": document_name} if document_name else {}
+                            )
+                            files.append(file_info)
+                            self.logger.debug(f"ファイルリンクを抽出: {document_name} -> {absolute_url} (type: {file_type})")
+        
+        return files
+
     def get_hachu_daibunrui_options(self, search_url: str) -> List[str]:
         """大分類のオプションを取得"""
         try:
@@ -1139,82 +1231,22 @@ class Scraper:
                 self.logger.debug(f"詳細ページHTMLを保存: {output_file}")
                 self._detail_page_saved = True
             
-            files = []
-            
             # 詳細ページのHTMLから直接ファイルリンクを抽出
-            # dgrKokokuとdgrKeikaテーブル内のリンクを抽出
-            for table_id in ["dgrKokoku", "dgrKeika"]:
-                table = detail_soup.find("table", id=table_id)
-                if not table:
-                    continue
-                
-                # テーブル内のすべての行を取得（ヘッダー行を除く）
-                rows = table.find_all("tr")[1:]  # 最初の行はヘッダー
-                
-                for row in rows:
-                    cells = row.find_all("td")
-                    if len(cells) < 2:
-                        continue
-                    
-                    # 文書名称（最初のセル）
-                    document_name = cells[0].get_text(strip=True)
-                    
-                    # 公開状況セル（2番目のセル）内のリンクを探す
-                    status_cell = cells[1]
-                    link = status_cell.find("a", href=True)
-                    
-                    if link:
-                        href = link.get("href")
-                        if href:
-                            # 相対URLを絶対URLに変換
-                            absolute_url = urljoin(base_url, href)
-                            
-                            # ファイルタイプをチェック（URLに拡張子が含まれている場合）
-                            # または、KokaiBunshoServletのようなファイルダウンロードURLの場合
-                            is_file_link = False
-                            if any(href.lower().endswith(ext) for ext in file_types):
-                                is_file_link = True
-                            elif "KokaiBunshoServlet" in href or "Publish" in href or "Download" in href:
-                                # ファイルダウンロードURLの可能性が高い
-                                is_file_link = True
-                            
-                            if is_file_link:
-                                # ファイル名をURLから抽出（拡張子がある場合）
-                                filename = absolute_url.split("/")[-1].split("?")[0]
-                                if not filename or "." not in filename:
-                                    # 拡張子がない場合、文書名称から推測
-                                    filename = document_name
-                                
-                                # ファイルタイプを抽出
-                                # URLに拡張子が含まれている場合はそれを使用
-                                file_type = ""
-                                url_path = absolute_url.split("?")[0]
-                                # URLパスの最後の部分から拡張子を抽出（例: /path/to/file.pdf）
-                                path_parts = url_path.split("/")
-                                if path_parts:
-                                    last_part = path_parts[-1]
-                                    if "." in last_part:
-                                        # 拡張子を抽出（例: file.pdf -> .pdf）
-                                        ext = "." + last_part.split(".")[-1].lower()
-                                        # 有効な拡張子かチェック（短すぎる場合は無視）
-                                        if len(ext) <= 6:  # .pdf, .xlsx, .docx など
-                                            file_type = ext
-                                
-                                # 拡張子がない場合、デフォルトで.pdfを設定（KokaiBunshoServletは通常PDFを返す）
-                                if not file_type:
-                                    file_type = ".pdf"
-                                
-                                file_info = FileInfo(
-                                    url=absolute_url,
-                                    filename=filename,
-                                    file_type=file_type,
-                                    page_url=detail_url,  # 詳細ページのURLを設定（Refererヘッダーに使用）
-                                    metadata={"title": document_name} if document_name else {}
-                                )
-                                files.append(file_info)
-                                self.logger.debug(f"ファイルリンクを抽出: {document_name} -> {absolute_url} (type: {file_type})")
+            # dgrKokokuとdgrKeikaテーブル内のリンクを抽出（再利用可能なメソッドを使用）
+            files = self._extract_files_from_tables(detail_soup, detail_url, file_types)
             
-            # ファイルが見つからなかった場合、従来の方法（UserEntry_Download.aspx）を試す
+            # フォールバック: テーブルから取得できなかった場合、通常のextract_file_linksも試す
+            if not files:
+                files = self.extract_file_links(detail_soup, detail_url, file_types)
+            
+            # ファイルが見つかった場合は、UserEntry_Download.aspxを試さない
+            # （UserEntry_Download.aspxにはテーブルが存在しないため、試しても0件になる）
+            if files:
+                self.logger.info(f"詳細ページから{len(files)}個のファイルリンクを抽出しました（UserEntry_Download.aspxはスキップ）")
+                return files
+            
+            # ファイルが見つからなかった場合のみ、従来の方法（UserEntry_Download.aspx）を試す
+            # ただし、実際にはUserEntry_Download.aspxにはテーブルがないため、効果がない可能性が高い
             if not files:
                 # 詳細ページからAnkenkanriNoとHachushaIdを抽出
                 ankenkanri_no = None
@@ -1260,7 +1292,11 @@ class Scraper:
                             
                             if download_soup:
                                 # UserEntry_Download.aspxページからファイルリンクを抽出
-                                files = self.extract_file_links(download_soup, download_url, file_types)
+                                # dgrKokoku/dgrKeikaテーブル走査ロジックを使用（詳細ページと同じロジック）
+                                files = self._extract_files_from_tables(download_soup, download_url, file_types)
+                                if not files:
+                                    # フォールバック: 通常のextract_file_linksも試す
+                                    files = self.extract_file_links(download_soup, download_url, file_types)
                                 self.logger.info(f"UserEntry_Download.aspxから{len(files)}個のファイルリンクを抽出しました")
                                 
                                 # 詳細ページの文書情報（dgrKokoku、dgrKeika）を取得してメタデータに追加
