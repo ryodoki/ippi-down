@@ -1,0 +1,81 @@
+{
+  "download_urls": [
+    {
+      "filename": "入札公告",
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=20",
+      "page_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4",
+      "domain": "e2ppiw01.e-bisc.go.jp",
+      "path": "/CALS/Publish/KokaiBunshoServlet",
+      "query_params": {
+        "AnkenKanriNo": "021030002025412000000704",
+        "BunshoKanriId": "20"
+      }
+    },
+    {
+      "filename": "電子入札システム停止期間中の入札契約手続について",
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=18",
+      "page_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4",
+      "domain": "e2ppiw01.e-bisc.go.jp",
+      "path": "/CALS/Publish/KokaiBunshoServlet",
+      "query_params": {
+        "AnkenKanriNo": "021030002025412000000704",
+        "BunshoKanriId": "18"
+      }
+    },
+    {
+      "filename": "入札公告",
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000709&BunshoKanriId=20",
+      "page_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4",
+      "domain": "e2ppiw01.e-bisc.go.jp",
+      "path": "/CALS/Publish/KokaiBunshoServlet",
+      "query_params": {
+        "AnkenKanriNo": "021030002025412000000709",
+        "BunshoKanriId": "20"
+      }
+    },
+    {
+      "filename": "お知らせ（重要）",
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000709&BunshoKanriId=18",
+      "page_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4",
+      "domain": "e2ppiw01.e-bisc.go.jp",
+      "path": "/CALS/Publish/KokaiBunshoServlet",
+      "query_params": {
+        "AnkenKanriNo": "021030002025412000000709",
+        "BunshoKanriId": "18"
+      }
+    },
+    {
+      "filename": "入札公告",
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000749&BunshoKanriId=20",
+      "page_url": "https://www.i-ppi.jp/IPPI/SearchServices/Web/Koji/Keika/List.aspx?tab=4",
+      "domain": "e2ppiw01.e-bisc.go.jp",
+      "path": "/CALS/Publish/KokaiBunshoServlet",
+      "query_params": {
+        "AnkenKanriNo": "021030002025412000000749",
+        "BunshoKanriId": "20"
+      }
+    }
+  ],
+  "url_analysis": [
+    {
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=20",
+      "error": "HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', port=443): Max retries exceeded with url: /CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=20 (Caused by ConnectTimeoutError(<HTTPSConnection(host='e2ppiw01.e-bisc.go.jp', port=443) at 0x1a2ec50a090>, 'Connection to e2ppiw01.e-bisc.go.jp timed out. (connect timeout=10)'))"
+    },
+    {
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=18",
+      "error": "HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', port=443): Max retries exceeded with url: /CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000704&BunshoKanriId=18 (Caused by ConnectTimeoutError(<HTTPSConnection(host='e2ppiw01.e-bisc.go.jp', port=443) at 0x1a2ec4f5690>, 'Connection to e2ppiw01.e-bisc.go.jp timed out. (connect timeout=10)'))"
+    },
+    {
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000709&BunshoKanriId=20",
+      "error": "HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', port=443): Max retries exceeded with url: /CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000709&BunshoKanriId=20 (Caused by ConnectTimeoutError(<HTTPSConnection(host='e2ppiw01.e-bisc.go.jp', port=443) at 0x1a2ec4b2e50>, 'Connection to e2ppiw01.e-bisc.go.jp timed out. (connect timeout=10)'))"
+    },
+    {
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000709&BunshoKanriId=18",
+      "error": "HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', port=443): Max retries exceeded with url: /CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000709&BunshoKanriId=18 (Caused by ConnectTimeoutError(<HTTPSConnection(host='e2ppiw01.e-bisc.go.jp', port=443) at 0x1a2ec377a90>, 'Connection to e2ppiw01.e-bisc.go.jp timed out. (connect timeout=10)'))"
+    },
+    {
+      "url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000749&BunshoKanriId=20",
+      "error": "HTTPSConnectionPool(host='e2ppiw01.e-bisc.go.jp', port=443): Max retries exceeded with url: /CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021030002025412000000749&BunshoKanriId=20 (Caused by ConnectTimeoutError(<HTTPSConnection(host='e2ppiw01.e-bisc.go.jp', port=443) at 0x1a2ec4b0d90>, 'Connection to e2ppiw01.e-bisc.go.jp timed out. (connect timeout=10)'))"
+    }
+  ]
+}
