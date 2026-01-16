@@ -49,7 +49,7 @@ htmlcov/
 *.swo
 *~
 
-# Logs
+# Logs（運用生成物）
 logs/
 *.log
 
@@ -61,7 +61,7 @@ desktop.ini
 # 設定ファイル（機密情報を含む可能性）
 config/config.yaml
 
-# ダウンロードファイル
+# ダウンロードファイル（運用生成物）
 downloads/
 !downloads/.gitkeep
 
@@ -69,34 +69,8 @@ downloads/
 .env
 .env.local
 
-# 一時ファイル・デバッグファイル（ルート直下のみ）
-/test_*.html
-/test_*.py
-/test_*_test.py
-/analyze_*.py
-/step*.json
-/step*.html
-/post_request_*.json
-/chubunrui_*.html
-/test_detail_page*.html
-/test_search_page*.html
-/test_post_response*.html
-/test_investigate*.html
-/test_shoubunrui*.html
-/test_userentry_download*.html
-/debug_request_info.json
-/verify_download_results.json
-
-# Git履歴修正用スクリプト（作業完了後不要）
-/fix_commit_*.py
-/fix_commit_*.bat
-/fix_commit_*.sh
-/fix_msg_filter.sh
-
-# 整理メモ類（作業完了後不要）
-/FILE_ORGANIZATION_*.md
-/FILE_CLEANUP_*.md
-/DOWNLOAD_TEST_RESULT_FINAL.md
+# 調査・デバッグ生成物（artifacts/配下は全てGit管理外）
+artifacts/
 
 # リリース生成物
 release/

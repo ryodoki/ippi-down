@@ -8,6 +8,7 @@ from threading import Thread, Event
 import platform
 from ..models.config_model import AppConfig
 from ..utils.logger import Logger
+from ..gui.event_handler import EventHandler
 from ..utils.http_client import HTTPClient
 from ..core.scraper import Scraper
 from ..config.config_manager import ConfigManager
@@ -39,8 +40,13 @@ class MainWindow:
         self.setup_ui()
         self.setup_bindings()
         
-        # 初期化時に大分類のオプションを取得
-        self.load_hachu_daibunrui_options()
+        # イベントハンドラーを初期化（スレッドセーフなUI更新用）
+        self.event_handler = EventHandler(root, self)
+        self.event_handler.start_polling()
+        
+        # 初期化時に大分類のオプションを取得（遅延実行：root.afterでGUI表示後に実行）
+        # import時にHTTPリクエストが送られないようにするため
+        self.root.after(100, self.load_hachu_daibunrui_options)
 
     def setup_font(self):
         """日本語フォントを設定"""
@@ -274,14 +280,28 @@ class MainWindow:
         # 地方、都道府県、市町村（プルダウン）
         place_chihou_options = ["", "北海道", "東北", "関東", "北陸", "中部", "近畿", "中国", "四国", "九州・沖縄"]
         ttk.Label(place_frame, text="地方:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
-        self.place_chihou_var = tk.StringVar(value=search_conditions.place_chihou)
-        ttk.Combobox(
+        # 初期値を明示的に空文字列に設定（検索条件が空文字列でない場合のみ設定）
+        initial_place_chihou = search_conditions.place_chihou if search_conditions.place_chihou else ""
+        self.place_chihou_var = tk.StringVar(value=initial_place_chihou)
+        self.place_chihou_combobox = ttk.Combobox(
             place_frame,
             textvariable=self.place_chihou_var,
             values=place_chihou_options,
             state="readonly",
             width=30,
-        ).grid(row=0, column=1, sticky=tk.W, padx=5, pady=2)
+        )
+        self.place_chihou_combobox.grid(row=0, column=1, sticky=tk.W, padx=5, pady=2)
+        # readonlyのComboboxで空文字列を選択するには、current(0)を使用する必要がある
+        if not initial_place_chihou:
+            self.place_chihou_combobox.current(0)  # 最初の要素（空文字列）を選択
+        else:
+            # 検索条件に値が設定されている場合、その値のインデックスを探す
+            try:
+                index = place_chihou_options.index(initial_place_chihou)
+                self.place_chihou_combobox.current(index)
+            except ValueError:
+                # 値が見つからない場合は空文字列を選択
+                self.place_chihou_combobox.current(0)
 
         ttk.Label(place_frame, text="都道府県:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
         self.place_todofuken_var = tk.StringVar(value=search_conditions.place_todofuken)
@@ -729,8 +749,8 @@ class MainWindow:
                 self.download_callback(self)
         except Exception as e:
             if not self.cancel_flag.is_set():
-            self.logger.error(f"ダウンロードエラー: {str(e)}")
-            self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
+                self.logger.error(f"ダウンロードエラー: {str(e)}")
+                self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
         finally:
             self.root.after(0, lambda: self._reset_download_ui())
 
@@ -790,8 +810,26 @@ class MainWindow:
         # 工事名
         self.koji_name_var.set(search_conditions.koji_name)
 
-        # 工事場所
-        self.place_chihou_var.set(search_conditions.place_chihou)
+        # 工事場所（空文字列の場合は明示的に空文字列を設定）
+        place_chihou_value = search_conditions.place_chihou if search_conditions.place_chihou else ""
+        # readonlyのComboboxで空文字列を選択するには、current(0)を使用する必要がある
+        if not place_chihou_value:
+            # 空文字列の場合は、Comboboxのcurrent(0)を使用
+            self.place_chihou_var.set("")
+            if hasattr(self, 'place_chihou_combobox'):
+                self.place_chihou_combobox.current(0)
+        else:
+            self.place_chihou_var.set(place_chihou_value)
+            # 値が設定されている場合、その値のインデックスを探す
+            place_chihou_options = ["", "北海道", "東北", "関東", "北陸", "中部", "近畿", "中国", "四国", "九州・沖縄"]
+            try:
+                index = place_chihou_options.index(place_chihou_value)
+                if hasattr(self, 'place_chihou_combobox'):
+                    self.place_chihou_combobox.current(index)
+            except ValueError:
+                # 値が見つからない場合は空文字列を選択
+                if hasattr(self, 'place_chihou_combobox'):
+                    self.place_chihou_combobox.current(0)
         self.place_todofuken_var.set(search_conditions.place_todofuken)
         self.place_shichouson_var.set(search_conditions.place_shichouson)
         self.place_text_var.set(search_conditions.place_text)

@@ -63,10 +63,21 @@ class Downloader:
         save_dir: str,
         naming,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        folder_name: Optional[str] = None,
     ) -> DownloadResult:
-        """複数のファイルをダウンロード"""
+        """複数のファイルをダウンロード
+        
+        Args:
+            file_list: ダウンロード対象のファイルリスト
+            save_dir: 保存先ディレクトリ
+            naming: ファイル名生成オブジェクト
+            progress_callback: 進捗コールバック関数
+            folder_name: サブフォルダ名（指定された場合はサブフォルダを作成）
+        """
         result = DownloadResult(total=len(file_list))
         save_dir_path = Path(save_dir)
+        
+        # ベースディレクトリを作成
         save_dir_path.mkdir(parents=True, exist_ok=True)
 
         for index, file_info in enumerate(file_list):
@@ -84,9 +95,14 @@ class Downloader:
                     pass
             
             try:
+                # 各ファイルごとにフォルダ名を生成
+                file_folder_name = naming.generate_folder_name(file_info)
+                file_save_dir = save_dir_path / file_folder_name
+                file_save_dir.mkdir(parents=True, exist_ok=True)
+                
                 # ファイル名を生成
                 filename = naming.generate_filename(file_info, file_info.metadata, index)
-                save_path = str(save_dir_path / filename)
+                save_path = str(file_save_dir / filename)
 
                 # 重複チェック
                 if self.check_duplicate(save_path):

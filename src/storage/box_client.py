@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Optional
 from ..utils.logger import Logger
+from ..app.exceptions import BoxApiError
 
 # Box SDKをオプショナルインポート
 try:
@@ -123,10 +124,10 @@ class BoxClient:
 
         except BoxAPIException as e:
             self.logger.error(f"Box APIエラー: {str(e)}")
-            return None
+            raise BoxApiError(f"Box APIエラー: {str(e)}")
         except Exception as e:
             self.logger.error(f"Boxフォルダ作成エラー: {str(e)}")
-            return None
+            raise BoxApiError(f"Boxフォルダ作成エラー: {str(e)}")
 
     def file_exists(self, box_folder_id: str, filename: str) -> bool:
         """ファイルが存在するかチェック"""

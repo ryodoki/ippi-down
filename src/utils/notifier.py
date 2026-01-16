@@ -49,15 +49,33 @@ class Notifier:
             self._notify_windows_fallback(title, message)
 
     def _notify_windows_fallback(self, title: str, message: str):
-        """Windows通知のフォールバック（メッセージボックス）"""
+        """Windows通知のフォールバック（メッセージボックス）
+        
+        注意: このメソッドはimport時に呼ばれないように、notify()メソッド内でのみ呼ばれる
+        """
         try:
             import tkinter.messagebox as messagebox
             import tkinter as tk
 
-            root = tk.Tk()
-            root.withdraw()  # メインウィンドウを非表示
-            messagebox.showinfo(title, message)
-            root.destroy()
+            # GUIが既に起動している場合は、そのrootを使用
+            # 起動していない場合は新規作成（ただし、これは通常の実行時のみ）
+            try:
+                # 既存のTkインスタンスを探す（存在する場合）
+                root = tk._default_root
+                if root is None:
+                    root = tk.Tk()
+                    root.withdraw()  # メインウィンドウを非表示
+                    messagebox.showinfo(title, message)
+                    root.destroy()
+                else:
+                    # 既存のrootがある場合は、そのrootでメッセージボックスを表示
+                    messagebox.showinfo(title, message)
+            except Exception:
+                # フォールバック: 新規作成
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showinfo(title, message)
+                root.destroy()
         except Exception as e:
             self.logger.error(f"フォールバック通知エラー: {str(e)}")
 

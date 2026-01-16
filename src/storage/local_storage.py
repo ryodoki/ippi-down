@@ -1,12 +1,14 @@
 """ローカルファイルシステムへの保存を行うクラス"""
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, BinaryIO
 from ..utils.logger import Logger
 from ..utils.file_utils import FileUtils
+from ..app.exceptions import FilesystemError
+from .base import Storage
 
 
-class LocalStorage:
+class LocalStorage(Storage):
     """ローカルファイルシステムへの保存を行うクラス"""
 
     def __init__(self, base_path: str, logger: Optional[Logger] = None):
@@ -46,3 +48,42 @@ class LocalStorage:
         """ファイルが存在するかチェック"""
         return Path(file_path).exists()
 
+    # Storageインターフェースの実装
+    def exists(self, key: str) -> bool:
+        """ファイルが存在するかチェック（Storageインターフェース）"""
+        return self.file_exists(key)
+
+    def save(
+        self,
+        stream: BinaryIO,
+        key: str,
+        metadata: Optional[dict] = None
+    ) -> bool:
+        """ファイルを保存（Storageインターフェース）"""
+        try:
+            path = Path(key)
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(path, "wb") as f:
+                f.write(stream.read())
+
+            self.logger.info(f"ファイルを保存しました: {key}")
+            return True
+        except (IOError, OSError) as e:
+            self.logger.error(f"ファイル保存エラー: {key} - {str(e)}")
+            raise FilesystemError(f"ファイル保存エラー: {key} - {str(e)}")
+        except Exception as e:
+            self.logger.error(f"ファイル保存エラー: {key} - {str(e)}")
+            raise FilesystemError(f"ファイル保存エラー: {key} - {str(e)}")
+
+    def ensure_path(self, key: str) -> None:
+        """パス（ディレクトリ）を確保（Storageインターフェース）"""
+        try:
+            path = Path(key)
+            if path.is_file():
+                path.parent.mkdir(parents=True, exist_ok=True)
+            else:
+                path.mkdir(parents=True, exist_ok=True)
+        except (IOError, OSError) as e:
+            self.logger.error(f"ディレクトリ作成エラー: {key} - {str(e)}")
+            raise FilesystemError(f"ディレクトリ作成エラー: {key} - {str(e)}")

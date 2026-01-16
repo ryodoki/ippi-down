@@ -132,48 +132,77 @@ def test_download_with_playwright() -> Dict[str, Any]:
                 result["download_info"]["url"] = download_url
                 result["download_info"]["link_text"] = download_link_text
                 
-                # 3. ダウンロードを試行
+                # 3. ダウンロードを試行（リクエストAPIを使用）
                 logger.info(f"ダウンロードを試行: {download_url}")
                 
                 # ダウンロードディレクトリを設定
                 download_dir = PROJECT_ROOT / "tests" / "debug" / "downloads"
                 download_dir.mkdir(parents=True, exist_ok=True)
                 
-                # ダウンロードを待機
-                with page.expect_download(timeout=60000) as download_info:
-                    # リンクをクリック
-                    page.evaluate(f"""
-                        window.location.href = '{download_url}';
-                    """)
+                # 現在のページのURLをRefererとして使用
+                referer_url = page.url
+                logger.info(f"Referer URL: {referer_url}")
                 
-                download = download_info.value
-                suggested_filename = download.suggested_filename
-                save_path = download_dir / suggested_filename
-                
-                logger.info(f"ダウンロード開始: {suggested_filename}")
-                download.save_as(str(save_path))
-                
-                # ファイルサイズを確認
-                file_size = save_path.stat().st_size if save_path.exists() else 0
-                logger.info(f"ダウンロード完了: {save_path} ({file_size:,} bytes)")
-                
-                result["download_success"] = save_path.exists() and file_size > 0
-                result["download_info"]["saved_path"] = str(save_path)
-                result["download_info"]["file_size"] = file_size
-                result["download_info"]["suggested_filename"] = suggested_filename
-                
-                # ファイルの先頭バイトを確認
-                if save_path.exists():
-                    with open(save_path, "rb") as f:
-                        first_bytes = f.read(16)
-                        is_pdf = first_bytes.startswith(b"%PDF")
-                        is_html = first_bytes.startswith(b"<html") or first_bytes.startswith(b"<!DOCTYPE")
+                # リクエストAPIを使用してダウンロード
+                try:
+                    response = page.request.get(
+                        download_url,
+                        headers={
+                            "Referer": referer_url,
+                        },
+                        timeout=60000
+                    )
+                    
+                    logger.info(f"レスポンスステータス: {response.status}")
+                    logger.info(f"レスポンスヘッダー: {dict(response.headers)}")
+                    
+                    if response.status == 200:
+                        # ファイルを保存
+                        content = response.body()
+                        content_type = response.headers.get("content-type", "")
                         
-                        result["download_info"]["is_pdf"] = is_pdf
-                        result["download_info"]["is_html"] = is_html
-                        result["download_info"]["first_bytes"] = first_bytes.hex()
+                        # ファイル名を決定
+                        suggested_filename = "download"
+                        if "pdf" in content_type.lower():
+                            suggested_filename = "download.pdf"
+                        elif "application/pdf" in content_type:
+                            suggested_filename = "download.pdf"
                         
-                        logger.info(f"  先頭バイト: PDF={is_pdf}, HTML={is_html}")
+                        save_path = download_dir / suggested_filename
+                        save_path.write_bytes(content)
+                        
+                        # ファイルサイズを確認
+                        file_size = save_path.stat().st_size if save_path.exists() else 0
+                        logger.info(f"ダウンロード完了: {save_path} ({file_size:,} bytes)")
+                        
+                        result["download_success"] = save_path.exists() and file_size > 0
+                        result["download_info"]["saved_path"] = str(save_path)
+                        result["download_info"]["file_size"] = file_size
+                        result["download_info"]["suggested_filename"] = suggested_filename
+                        result["download_info"]["content_type"] = content_type
+                        result["download_info"]["response_status"] = response.status
+                        result["download_info"]["response_headers"] = dict(response.headers)
+                        
+                        # ファイルの先頭バイトを確認
+                        if save_path.exists():
+                            with open(save_path, "rb") as f:
+                                first_bytes = f.read(16)
+                                is_pdf = first_bytes.startswith(b"%PDF")
+                                is_html = first_bytes.startswith(b"<html") or first_bytes.startswith(b"<!DOCTYPE")
+                                
+                                result["download_info"]["is_pdf"] = is_pdf
+                                result["download_info"]["is_html"] = is_html
+                                result["download_info"]["first_bytes"] = first_bytes.hex()
+                                
+                                logger.info(f"  先頭バイト: PDF={is_pdf}, HTML={is_html}")
+                    else:
+                        logger.error(f"ダウンロード失敗: ステータスコード {response.status}")
+                        result["download_info"]["response_status"] = response.status
+                        result["download_info"]["response_headers"] = dict(response.headers)
+                        
+                except Exception as e:
+                    logger.error(f"リクエストAPIエラー: {str(e)}", exc_info=True)
+                    result["download_info"]["error"] = str(e)
                 
                 # ネットワークリクエストを記録
                 result["network_requests"] = network_requests

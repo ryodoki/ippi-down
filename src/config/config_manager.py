@@ -14,6 +14,7 @@ from ..models.config_model import (
 )
 from ..utils.logger import Logger
 from .config_validator import ConfigValidator
+from ..app.exceptions import ConfigError, FilesystemError
 
 
 class ConfigManager:
@@ -47,10 +48,14 @@ class ConfigManager:
             self.logger.info(f"設定ファイルを読み込みました: {self.config_path}")
             return config
 
+        except (IOError, OSError) as e:
+            self.logger.error(f"設定ファイルの読み込みエラー: {str(e)}")
+            self.logger.info("デフォルト設定を使用します")
+            raise FilesystemError(f"設定ファイルの読み込みに失敗しました: {self.config_path} - {str(e)}")
         except Exception as e:
             self.logger.error(f"設定ファイルの読み込みエラー: {str(e)}")
             self.logger.info("デフォルト設定を使用します")
-            return self.get_default_config()
+            raise ConfigError(f"設定ファイルの解析に失敗しました: {str(e)}")
 
     def save_config(self, config: AppConfig) -> bool:
         """設定ファイルを保存する"""
@@ -74,9 +79,12 @@ class ConfigManager:
             self.logger.info(f"設定ファイルを保存しました: {self.config_path}")
             return True
 
+        except (IOError, OSError) as e:
+            self.logger.error(f"設定ファイルの保存エラー: {str(e)}")
+            raise FilesystemError(f"設定ファイルの保存に失敗しました: {self.config_path} - {str(e)}")
         except Exception as e:
             self.logger.error(f"設定ファイルの保存エラー: {str(e)}")
-            return False
+            raise ConfigError(f"設定ファイルの保存に失敗しました: {str(e)}")
 
     def validate_config(self, config: AppConfig) -> Tuple[bool, List[str]]:
         """設定を検証する"""

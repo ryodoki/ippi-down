@@ -7,6 +7,7 @@ import time
 from typing import Dict, Optional, Callable
 from pathlib import Path
 from .logger import Logger
+from ..app.exceptions import NetworkError, RateLimitError
 
 
 class HTTPClient:
@@ -69,21 +70,40 @@ class HTTPClient:
                 
                 # HTTPステータス429（レート制限）の処理
                 if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', retry_delay * (attempt + 1)))
                     if attempt < max_retries - 1:
-                        retry_after = int(response.headers.get('Retry-After', retry_delay * (attempt + 1)))
                         self.logger.warning(f"レート制限に達しました。{retry_after}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
                         time.sleep(retry_after)
                         continue
                     else:
-                        response.raise_for_status()
+                        raise RateLimitError(
+                            f"レート制限に達しました: {url}",
+                            retry_after=retry_after
+                        )
                 else:
                     response.raise_for_status()
                 
                 return response
+            except RateLimitError:
+                raise
+            except requests.exceptions.Timeout as e:
+                if attempt == max_retries - 1:
+                    self.logger.error(f"GETリクエストタイムアウト: {url} - {str(e)}")
+                    raise NetworkError(f"リクエストタイムアウト: {url} - {str(e)}")
+                wait_time = retry_delay * (attempt + 1)
+                self.logger.warning(f"リクエストタイムアウト。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            except requests.exceptions.ConnectionError as e:
+                if attempt == max_retries - 1:
+                    self.logger.error(f"GETリクエスト接続エラー: {url} - {str(e)}")
+                    raise NetworkError(f"接続エラー: {url} - {str(e)}")
+                wait_time = retry_delay * (attempt + 1)
+                self.logger.warning(f"リクエスト接続エラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
             except requests.exceptions.RequestException as e:
                 if attempt == max_retries - 1:
                     self.logger.error(f"GETリクエストエラー: {url} - {str(e)}")
-                    raise
+                    raise NetworkError(f"リクエストエラー: {url} - {str(e)}")
                 # リトライ前に待機
                 wait_time = retry_delay * (attempt + 1)
                 self.logger.warning(f"リクエストエラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
@@ -109,21 +129,40 @@ class HTTPClient:
                 
                 # HTTPステータス429（レート制限）の処理
                 if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', retry_delay * (attempt + 1)))
                     if attempt < max_retries - 1:
-                        retry_after = int(response.headers.get('Retry-After', retry_delay * (attempt + 1)))
                         self.logger.warning(f"レート制限に達しました。{retry_after}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
                         time.sleep(retry_after)
                         continue
                     else:
-                        response.raise_for_status()
+                        raise RateLimitError(
+                            f"レート制限に達しました: {url}",
+                            retry_after=retry_after
+                        )
                 else:
                     response.raise_for_status()
                 
                 return response
+            except RateLimitError:
+                raise
+            except requests.exceptions.Timeout as e:
+                if attempt == max_retries - 1:
+                    self.logger.error(f"POSTリクエストタイムアウト: {url} - {str(e)}")
+                    raise NetworkError(f"リクエストタイムアウト: {url} - {str(e)}")
+                wait_time = retry_delay * (attempt + 1)
+                self.logger.warning(f"リクエストタイムアウト。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            except requests.exceptions.ConnectionError as e:
+                if attempt == max_retries - 1:
+                    self.logger.error(f"POSTリクエスト接続エラー: {url} - {str(e)}")
+                    raise NetworkError(f"接続エラー: {url} - {str(e)}")
+                wait_time = retry_delay * (attempt + 1)
+                self.logger.warning(f"リクエスト接続エラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
             except requests.exceptions.RequestException as e:
                 if attempt == max_retries - 1:
                     self.logger.error(f"POSTリクエストエラー: {url} - {str(e)}")
-                    raise
+                    raise NetworkError(f"リクエストエラー: {url} - {str(e)}")
                 # リトライ前に待機
                 wait_time = retry_delay * (attempt + 1)
                 self.logger.warning(f"リクエストエラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
@@ -191,13 +230,16 @@ class HTTPClient:
                 
                 # HTTPステータス429（レート制限）の処理
                 if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', retry_delay * (attempt + 1)))
                     if attempt < max_retries - 1:
-                        retry_after = int(response.headers.get('Retry-After', retry_delay * (attempt + 1)))
                         self.logger.warning(f"レート制限に達しました。{retry_after}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
                         time.sleep(retry_after)
                         continue
                     else:
-                        response.raise_for_status()
+                        raise RateLimitError(
+                            f"レート制限に達しました: {url}",
+                            retry_after=retry_after
+                        )
                 else:
                     response.raise_for_status()
 
@@ -274,6 +316,8 @@ class HTTPClient:
                 self.logger.info(f"ファイルダウンロード完了: {save_path}")
                 return True
 
+            except RateLimitError:
+                raise
             except requests.exceptions.Timeout as e:
                 # タイムアウトエラーの詳細な処理
                 error_type = "接続タイムアウト" if "connect" in str(e).lower() else "読み取りタイムアウト"
@@ -318,10 +362,14 @@ class HTTPClient:
                 )
                 time.sleep(wait_time)
             except Exception as e:
+                from ..app.exceptions import FilesystemError
                 self.logger.error(
                     f"ファイル保存エラー: {save_path} - {str(e)} "
                     f"(エラータイプ: {type(e).__name__})"
                 )
+                # FilesystemErrorとして再発生させる（呼び出し側で処理可能）
+                if attempt == max_retries - 1:
+                    raise FilesystemError(f"ファイル保存エラー: {save_path} - {str(e)}")
                 return False
         
         return False
