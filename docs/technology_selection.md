@@ -12,7 +12,6 @@
 - **豊富なライブラリエコシステム**
   - HTML解析: BeautifulSoup4, lxml, html.parser
   - HTTPクライアント: requests, httpx
-  - Box SDK: boxsdk（公式SDK）
   - スケジューリング: schedule, APScheduler, croniter
 - **開発速度が速い**
   - シンプルな構文で可読性が高い
@@ -20,8 +19,8 @@
 - **Webスクレイピングに最適**
   - BeautifulSoupはHTML解析のデファクトスタンダード
   - 多くの実装例とドキュメントが存在
-- **クロスプラットフォーム対応**
-  - Windows、Linux、macOSで動作
+- **Windows対応**
+  - Windows 10/11で動作
 - **CLI/GUI開発が容易**
   - CLI: argparse, click, typer
   - GUI: tkinter（標準ライブラリ）, PyQt, PySide, Kivy
@@ -41,7 +40,6 @@
 |------|-----------|-----------|------|
 | HTML解析 | BeautifulSoup4 | 4.x | 最も一般的 |
 | HTTPクライアント | requests | 2.x | シンプルで使いやすい |
-| Box SDK | boxsdk | 3.x | 公式SDK |
 | スケジューリング | schedule | 1.x | シンプルなスケジューラー |
 | 設定ファイル | pyyaml | 6.x | YAML形式 |
 | ログ | logging | 標準 | 標準ライブラリ |
@@ -56,7 +54,6 @@
 - **豊富なnpmパッケージ**
   - HTML解析: cheerio, jsdom
   - HTTPクライアント: axios, node-fetch
-  - Box SDK: box-node-sdk（公式SDK）
   - スケジューリング: node-cron, node-schedule
 - **JSON処理が自然**
   - 設定ファイルとしてJSONを使用する場合に適している
@@ -74,7 +71,6 @@
 |------|-----------|-----------|------|
 | HTML解析 | cheerio | 1.x | jQueryライクなAPI |
 | HTTPクライアント | axios | 1.x | Promiseベース |
-| Box SDK | box-node-sdk | 2.x | 公式SDK |
 | スケジューリング | node-cron | 3.x | cron形式対応 |
 | 設定ファイル | js-yaml | 4.x | YAML形式 |
 | ログ | winston | 3.x | 高機能なロガー |
@@ -98,15 +94,12 @@
   - エコシステムがPython/Node.jsより小さい
 - **HTML解析ライブラリ**
   - goqueryはあるが、BeautifulSoupほど成熟していない
-- **Box SDK**
-  - 公式SDKはあるが、Python/Node.jsほど充実していない
 
 #### 主要ライブラリ候補
 | 機能 | ライブラリ | バージョン | 備考 |
 |------|-----------|-----------|------|
 | HTML解析 | goquery | 1.x | jQueryライクなAPI |
 | HTTPクライアント | net/http | 標準 | 標準ライブラリ |
-| Box SDK | box-go-sdk | 2.x | 公式SDK |
 | スケジューリング | robfig/cron | v3 | cron形式対応 |
 | 設定ファイル | viper | 1.x | 多形式対応 |
 | ログ | logrus | 1.x | 構造化ログ |
@@ -124,12 +117,10 @@
    - シンプルな構文で可読性が高い
    - プロトタイピングから本番まで対応可能
 3. **ライブラリの充実度**
-   - Box SDK（boxsdk）が公式で提供されている
    - 必要な機能のライブラリがすべて揃っている
 4. **GUI実装が容易**
    - tkinterが標準ライブラリに含まれており追加インストール不要
    - GUI開発の実装例が豊富
-   - クロスプラットフォーム対応
 5. **実行ファイル化が容易**
    - PyInstallerでシングル実行ファイル（.exe）に変換可能
    - Python環境がなくても実行可能
@@ -137,8 +128,8 @@
 6. **保守性**
    - コードが読みやすく、メンテナンスが容易
    - HTML構造が変更された場合の修正が容易
-7. **クロスプラットフォーム**
-   - Windows環境でも問題なく動作
+7. **Windows対応**
+   - Windows 10/11 64bitで動作
 
 ### 3.2 技術スタック詳細
 
@@ -148,7 +139,6 @@
 |---------|-----------|------|-----------|
 | HTML解析 | BeautifulSoup4 | HTML構造の解析 | 4.12.0+ |
 | HTTPクライアント | requests | ファイルダウンロード | 2.31.0+ |
-| Box SDK | boxsdk | Box API連携 | 3.9.0+ |
 | スケジューリング | schedule | 定期実行 | 1.2.0+ |
 | 設定管理 | pyyaml | YAML設定ファイル | 6.0.1+ |
 | ログ | logging | ログ出力（標準） | 標準 |
@@ -184,7 +174,6 @@ ppi-file-downloader/
 │   │   └── log_viewer.py    # ログ表示ウィンドウ
 │   ├── scraper.py           # HTML解析・スクレイピング
 │   ├── downloader.py        # ファイルダウンロード
-│   ├── box_client.py        # Box API連携
 │   ├── scheduler.py         # スケジューリング
 │   ├── config.py            # 設定管理
 │   ├── logger.py            # ログ管理
@@ -233,9 +222,6 @@ download_conditions:
 # 保存先
 save_paths:
   local: ./downloads
-  box:
-    enabled: false
-    folder_id: null
 
 # ファイル命名規則
 naming_rule: "{category}_{title}_{date}_{index}"
@@ -272,11 +258,8 @@ cd ppi-file-downloader
 # 仮想環境を作成
 python -m venv venv
 
-# 仮想環境を有効化
-# Windows
+# 仮想環境を有効化（Windows）
 venv\Scripts\activate
-# Linux/macOS
-source venv/bin/activate
 
 # 依存関係をインストール
 pip install -r requirements.txt
@@ -309,8 +292,8 @@ pip install -r requirements.txt
 2. **シンプルで使いやすい**
    - 基本的なGUI要素（ボタン、テキストボックス、リストボックス等）が揃っている
    - 学習コストが低い
-3. **クロスプラットフォーム**
-   - Windows、Linux、macOSで動作
+3. **Windows対応**
+   - Windows 10/11で動作
 4. **実行ファイル化との相性**
    - PyInstallerとの相性が良い
    - ファイルサイズが小さい
@@ -327,7 +310,6 @@ pip install -r requirements.txt
    - キーワード入力欄
    - 日付範囲選択
    - 保存先フォルダ選択ボタン
-   - Box連携設定ボタン
    - 「ダウンロード開始」ボタン
    - 「設定保存」ボタン
    - 「設定読み込み」ボタン

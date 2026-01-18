@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ダウンロード結果を保持するデータモデル"""
 
 from dataclasses import dataclass, field

@@ -1,4 +1,4 @@
-# ippi-down
+﻿# ippi-down
 
 建設情報サービス「ppi.jp」から条件に基づいてファイルを自動ダウンロードするツール
 
@@ -12,7 +12,6 @@ ppi.jpのWebサイトを解析し、ユーザーが指定した条件に一致�
 - 条件に基づくファイルの自動ダウンロード
 - HTML構造に基づく自動ファイル命名
 - ローカルフォルダへの保存
-- Boxクラウドストレージへの保存
 - 定期実行（スケジューリング）
 - HTTPレート制限（429エラー）の自動処理
 - Windowsパス長制限（260文字）の自動対応
@@ -45,10 +44,14 @@ ippi-down/
 ├── config/               # 設定ファイル
 │   └── config.example.yaml
 ├── scripts/              # スクリプト
-│   ├── build_exe.bat     # 実行ファイルビルド（バッチ）
-│   ├── build_exe.ps1     # 実行ファイルビルド（PowerShell）
-│   ├── rebuild_exe.bat   # 実行ファイル再ビルド（バッチ）
-│   ├── rebuild_exe.ps1   # 実行ファイル再ビルド（PowerShell）
+│   ├── build/            # ビルドスクリプト
+│   │   ├── build_exe.bat     # 実行ファイルビルド（バッチ）
+│   │   ├── build_exe.ps1     # 実行ファイルビルド（PowerShell）
+│   │   ├── rebuild_exe.bat   # 実行ファイル再ビルド（バッチ）
+│   │   ├── rebuild_exe.ps1   # 実行ファイル再ビルド（PowerShell）
+│   │   └── build.spec        # PyInstaller設定
+│   ├── utils/            # ユーティリティスクリプト
+│   ├── tools/            # 配布用ツール
 │   ├── start_background.bat  # バックグラウンド起動（バッチ）
 │   └── start_background.ps1  # バックグラウンド起動（PowerShell）
 ├── tests/                # テストコード
@@ -108,9 +111,6 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 # または
 .venv\Scripts\activate.bat
-
-# Linux/macOS
-source .venv/bin/activate
 ```
 
 4. 依存関係をインストール
@@ -129,9 +129,6 @@ pip install -r requirements.txt
 
    # Windows (PowerShell)
    Copy-Item config\config.example.yaml config\config.yaml
-
-   # Linux/macOS
-   cp config/config.example.yaml config/config.yaml
    ```
 
 6. 設定ファイルを編集（必要に応じて）
@@ -207,21 +204,21 @@ PyInstallerを使用して実行ファイル（.exe）を作成できます。
    
    **Windows (コマンドプロンプト):**
    ```cmd
-   scripts\build_exe.bat
+   scripts\build\build_exe.bat
    ```
    
    **Windows (PowerShell):**
    ```powershell
-   .\scripts\build_exe.ps1
+   .\scripts\build\build_exe.ps1
    ```
    
    **再ビルド（依存関係を再インストール）:**
    ```cmd
    # コマンドプロンプト
-   scripts\rebuild_exe.bat
+   scripts\build\rebuild_exe.bat
    
    # PowerShell
-   .\scripts\rebuild_exe.ps1
+   .\scripts\build\rebuild_exe.ps1
    ```
 
 2. **手動でビルド**
@@ -232,12 +229,9 @@ PyInstallerを使用して実行ファイル（.exe）を作成できます。
    
    # Windows (PowerShell)
    .venv\Scripts\Activate.ps1
-   
-   # Linux/macOS
-   source .venv/bin/activate
 
    # PyInstallerでビルド
-   pyinstaller build.spec
+   pyinstaller scripts\build\build.spec
    ```
 
 ビルドが完了すると、`dist/ippi-down.exe` が生成されます。
@@ -325,7 +319,7 @@ Windowsのパス長制限（260文字）を超えるファイル名は自動的�
 **重要**: 
 - Gitで管理されるのは `config/config.example.yaml`（テンプレート）のみです
 - 実際に使用する `config/config.yaml` はローカルで作成し、Gitで追跡されません
-- `config/config.yaml` には機密情報（Box認証情報など）を含める可能性があるため、Gitに含めません
+- `config/config.yaml` には機密情報を含める可能性があるため、Gitに含めません
 
 初回セットアップ時は、`config/config.example.yaml` をコピーして `config/config.yaml` を作成してください。
 

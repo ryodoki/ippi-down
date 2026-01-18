@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ファイル名を生成するクラス"""
 
 from typing import Dict, Any, Optional

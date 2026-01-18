@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ASP.NET Form Parser（__VIEWSTATE等hidden解析 + postback組み立て）"""
 
 from typing import Dict, Optional

@@ -1,0 +1,45 @@
+# EditorConfig は、様々なエディタで一貫したコーディングスタイルを維持するための設定ファイルです
+# https://editorconfig.org
+
+root = true
+
+# すべてのファイル
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Python ファイル
+[*.py]
+indent_style = space
+indent_size = 4
+
+# YAML ファイル
+[*.{yaml,yml}]
+indent_style = space
+indent_size = 2
+
+# Markdown ファイル
+[*.md]
+trim_trailing_whitespace = false
+
+# Batch ファイル (Windows)
+[*.bat]
+charset = utf-8
+end_of_line = crlf
+
+# PowerShell スクリプト
+[*.ps1]
+charset = utf-8
+end_of_line = crlf
+
+# JSON ファイル
+[*.json]
+indent_style = space
+indent_size = 2
+
+# HTML ファイル
+[*.html]
+indent_style = space
+indent_size = 2

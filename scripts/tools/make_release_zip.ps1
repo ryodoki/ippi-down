@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 
 # スクリプトのディレクトリに移動
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)  # scripts/tools/ から プロジェクトルートへ
 Set-Location $ProjectRoot
 
 Write-Host "=== クリーンな配布用zipファイルを作成 ===" -ForegroundColor Cyan

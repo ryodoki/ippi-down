@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Detail Page Parser（詳細ページ→ファイル一覧抽出）"""
 
 from typing import List, Optional

@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
+
 """設定ファイルの読み込み・保存を行うクラス"""
 
 import yaml
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from ..models.config_model import (
     AppConfig,
     DownloadConditions,
@@ -10,9 +12,9 @@ from ..models.config_model import (
     SavePaths,
     ScheduleConfig,
     LoggingConfig,
-    BoxConfig,
 )
 from ..utils.logger import Logger
+from ..utils.path_utils import get_config_path, get_logs_path, get_downloads_path
 from .config_validator import ConfigValidator
 from ..app.exceptions import ConfigError, FilesystemError
 
@@ -20,9 +22,19 @@ from ..app.exceptions import ConfigError, FilesystemError
 class ConfigManager:
     """設定ファイルの読み込み・保存を行うクラス"""
 
-    def __init__(self, config_path: str = "config/config.yaml", logger: Logger = None):
-        """初期化"""
-        self.config_path = Path(config_path)
+    def __init__(self, config_path: Optional[str] = None, logger: Logger = None):
+        """初期化
+        
+        Args:
+            config_path: 設定ファイルのパス。Noneの場合はデフォルトパスを使用。
+            logger: ロガーインスタンス
+        """
+        if config_path:
+            self.config_path = Path(config_path)
+        else:
+            # exe配布時も正しいパスを取得
+            self.config_path = get_config_path("config.yaml")
+        
         self.logger = logger or Logger()
         self.validator = ConfigValidator(self.logger)
 
@@ -91,8 +103,14 @@ class ConfigManager:
         return self.validator.validate_config(config)
 
     def get_default_config(self) -> AppConfig:
-        """デフォルト設定を取得する"""
-        return AppConfig()
+        """デフォルト設定を取得する
+        
+        exe配布時も正しいパスをデフォルト値として使用。
+        """
+        return AppConfig(
+            save_paths=SavePaths(local=str(get_downloads_path())),
+            logging=LoggingConfig(file=str(get_logs_path("app.log"))),
+        )
 
     def _dict_to_config(self, config_dict: dict) -> AppConfig:
         """辞書をAppConfigに変換"""
@@ -103,9 +121,10 @@ class ConfigManager:
             date_range=config_dict.get("download_conditions", {}).get("date_range"),
         )
 
+        # デフォルトのダウンロードパスはexeの場所を基準にする
+        default_downloads = str(get_downloads_path())
         save_paths = SavePaths(
-            local=config_dict.get("save_paths", {}).get("local", "./downloads"),
-            box=config_dict.get("save_paths", {}).get("box", {"enabled": False, "folder_id": None}),
+            local=config_dict.get("save_paths", {}).get("local", default_downloads),
         )
 
         schedule = ScheduleConfig(
@@ -115,18 +134,13 @@ class ConfigManager:
             cron=config_dict.get("schedule", {}).get("cron"),
         )
 
+        # デフォルトのログパスはexeの場所を基準にする
+        default_log_file = str(get_logs_path("app.log"))
         logging_config = LoggingConfig(
             level=config_dict.get("logging", {}).get("level", "INFO"),
-            file=config_dict.get("logging", {}).get("file", "./logs/app.log"),
+            file=config_dict.get("logging", {}).get("file", default_log_file),
             max_bytes=config_dict.get("logging", {}).get("max_bytes", 10485760),
             backup_count=config_dict.get("logging", {}).get("backup_count", 5),
-        )
-
-        box_config = BoxConfig(
-            client_id=config_dict.get("box", {}).get("client_id", ""),
-            client_secret=config_dict.get("box", {}).get("client_secret", ""),
-            access_token=config_dict.get("box", {}).get("access_token", ""),
-            refresh_token=config_dict.get("box", {}).get("refresh_token", ""),
         )
 
         # 検索条件
@@ -184,7 +198,6 @@ class ConfigManager:
             naming_rule=config_dict.get("naming_rule", "{category}_{title}_{date}_{index}"),
             schedule=schedule,
             logging=logging_config,
-            box=box_config,
         )
 
     def _config_to_dict(self, config: AppConfig) -> dict:
@@ -234,7 +247,6 @@ class ConfigManager:
             },
             "save_paths": {
                 "local": config.save_paths.local,
-                "box": config.save_paths.box,
             },
             "naming_rule": config.naming_rule,
             "schedule": {
@@ -248,12 +260,6 @@ class ConfigManager:
                 "file": config.logging.file,
                 "max_bytes": config.logging.max_bytes,
                 "backup_count": config.logging.backup_count,
-            },
-            "box": {
-                "client_id": config.box.client_id,
-                "client_secret": config.box.client_secret,
-                "access_token": config.box.access_token,
-                "refresh_token": config.box.refresh_token,
             },
         }
 

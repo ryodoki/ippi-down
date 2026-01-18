@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Storage抽象化インターフェース"""
 
 from abc import ABC, abstractmethod

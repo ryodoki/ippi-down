@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """メインウィンドウクラス"""
 
 import tkinter as tk
@@ -5,7 +7,6 @@ import tkinter.font
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 from typing import Optional, Callable
 from threading import Thread, Event
-import platform
 from ..models.config_model import AppConfig
 from ..utils.logger import Logger
 from ..gui.event_handler import EventHandler
@@ -49,33 +50,32 @@ class MainWindow:
         self.root.after(100, self.load_hachu_daibunrui_options)
 
     def setup_font(self):
-        """日本語フォントを設定"""
-        if platform.system() == "Windows":
-            # Windowsで利用可能な日本語フォントを試す
-            fonts_to_try = ["Yu Gothic UI", "MS UI Gothic", "Meiryo UI", "MS PGothic"]
-            default_font = None
+        """日本語フォントを設定（Windows専用）"""
+        # Windowsで利用可能な日本語フォントを試す
+        fonts_to_try = ["Yu Gothic UI", "MS UI Gothic", "Meiryo UI", "MS PGothic"]
+        default_font = None
 
-            # 利用可能なフォントを確認
+        # 利用可能なフォントを確認
+        try:
+            available_fonts = tk.font.families()
+            for font in fonts_to_try:
+                if font in available_fonts:
+                    default_font = font
+                    break
+        except Exception:
+            pass
+
+        # フォントが見つかった場合は設定
+        if default_font:
             try:
-                available_fonts = tk.font.families()
-                for font in fonts_to_try:
-                    if font in available_fonts:
-                        default_font = font
-                        break
-            except Exception:
-                pass
-
-            # フォントが見つかった場合は設定
-            if default_font:
-                try:
-                    # ttkスタイルのデフォルトフォントを設定
-                    style = ttk.Style()
-                    style.configure(".", font=(default_font, 9))
-                    # tkウィジェットのデフォルトフォントも設定
-                    default_font_obj = tk.font.nametofont("TkDefaultFont")
-                    default_font_obj.configure(family=default_font, size=9)
-                except Exception as e:
-                    self.logger.warning(f"フォント設定エラー: {str(e)}")
+                # ttkスタイルのデフォルトフォントを設定
+                style = ttk.Style()
+                style.configure(".", font=(default_font, 9))
+                # tkウィジェットのデフォルトフォントも設定
+                default_font_obj = tk.font.nametofont("TkDefaultFont")
+                default_font_obj.configure(family=default_font, size=9)
+            except Exception as e:
+                self.logger.warning(f"フォント設定エラー: {str(e)}")
 
     def setup_ui(self):
         """UIをセットアップ"""
@@ -668,7 +668,9 @@ class MainWindow:
                 self.logger.error(f"小分類オプション読み込みエラー: {str(e)}")
                 self.root.after(0, lambda: self.show_message(f"小分類オプションの読み込みに失敗しました: {str(e)}", "error"))
         
-        # 細分類をクリア
+        # 小分類・細分類をクリア
+        self.hachu_shoubunrui_var.set("")
+        self.hachu_shoubunrui_combo['values'] = []
         self.hachu_saibunrui_var.set("")
         self.hachu_saibunrui_combo['values'] = []
         

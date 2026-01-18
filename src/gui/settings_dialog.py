@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """設定ダイアログクラス"""
 
 import tkinter as tk
@@ -5,7 +7,6 @@ import tkinter.font
 from tkinter import ttk, filedialog, messagebox
 from typing import Optional, Tuple, List, Dict, Any
 from datetime import datetime
-import platform
 from ..models.config_model import (
     AppConfig,
     DownloadConditions,
@@ -13,7 +14,6 @@ from ..models.config_model import (
     SavePaths,
     ScheduleConfig,
     LoggingConfig,
-    BoxConfig,
 )
 from ..config.config_manager import ConfigManager
 from ..config.config_validator import ConfigValidator
@@ -58,34 +58,33 @@ class SettingsDialog:
         self.load_config_to_ui()
 
     def setup_font(self):
-        """日本語フォントを設定"""
-        if platform.system() == "Windows":
-            # Windowsで利用可能な日本語フォントを試す
-            fonts_to_try = ["Yu Gothic UI", "MS UI Gothic", "Meiryo UI", "MS PGothic"]
-            default_font = None
+        """日本語フォントを設定（Windows専用）"""
+        # Windowsで利用可能な日本語フォントを試す
+        fonts_to_try = ["Yu Gothic UI", "MS UI Gothic", "Meiryo UI", "MS PGothic"]
+        default_font = None
 
-            # 利用可能なフォントを確認
+        # 利用可能なフォントを確認
+        try:
+            available_fonts = tk.font.families()
+            for font in fonts_to_try:
+                if font in available_fonts:
+                    default_font = font
+                    break
+        except Exception:
+            pass
+
+        # フォントが見つかった場合は設定
+        if default_font:
             try:
-                available_fonts = tk.font.families()
-                for font in fonts_to_try:
-                    if font in available_fonts:
-                        default_font = font
-                        break
-            except Exception:
-                pass
-
-            # フォントが見つかった場合は設定
-            if default_font:
-                try:
-                    # ttkスタイルのデフォルトフォントを設定
-                    style = ttk.Style()
-                    style.configure(".", font=(default_font, 9))
-                    # tkウィジェットのデフォルトフォントも設定
-                    default_font_obj = tk.font.nametofont("TkDefaultFont")
-                    default_font_obj.configure(family=default_font, size=9)
-                except Exception as e:
-                    if self.logger:
-                        self.logger.warning(f"フォント設定エラー: {str(e)}")
+                # ttkスタイルのデフォルトフォントを設定
+                style = ttk.Style()
+                style.configure(".", font=(default_font, 9))
+                # tkウィジェットのデフォルトフォントも設定
+                default_font_obj = tk.font.nametofont("TkDefaultFont")
+                default_font_obj.configure(family=default_font, size=9)
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"フォント設定エラー: {str(e)}")
 
     def setup_ui(self):
         """UIをセットアップ"""
@@ -106,11 +105,6 @@ class SettingsDialog:
         search_tab = ttk.Frame(notebook, padding="10")
         notebook.add(search_tab, text="検索条件")
         self.setup_search_tab(search_tab)
-
-        # Box設定タブ
-        box_tab = ttk.Frame(notebook, padding="10")
-        notebook.add(box_tab, text="Box設定")
-        self.setup_box_tab(box_tab)
 
         # 詳細設定タブ
         advanced_tab = ttk.Frame(notebook, padding="10")
@@ -700,43 +694,6 @@ class SettingsDialog:
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-    def setup_box_tab(self, parent: ttk.Frame):
-        """Box設定タブをセットアップ"""
-        # Box有効化
-        box_enable_frame = ttk.LabelFrame(parent, text="Box設定", padding="5")
-        box_enable_frame.pack(fill=tk.X, pady=(0, 10))
-
-        self.box_enabled_var = tk.BooleanVar()
-        ttk.Checkbutton(
-            box_enable_frame, text="Boxを有効にする", variable=self.box_enabled_var
-        ).pack(anchor=tk.W, pady=(0, 10))
-
-        ttk.Label(box_enable_frame, text="BoxフォルダID:").pack(anchor=tk.W, pady=(0, 5))
-        self.box_folder_id_var = tk.StringVar()
-        ttk.Entry(box_enable_frame, textvariable=self.box_folder_id_var, width=40).pack(
-            fill=tk.X, pady=(0, 10)
-        )
-
-        # 認証情報
-        auth_frame = ttk.LabelFrame(box_enable_frame, text="認証情報", padding="5")
-        auth_frame.pack(fill=tk.X)
-
-        ttk.Label(auth_frame, text="Client ID:").pack(anchor=tk.W, pady=(0, 5))
-        self.box_client_id_var = tk.StringVar()
-        ttk.Entry(auth_frame, textvariable=self.box_client_id_var, width=40).pack(fill=tk.X, pady=(0, 10))
-
-        ttk.Label(auth_frame, text="Client Secret:").pack(anchor=tk.W, pady=(0, 5))
-        self.box_client_secret_var = tk.StringVar()
-        secret_entry = ttk.Entry(
-            auth_frame, textvariable=self.box_client_secret_var, width=40, show="*"
-        )
-        secret_entry.pack(fill=tk.X, pady=(0, 10))
-
-        self.box_secret_visible = False
-        ttk.Button(auth_frame, text="表示/非表示", command=self.toggle_secret_visibility).pack(
-            anchor=tk.W
-        )
-
     def setup_advanced_tab(self, parent: ttk.Frame):
         """詳細設定タブをセットアップ"""
         # ログ設定
@@ -801,12 +758,6 @@ class SettingsDialog:
         interval_map = {"daily": "1日", "weekly": "1週間", "monthly": "1か月"}
         self.schedule_interval_var.set(interval_map.get(config.schedule.interval, "1日"))
         self.schedule_time_var.set(config.schedule.time)
-
-        # Box設定
-        self.box_enabled_var.set(config.save_paths.box.get("enabled", False))
-        self.box_folder_id_var.set(config.save_paths.box.get("folder_id", ""))
-        self.box_client_id_var.set(config.box.client_id)
-        self.box_client_secret_var.set(config.box.client_secret)
 
         # ログ設定
         self.log_level_var.set(config.logging.level)
@@ -895,10 +846,6 @@ class SettingsDialog:
         # 保存先
         save_paths = SavePaths(
             local=self.save_path_var.get(),
-            box={
-                "enabled": self.box_enabled_var.get(),
-                "folder_id": self.box_folder_id_var.get() if self.box_folder_id_var.get() else None,
-            },
         )
 
         # スケジュール設定
@@ -907,14 +854,6 @@ class SettingsDialog:
             enabled=self.schedule_enabled_var.get(),
             interval=interval_map.get(self.schedule_interval_var.get(), "daily"),
             time=self.schedule_time_var.get(),
-        )
-
-        # Box設定
-        box_config = BoxConfig(
-            client_id=self.box_client_id_var.get(),
-            client_secret=self.box_client_secret_var.get(),
-            access_token=self.config.box.access_token,
-            refresh_token=self.config.box.refresh_token,
         )
 
         # ログ設定
@@ -946,7 +885,6 @@ class SettingsDialog:
             naming_rule=self.naming_rule_var.get(),
             schedule=schedule,
             logging=logging_config,
-            box=box_config,
         )
 
     def get_search_conditions_from_ui(self) -> SearchConditions:
@@ -1078,12 +1016,6 @@ class SettingsDialog:
     def on_hachu_multi_select(self):
         """発注機関複数選択ボタンのハンドラ"""
         messagebox.showinfo("情報", "発注機関の複数選択機能は今後実装予定です")
-
-    def toggle_secret_visibility(self):
-        """Client Secretの表示/非表示を切り替え"""
-        # この機能はEntryウィジェットのshow属性を動的に変更する必要がある
-        # 実装は簡略化
-        pass
 
     def show(self) -> Optional[AppConfig]:
         """ダイアログを表示して結果を返す"""

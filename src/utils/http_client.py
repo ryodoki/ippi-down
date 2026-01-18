@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """HTTP通信を行うクラス（セッション管理含む）"""
 
 import requests

@@ -1,12 +1,16 @@
+# -*- coding: utf-8 -*-
+
 """エントリーポイント（GUI版）"""
 
 import tkinter as tk
 import sys
 from pathlib import Path
 
-# プロジェクトルートをパスに追加
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+# プロジェクトルートをパスに追加（開発時のみ必要、exe配布時は不要）
+if not getattr(sys, 'frozen', False):
+    project_root = Path(__file__).parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
 
 from src.config.config_manager import ConfigManager
 from src.models.config_model import AppConfig

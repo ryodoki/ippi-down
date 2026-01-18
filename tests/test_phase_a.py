@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Phase A リファクタリング動作確認テスト"""
 
 import pytest

@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ApplicationServiceの動作確認テスト"""
 
 import pytest
@@ -68,7 +70,7 @@ def test_run_result():
 def test_application_service_run_without_files(mock_downloader, mock_naming, mock_filter, mock_scraper, mock_http_client):
     """ApplicationService.run() - ファイルが見つからない場合"""
     from src.app.service import ApplicationService
-    from src.models.config_model import AppConfig, SearchConditions, DownloadConditions, SavePaths, ScheduleConfig, LoggingConfig, BoxConfig
+    from src.models.config_model import AppConfig, SearchConditions, DownloadConditions, SavePaths, ScheduleConfig, LoggingConfig
     from src.utils.logger import Logger
 
     # モックの設定
@@ -88,7 +90,6 @@ def test_application_service_run_without_files(mock_downloader, mock_naming, moc
         save_paths=SavePaths(local="./test_downloads"),
         schedule=ScheduleConfig(),
         logging=LoggingConfig(),
-        box=BoxConfig()
     )
 
     logger = Logger()
@@ -110,7 +111,7 @@ def test_application_service_run_without_files(mock_downloader, mock_naming, moc
 def test_application_service_run_with_progress_callback(mock_downloader, mock_naming, mock_filter, mock_scraper, mock_http_client):
     """ApplicationService.run() - 進捗コールバックの動作確認"""
     from src.app.service import ApplicationService
-    from src.models.config_model import AppConfig, SearchConditions, DownloadConditions, SavePaths, ScheduleConfig, LoggingConfig, BoxConfig
+    from src.models.config_model import AppConfig, SearchConditions, DownloadConditions, SavePaths, ScheduleConfig, LoggingConfig
     from src.models.file_info import FileInfo
     from src.models.download_result import DownloadResult
     from src.utils.logger import Logger
@@ -145,7 +146,6 @@ def test_application_service_run_with_progress_callback(mock_downloader, mock_na
         save_paths=SavePaths(local="./test_downloads"),
         schedule=ScheduleConfig(),
         logging=LoggingConfig(),
-        box=BoxConfig()
     )
 
     logger = Logger()

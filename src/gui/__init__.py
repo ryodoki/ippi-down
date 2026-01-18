@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """GUIモジュール"""
 
 from .main_window import MainWindow

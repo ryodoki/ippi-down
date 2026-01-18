@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Metadata Extractor（FileInfoへメタデータ正規化）"""
 
 from typing import Optional, Dict, Any

@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ローカルファイルシステムへの保存を行うクラス"""
 
 from pathlib import Path

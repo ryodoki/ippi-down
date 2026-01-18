@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Page Fetcher（HTTP取得/リトライ/429制御）"""
 
 from typing import Optional

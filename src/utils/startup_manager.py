@@ -1,33 +1,25 @@
-"""PC起動時の自動実行を管理するクラス"""
+# -*- coding: utf-8 -*-
+
+"""PC起動時の自動実行を管理するクラス（Windows専用）"""
 
 import os
 import sys
-import platform
 from pathlib import Path
 from typing import Optional
 from ..utils.logger import Logger
 
 
 class StartupManager:
-    """PC起動時の自動実行を管理するクラス"""
+    """PC起動時の自動実行を管理するクラス（Windows専用）"""
 
     def __init__(self, logger: Optional[Logger] = None):
         """初期化"""
         self.logger = logger or Logger()
-        self.system = platform.system()
 
     def register_startup(self, app_path: str, app_name: str = "ppi-file-downloader") -> bool:
         """PC起動時に自動実行するように登録"""
         try:
-            if self.system == "Windows":
-                return self._register_windows(app_path, app_name)
-            elif self.system == "Darwin":  # macOS
-                return self._register_macos(app_path, app_name)
-            elif self.system == "Linux":
-                return self._register_linux(app_path, app_name)
-            else:
-                self.logger.warning(f"未対応のOS: {self.system}")
-                return False
+            return self._register_windows(app_path, app_name)
         except Exception as e:
             self.logger.error(f"スタートアップ登録エラー: {str(e)}")
             return False
@@ -35,14 +27,7 @@ class StartupManager:
     def unregister_startup(self, app_name: str = "ppi-file-downloader") -> bool:
         """PC起動時の自動実行を解除"""
         try:
-            if self.system == "Windows":
-                return self._unregister_windows(app_name)
-            elif self.system == "Darwin":  # macOS
-                return self._unregister_macos(app_name)
-            elif self.system == "Linux":
-                return self._unregister_linux(app_name)
-            else:
-                return False
+            return self._unregister_windows(app_name)
         except Exception as e:
             self.logger.error(f"スタートアップ解除エラー: {str(e)}")
             return False
@@ -144,92 +129,3 @@ class StartupManager:
         except Exception as e:
             self.logger.error(f"Windowsスタートアップ解除エラー: {str(e)}")
             return False
-
-    def _register_macos(self, app_path: str, app_name: str) -> bool:
-        """macOSでスタートアップに登録"""
-        try:
-            # LaunchAgentsにplistファイルを作成
-            launch_agents_dir = Path.home() / "Library" / "LaunchAgents"
-            launch_agents_dir.mkdir(parents=True, exist_ok=True)
-
-            plist_path = launch_agents_dir / f"com.{app_name}.plist"
-            plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.{app_name}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>{sys.executable}</string>
-        <string>{app_path}</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>"""
-
-            with open(plist_path, "w") as f:
-                f.write(plist_content)
-
-            self.logger.info(f"macOSスタートアップに登録しました: {plist_path}")
-            return True
-
-        except Exception as e:
-            self.logger.error(f"macOSスタートアップ登録エラー: {str(e)}")
-            return False
-
-    def _unregister_macos(self, app_name: str) -> bool:
-        """macOSでスタートアップを解除"""
-        try:
-            plist_path = Path.home() / "Library" / "LaunchAgents" / f"com.{app_name}.plist"
-            if plist_path.exists():
-                plist_path.unlink()
-                self.logger.info("macOSスタートアップを解除しました")
-                return True
-            return False
-        except Exception as e:
-            self.logger.error(f"macOSスタートアップ解除エラー: {str(e)}")
-            return False
-
-    def _register_linux(self, app_path: str, app_name: str) -> bool:
-        """Linuxでスタートアップに登録"""
-        try:
-            # .config/autostartに.desktopファイルを作成
-            autostart_dir = Path.home() / ".config" / "autostart"
-            autostart_dir.mkdir(parents=True, exist_ok=True)
-
-            desktop_path = autostart_dir / f"{app_name}.desktop"
-            desktop_content = f"""[Desktop Entry]
-Type=Application
-Name={app_name}
-Exec={sys.executable} {app_path}
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-"""
-
-            with open(desktop_path, "w") as f:
-                f.write(desktop_content)
-            os.chmod(desktop_path, 0o755)
-
-            self.logger.info(f"Linuxスタートアップに登録しました: {desktop_path}")
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Linuxスタートアップ登録エラー: {str(e)}")
-            return False
-
-    def _unregister_linux(self, app_name: str) -> bool:
-        """Linuxでスタートアップを解除"""
-        try:
-            desktop_path = Path.home() / ".config" / "autostart" / f"{app_name}.desktop"
-            if desktop_path.exists():
-                desktop_path.unlink()
-                self.logger.info("Linuxスタートアップを解除しました")
-                return True
-            return False
-        except Exception as e:
-            self.logger.error(f"Linuxスタートアップ解除エラー: {str(e)}")
-            return False
-

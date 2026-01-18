@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Parser用データモデル"""
 
 from dataclasses import dataclass

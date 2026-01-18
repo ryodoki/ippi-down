@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ダウンロードタスクを保持するデータモデル"""
 
 from dataclasses import dataclass
@@ -11,7 +13,6 @@ class DownloadTask:
 
     file_info: FileInfo
     local_path: str
-    box_folder_id: Optional[str] = None
     status: str = "pending"  # pending, downloading, completed, failed
     error_message: str = ""
     retry_count: int = 0

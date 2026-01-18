@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """カスタム例外定義"""
 
 
@@ -20,11 +22,6 @@ class RateLimitError(PpiDownloaderError):
 
 class FilesystemError(PpiDownloaderError):
     """ファイルシステムエラー（ディレクトリ作成失敗、ファイル書き込み失敗等）"""
-    pass
-
-
-class BoxApiError(PpiDownloaderError):
-    """Box APIエラー"""
     pass
 
 

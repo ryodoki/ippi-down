@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """実行結果データモデル"""
 
 from dataclasses import dataclass

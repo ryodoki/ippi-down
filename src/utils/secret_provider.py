@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Secret Provider（機密情報管理）"""
 
 from abc import ABC, abstractmethod

@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """進捗イベント定義"""
 
 from dataclasses import dataclass

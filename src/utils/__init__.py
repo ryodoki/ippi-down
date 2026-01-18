@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ユーティリティモジュール"""
 
 from .logger import Logger

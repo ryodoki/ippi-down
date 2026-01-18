@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Logger Factory（安全なLogger生成）"""
 
 import logging

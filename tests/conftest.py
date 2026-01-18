@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """pytest設定とフィクスチャ"""
 
 import pytest

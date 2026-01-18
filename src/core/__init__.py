@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """コア機能モジュール"""
 
 from .scraper import Scraper

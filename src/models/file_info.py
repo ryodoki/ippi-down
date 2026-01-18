@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ファイル情報を保持するデータモデル"""
 
 from dataclasses import dataclass

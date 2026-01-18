@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """設定管理モジュール"""
 
 from .config_manager import ConfigManager

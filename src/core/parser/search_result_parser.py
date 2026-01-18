@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """Search Result Parser（検索結果→案件一覧抽出）"""
 
 from typing import List, Optional

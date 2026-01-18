@@ -1,4 +1,4 @@
-# ppi-file-downloader 設定ファイル例
+﻿# ppi-file-downloader 設定ファイル例
 
 # 対象URL
 target_urls:
@@ -18,9 +18,6 @@ download_conditions:
 # 保存先
 save_paths:
   local: ./downloads
-  box:
-    enabled: false
-    folder_id: null
 
 # ファイル命名規則
 # 使用可能な変数: {filename}, {file_type}, {category}, {title}, {date}, {index}
@@ -39,12 +36,4 @@ logging:
   file: ./logs/app.log
   max_bytes: 10485760  # 10MB
   backup_count: 5
-
-# Box設定
-# 注意: 認証情報は環境変数から読み込むことを推奨
-box:
-  client_id: ""      # 環境変数 BOX_CLIENT_ID から読み込む
-  client_secret: ""   # 環境変数 BOX_CLIENT_SECRET から読み込む
-  access_token: ""    # OAuth認証後に保存
-  refresh_token: ""   # OAuth認証後に保存
 

@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """ダウンロード条件でフィルタリングを行うクラス"""
 
 from typing import List
