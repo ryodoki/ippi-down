@@ -140,7 +140,7 @@ Add-Manifest "=== Actions ==="
 # -----------------------------
 # 3) コピー関数（除外しながら）
 # -----------------------------
-function Is-ExcludedFile([string]$fileName) {
+function Test-ExcludedFile([string]$fileName) {
     foreach ($pat in $ExcludeFilePatterns) {
         if ($fileName -like $pat) { return $true }
     }
@@ -160,7 +160,7 @@ function Copy-DirFiltered($srcDir, $dstDir) {
             $nextDst = Join-Path $dstDir $item.Name
             Copy-DirFiltered -srcDir $item.FullName -dstDir $nextDst
         } else {
-            if (Is-ExcludedFile $item.Name) {
+            if (Test-ExcludedFile $item.Name) {
                 Add-Manifest "SKIP_FILE $($item.FullName)"
                 continue
             }
