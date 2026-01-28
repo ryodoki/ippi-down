@@ -1,0 +1,148 @@
+Pack Time: 2026-01-24 04:41:51
+ProjectRoot: C:\Users\ryout\Workspaces\ippi-down
+OutDir: C:\Users\ryout\Workspaces\ippi-down\_review_pack
+
+=== Include Dirs ===
+src
+tests
+docs
+scripts
+assets
+resources
+templates
+
+=== Include Files ===
+README.md
+README.txt
+pyproject.toml
+poetry.lock
+uv.lock
+requirements.txt
+requirements-dev.txt
+requirements.lock
+pytest.ini
+tox.ini
+.coveragerc
+.gitignore
+LICENSE
+
+=== Exclude Dir Names ===
+.venv
+venv
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.tox
+.idea
+.vscode
+node_modules
+dist
+build
+.git
+
+=== Exclude File Patterns ===
+*.pyc
+*.pyo
+*.log
+*.pfx
+*.pem
+*.key
+.env
+.env.*
+*secret*
+*token*
+*credential*
+*password*
+
+=== Actions ===
+COPY_DIR  C:\Users\ryout\Workspaces\ippi-down\src
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\__pycache__
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\app\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\app\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\app\events.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\app\exceptions.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\app\run_result.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\app\service.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\config\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\config\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\config\config_manager.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\config\config_validator.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\core\__pycache__
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\core\extractor\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\extractor\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\extractor\metadata_extractor.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\core\fetcher\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\fetcher\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\fetcher\page_fetcher.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\core\parser\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\parser\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\parser\aspnet_form_parser.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\parser\detail_page_parser.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\parser\models.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\parser\search_result_parser.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\downloader.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\filter.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\naming.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\core\scraper.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\gui\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\gui\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\gui\event_handler.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\gui\main_window.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\gui\settings_dialog.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\models\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\models\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\models\config_model.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\models\download_result.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\models\download_task.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\models\file_info.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\scheduler\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\scheduler\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\scheduler\scheduler.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\storage\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\storage\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\storage\base.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\storage\local_storage.py
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\src\utils\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\file_utils.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\http_client.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\logger_factory.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\logger.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\notifier.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\path_utils.py
+SKIP_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\secret_provider.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\utils\startup_manager.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\src\main.py
+COPY_DIR  C:\Users\ryout\Workspaces\ippi-down\tests
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\tests\__pycache__
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\fixtures\test_detail_page.html
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\fixtures\test_download_session.pdf
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\__init__.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\conftest.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\test_application_service.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\test_config_model.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\test_file_utils.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\test_http_client.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\test_integration.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\test_phase_a.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\tests\test_phase_b.py
+COPY_DIR  C:\Users\ryout\Workspaces\ippi-down\docs
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\docs\DEPLOYMENT.md
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\docs\implementation_design.md
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\docs\requirements.md
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\docs\settings_requirements.md
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\docs\system_design.md
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\docs\technology_selection.md
+COPY_DIR  C:\Users\ryout\Workspaces\ippi-down\scripts
+SKIP_DIR  C:\Users\ryout\Workspaces\ippi-down\scripts\build
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\scripts\dev\test_download_with_playwright.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\scripts\tools\make_release_zip.ps1
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\scripts\utils\add_encoding_declarations.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\scripts\utils\check_encoding.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\scripts\utils\convert_to_utf8.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\scripts\utils\create_readme_docx.py
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\scripts\start_background.bat
+COPY_FILE C:\Users\ryout\Workspaces\ippi-down\scripts\start_background.ps1

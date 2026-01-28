@@ -1,0 +1,293 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html lang="ja">
+<head>
+<title>入札情報サービス 入札の経過（工事）案件概要</title>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+<meta content="Microsoft Visual Studio .NET 7.1" name="GENERATOR"/>
+<meta content="C#" name="CODE_LANGUAGE"/>
+<meta content="JavaScript" name="vs_defaultClientScript"/>
+<meta content="http://schemas.microsoft.com/intellisense/ie5" name="vs_targetSchema"/>
+<link href="../../css/main.css" rel="stylesheet" type="text/css"/>
+<link href="../../css/koji.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript">
+            //------------------------------------------------
+            //関数：sizeChangeTarget()
+            //------------------------------------------------	
+            function sizeChangeTarget() {
+                var arrayEle = [];
+
+                // 文字の大きさを変更する要素
+                arrayEle.push(document.getElementById('tblDataHdr'));
+                var dataEle = document.getElementById('tblDataDtl').getElementsByTagName('tr');
+                Array.prototype.forEach.call(dataEle, function (ele) {
+                    arrayEle.push(ele);
+                });
+
+                arrayEle.push(document.getElementById('tblReference').querySelectorAll('tr')[1]);
+                arrayEle.push(document.getElementById('tblReference').querySelectorAll('tr')[3]);
+
+				changeFontClass(arrayEle);
+
+                // 画面のフォントサイズちらつき対策
+                document.body.style.display = 'block';
+            }
+        </script>
+<script language="JavaScript">
+		function new_win1(){
+			
+			var AnkenkanriNo = "021020002025412000000566";
+			var HachushaId = "02102000";
+			selectWin = window.open("https://www.i-ppi.jp/IPPI/DownloadServices/Web/UserEntry_Download.aspx?data1=" + AnkenkanriNo + "&data2=" + HachushaId, "subList1Win","width=650px,height=600,location=no,menubar=no,resizable=yes,scrollbars=yes,status=yes,toolbar=no");
+		　　selectWin.focus();
+		}
+		</script>
+</head>
+<body ms_positioning="GridLayout" style="display:none;">
+<form action="List_Detail.aspx?tab=4" id="Form1" method="post" name="Form1">
+<input id="__VIEWSTATE" name="__VIEWSTATE" type="hidden" value="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"/>
+<input id="__VIEWSTATEGENERATOR" name="__VIEWSTATEGENERATOR" type="hidden" value="03924484"/>
+<input id="__EVENTVALIDATION" name="__EVENTVALIDATION" type="hidden" value="TVv/RWoC9JLIbraMn5A2/pO7WSkzd14QHZM1DMEzMQ7uQm7j0gXnvBW4wc61WcWx9YuHZDOxWGhQENb5S9tSEz1f42qjKQwrNOc4DRwrRzyzkz1eXXslvCF45EDv3LzcbKJlsdMnApboTrpmxQ+MEfQmQyjABz7jMoHxbwVSw1gVkoh/BfOeOvi69P1kNaKy8SdWjzMFMU0dUdCV7FkqzLtqHOwYquu9AHnAst6TM2x1Uwqjxgfp3ODMFrhMGG2iTMPQyv9EIthk+hUcxn4pdGhQ10jzCldWmLutswizzIDroy/vA2Ypuz8QWSM="/>
+<div align="left" style="text-align: -webkit-center;">
+<link href="../../css/ppi_main_base.css" rel="stylesheet" type="text/css"/>
+<link href="" id="css" rel="stylesheet" type="text/css"/>
+<script language="JavaScript" src="../../js/Common.js" type="text/javascript"></script>
+<script src="../../js/Header.js" type="text/javascript"></script>
+<script type="text/javascript">
+	function new_winHelp(url) {
+		selectWin = window.open(url, "subList2Win", "width=650px,height=600,location=no,menubar=no,resizable=yes,scrollbars=yes,status=no,toolbar=no");
+		selectWin.focus();
+	}
+</script>
+<div class="print_header" id="header_div">
+<table id="header_table">
+<tr>
+<td id="header_block" rowspan="2">
+<a href="../../Index.htm" target="_top">
+<div>
+<font id="ppi_title">入札情報サービス</font><br/>
+<font id="ppi_sub">公共発注機関が公開する全国の入札情報を提供しています</font><br/>
+</div>
+</a>
+</td>
+<td id="support_frm">
+<div class="support_btn support_title">文字の<br/>大きさ</div>
+<a href="javascript:onClickLargeText()"><span class="support_btn size_color_btn">大</span></a>
+<a href="javascript:onClickMediumText()"><span class="support_btn size_color_btn">中</span></a>
+<a href="javascript:onClickSmallText()"><span class="support_btn size_color_btn" style="margin-right: 25px;">小</span></a>
+<div class="support_btn support_title">背景色と<br/>文字色</div>
+<a href="javascript:onClickBlackText()"><span class="support_btn size_color_btn color_selected">黒</span></a>
+<a href="javascript:onClickWhiteText()"><span class="support_btn size_color_btn color_w_b">白</span></a>
+<a href="javascript:onClickYellowText()"><span class="support_btn size_color_btn color_bl_y" style="margin-right: 15px;">黄</span></a>
+<div class="support_btn" style="line-height:19px; color:white; padding-right: 12px; text-align: left;">
+<a class="support_txt" href="javascript:new_winHelp('../../help_search.htm');"><span id="q_icon">？</span> ヘルプ</a><br/>
+<a class="support_txt" href="mailto:i-ppi.helpdesk@jacic.or.jp">✉ お問い合わせ</a>
+</div>
+</td>
+</tr>
+<tr>
+<td style="width:812px; min-width: 812px; vertical-align: bottom; padding: 0px;">
+<a href="../../Index.htm" target="_top"><span class="button_cls">全国</span></a>
+<a href="../../IndexArea.aspx?data1=1" target="_top"><span class="button_cls">北海道</span></a>
+<a href="../../IndexArea.aspx?data1=2" target="_top"><span class="button_cls">東北</span></a>
+<a href="../../IndexArea.aspx?data1=3" target="_top"><span class="button_cls">関東</span></a>
+<a href="../../IndexArea.aspx?data1=4" target="_top"><span class="button_cls">北陸</span></a>
+<a href="../../IndexArea.aspx?data1=5" target="_top"><span class="button_cls">中部</span></a>
+<a href="../../IndexArea.aspx?data1=6" target="_top"><span class="button_cls">近畿</span></a>
+<a href="../../IndexArea.aspx?data1=7" target="_top"><span class="button_cls">中国</span></a>
+<a href="../../IndexArea.aspx?data1=8" target="_top"><span class="button_cls">四国</span></a>
+<a href="../../IndexArea.aspx?data1=9" target="_top"><span class="button_cls">九州･沖縄</span></a>
+</td>
+</tr>
+</table>
+</div>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table1" style="border-collapse:collapse;">
+<tr>
+<td class="chuchoki tabtitle">
+<label class="tabtitletext">●</label>
+<label>中長期の検索</label>
+<label class="tabtitletext">●</label>
+</td><td class="koji tabtitle">
+<label class="tabtitletext">●●●●●●●●●●</label>
+<label>工事の検索</label>
+<label class="tabtitletext">●●●●●●●●●●</label>
+</td><td class="gyomu tabtitle">
+<label class="tabtitletext">●●●●●●●●●●</label>
+<label>業務の検索</label>
+<label class="tabtitletext">●●●●●●●●●●</label>
+</td><td class="hachu tabtitle">
+<label class="tabtitletext">●</label>
+<label>発注機関の検索</label>
+<label class="tabtitletext">●</label>
+</td>
+</tr><tr align="center" valign="bottom">
+<td class="chuchoki"><input class="tab chuchokitab" id="imgChuchokiMitoshi" name="imgChuchokiMitoshi" type="submit" value="中長期発注見通し"/></td><td class="koji"><input class="tab kojitab" id="imgKojiMitoshi" name="imgKojiMitoshi" type="submit" value="発注の見通し"/><input class="tab kojitab" id="imgKojiKokoku" name="imgKojiKokoku" type="submit" value="入札公告等"/><input class="tab selectkojitab" id="imgKojiKeika" name="imgKojiKeika" type="submit" value="入札の経過"/></td><td class="gyomu"><input class="tab gyomutab" id="imgGyomuMitoshi" name="imgGyomuMitoshi" type="submit" value="発注の見通し"/><input class="tab gyomutab" id="imgGyomuKokoku" name="imgGyomuKokoku" type="submit" value="入札公告等"/><input class="tab gyomutab" id="imgGyomuKeika" name="imgGyomuKeika" type="submit" value="入札の経過"/></td><td class="hachu"><input class="tab hachutab" id="imgHachuInf" name="imgHachuInf" type="submit" value="発注機関情報"/></td>
+</tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="Table2" style="border-collapse:collapse;">
+<tr class="back_top">
+<td colspan="5"></td>
+</tr><tr class="title_mid">
+<td colspan="5">入札の経過（工事）案件概要</td>
+</tr>
+</table>
+<table border="1" cellpadding="3" cellspacing="0" class="search" frame="box" id="tblDataHdr" style="empty-cells:show" width="1024">
+<tr class="odd">
+<td class="hdr">発注機関</td>
+<td><span id="lblHachukikan">国土交通省東北地方整備局</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">担当部・事務所</td>
+<td><span id="lblHachusha">能代河川国道事務所</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">工事名称</td>
+<td><span id="lblKojiNm">摩当山トンネル換気設備製作据付工事</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr" rowspan="2">工事場所</td>
+<td>自：
+							<span id="lblKojiPlaceFrom">秋田県北秋田市栄から大館市大子内　地内</span></td>
+</tr>
+<tr class="odd">
+<td>至：
+							<span id="lblKojiPlaceTo">秋田県</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">入札契約方式</td>
+<td><span id="lblNyusatsuPtn">一般競争入札（同時提出型）</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">工事種別／工事の業種</td>
+<td><span id="lblKojiType">機械設備工事</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">設計書番号</td>
+<td><span id="lblSekkeisyoNo">2025824741010012</span>         
+							＊発注機関が独自に定めるコード</td>
+</tr>
+<tr class="odd">
+<td class="hdr">公告日時</td>
+<td><span id="lblKokokuDate">2025年10月03日 00時00分</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">期限日時</td>
+<td><span id="lblkigenDate">2025年10月14日 14時00分</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">開札日時</td>
+<td><span id="lblKasatuDate">2025年11月27日 10時00分</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">契約日</td>
+<td><span id="lblKeiyakuYmd"><br/></span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">電子入札対象</td>
+<td><span id="lblElectronicNyusatsu">対象</span></td>
+</tr>
+<tr class="title_light">
+<td class="hdr" colspan="2">■予定価格情報</td>
+</tr>
+<tr class="odd">
+<td class="hdr">予定価格</td>
+<td><span id="lblYoteiPrice">70,690,000（税抜き）</span></td>
+</tr>
+<tr class="title_light">
+<td class="hdr" colspan="2">■落札者情報</td>
+</tr>
+<tr class="odd">
+<td class="hdr">落札者名</td>
+<!-- 2018.02.02 EDIT hiroaki sasaki 法人番号対応_桁数変更対応（画面崩れ対応）-->
+<td class="item_word_break"><span id="lblRakusatsuNm">株式会社日立インダストリアルプロダクツ</span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">落札価格</td>
+<td><span id="lblRakusatsuPrice">65,700,000（税抜き）</span></td>
+</tr>
+<tr class="title_light">
+<td class="hdr" colspan="2">■契約情報</td>
+</tr>
+<tr class="odd">
+<td class="hdr">契約者名</td>
+<!-- 2018.02.02 EDIT hiroaki sasaki 法人番号対応_桁数変更対応（画面崩れ対応）-->
+<td class="item_word_break"><span id="lblKeiyakuNm"><br/></span></td>
+</tr>
+<tr class="odd">
+<td class="hdr">契約金額</td>
+<td><span id="lblKeiyakuPrice"><br/></span></td>
+</tr>
+</table>
+<br/>
+<hr/>
+<br/>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="tblDataDtl" width="1024">
+<tr class="title_mid_midle">
+<td>公開文書</td>
+</tr>
+<tr class="title_light">
+<td class="hdr">入札公告等</td>
+</tr>
+<tr>
+<td>
+<table border="1" cellspacing="0" class="searchgrid_bunsho" id="dgrKokoku" rules="all" style="border-collapse:collapse;">
+<tr class="dgrtitle" nowrap="nowrap">
+<td class="w360">文書名称</td><td class="w150">公開状況</td><td class="w150">最終更新日</td><td class="w150">掲載終了日</td>
+</tr><tr>
+<td>入札公告</td><td><a href="https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021020002025412000000566&amp;BunshoKanriId=20" target="_blank">公開中</a></td><td>2025年10月03日 07時00分</td><td>2027年03月31日 23時00分</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td> </td>
+</tr>
+<tr class="title_light">
+<td class="hdr">入札経過・その他</td>
+</tr>
+<tr>
+<td>
+<table border="1" cellspacing="0" class="searchgrid_bunsho" id="dgrKeika" rules="all" style="border-collapse:collapse;">
+<tr class="dgrtitle" nowrap="nowrap">
+<td class="w360">文書名称</td><td class="w150">公開状況</td><td class="w150">最終更新日</td><td class="w150">掲載終了日</td>
+</tr><tr>
+<td>入札調書</td><td><a href="https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021020002025412000000566&amp;BunshoKanriId=40" target="_blank">公開中</a></td><td>2025年12月01日 15時53分</td><td>2027年03月31日 23時00分</td>
+</tr><tr>
+<td>入札調書（総合評価落札方式）</td><td><a href="https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021020002025412000000566&amp;BunshoKanriId=41" target="_blank">公開中</a></td><td>2025年12月01日 16時13分</td><td>2027年03月31日 23時00分</td>
+</tr>
+</table>
+<br/>
+</td>
+</tr>
+</table>
+<br/>
+<hr/>
+<br/>
+<table border="0" cellpadding="0" cellspacing="0" class="search" id="tblReference">
+<tr class="title_mid_small">
+<td colspan="2">内容に関するお問い合わせは各発注機関までお願い致します。</td>
+</tr>
+<tr class="odd">
+<td class="inf">発注機関への連絡先等はこちらからご確認ください。</td>
+<td align="left">
+<a href="https://www.i-ppi.jp/IPPI/SearchServices/Web/Hachu/Inf/List_Detail.aspx?data1=%a%%s%%k%%a%%s%%a%%a%%a%" id="hlkInquiryList" target="_blank">問い合わせ先一覧</a>
+</td>
+</tr>
+<tr class="odd">
+<td colspan="2"></td>
+</tr>
+<tr class="back_src">
+<td colspan="2">
+<a class="backlink" href="javascript:history.back()">検索結果一覧画面に戻る</a>
+</td>
+</tr>
+</table>
+<!-- 2009.8.26 ADD H21サーバ更改/機能修正：画面遷移時検索情報引継ぎ -start- -->
+<!-- 2009.8.26 ADD H21サーバ更改/機能修正：画面遷移時検索情報引継ぎ -end- -->
+<!-- 2009.11.2 ADD H21サーバ更改/機能修正：発注機関複数選択 -start- -->
+<input id="txt_ObjWin2Status" name="txt_ObjWin2Status" size="1" type="hidden"/>
+<!-- 2009.11.2 ADD H21サーバ更改/機能修正：発注機関複数選択 -end- -->
+</div>
+</form>
+</body>
+<script src="../../js/Timer.js" type="text/javascript"></script>
+</html>
