@@ -1,4 +1,4 @@
-"""ASP.NET Form Parser（__VIEWSTATE等hidden解析 + postback組み立て）"""
+﻿"""ASP.NET Form Parser（__VIEWSTATE等hidden解析 + postback組み立て）"""
 
 from typing import Dict, Optional
 from bs4 import BeautifulSoup

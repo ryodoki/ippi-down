@@ -1,4 +1,4 @@
-"""Parser用データモデル"""
+﻿"""Parser用データモデル"""
 
 from dataclasses import dataclass
 from typing import Optional

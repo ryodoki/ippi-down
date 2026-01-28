@@ -1,4 +1,4 @@
-"""Page Fetcher（HTTP取得/リトライ/429制御）"""
+﻿"""Page Fetcher（HTTP取得/リトライ/429制御）"""
 
 from typing import Optional
 from bs4 import BeautifulSoup

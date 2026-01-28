@@ -1,4 +1,4 @@
-"""ダウンロード結果を保持するデータモデル"""
+﻿"""ダウンロード結果を保持するデータモデル"""
 
 from dataclasses import dataclass, field
 from typing import List

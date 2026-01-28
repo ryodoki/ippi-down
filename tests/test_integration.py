@@ -1,4 +1,4 @@
-"""統合テスト（既存機能の動作確認）"""
+﻿"""統合テスト（既存機能の動作確認）"""
 
 import pytest
 import sys
@@ -15,7 +15,7 @@ sys.path.insert(0, str(project_root))
 def test_application_service_with_mocks():
     """ApplicationServiceの統合テスト（モック使用）"""
     from src.app.service import ApplicationService
-    from src.models.config_model import AppConfig, SearchConditions, DownloadConditions, SavePaths, ScheduleConfig, LoggingConfig, BoxConfig
+    from src.models.config_model import AppConfig, SearchConditions, DownloadConditions, SavePaths, ScheduleConfig, LoggingConfig
     from src.models.file_info import FileInfo
     from src.models.download_result import DownloadResult
     from src.utils.logger import Logger
@@ -56,7 +56,6 @@ def test_application_service_with_mocks():
             save_paths=SavePaths(local="./test_downloads"),
             schedule=ScheduleConfig(),
             logging=LoggingConfig(),
-            box=BoxConfig()
         )
 
         logger = Logger()

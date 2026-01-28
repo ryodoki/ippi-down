@@ -19,6 +19,44 @@ class Scraper:
         self.http_client = http_client
         self.logger = logger or Logger()
 
+    def _set_response_encoding(self, response) -> None:
+        """レスポンスのエンコーディングを設定（共通処理）"""
+        if response.encoding:
+            response.encoding = response.apparent_encoding or 'utf-8'
+        else:
+            response.encoding = 'utf-8'
+
+    def _parse_response_to_soup(self, response) -> BeautifulSoup:
+        """レスポンスからBeautifulSoupを生成（共通処理）"""
+        self._set_response_encoding(response)
+        try:
+            return BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
+        except (UnicodeDecodeError, LookupError):
+            try:
+                return BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
+            except UnicodeDecodeError:
+                return BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
+
+    def _set_chubunrui_select_index(self, soup: BeautifulSoup, form_data: Dict[str, str], chubunrui_value: str) -> None:
+        """中分類の選択インデックスをform_dataに設定"""
+        dropdown = soup.find("select", id="drpLargeKikanInf2")
+        if dropdown:
+            for idx, opt in enumerate(dropdown.find_all("option")):
+                if opt.get("value", "") == chubunrui_value:
+                    form_data["txtLgKikanInf2SelIndex_h"] = str(idx)
+                    self.logger.debug(f"中分類の選択インデックス: {idx}")
+                    break
+
+    def _do_postback(self, url: str, soup: BeautifulSoup, event_target: str, additional_data: Optional[Dict[str, str]] = None) -> BeautifulSoup:
+        """POSTバックを実行してBeautifulSoupを返す"""
+        form_data = self._get_all_hidden_inputs(soup)
+        form_data["__EVENTTARGET"] = event_target
+        form_data["__EVENTARGUMENT"] = ""
+        if additional_data:
+            form_data.update(additional_data)
+        response = self.http_client.post(url, data=form_data)
+        return self._parse_response_to_soup(response)
+
     def _normalize_search_url(self, search_url: str) -> str:
         """検索URLを正規化（tab=4パラメータを追加）"""
         parsed = urlparse(search_url)
@@ -38,21 +76,7 @@ class Scraper:
             normalized_url = self._normalize_search_url(url)
             self.logger.info(f"ページを取得中: {normalized_url}")
             response = self.http_client.get(normalized_url)
-            
-            if response.encoding:
-                response.encoding = response.apparent_encoding or 'utf-8'
-            else:
-                response.encoding = 'utf-8'
-            
-            try:
-                soup = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    soup = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
-            
-            return soup
+            return self._parse_response_to_soup(response)
         except Exception as e:
             self.logger.error(f"ページ取得エラー: {url} - {str(e)}", exc_info=True)
             return None
@@ -95,6 +119,57 @@ class Scraper:
             self.logger.debug(f"__VIEWSTATEGENERATOR: 取得済み")
         
         return hidden_inputs
+
+    def _get_all_form_inputs(self, soup: BeautifulSoup) -> Dict[str, str]:
+        """すべてのフォームフィールド（hidden, select, text, checkbox）の値を取得
+        
+        ASP.NET WebFormsのページネーションでは、検索条件を維持するために
+        すべてのフォームフィールドを送信する必要があります。
+        """
+        form_data = {}
+        
+        # 1. Hidden inputs
+        for hidden in soup.find_all("input", type="hidden"):
+            name = hidden.get("name", "")
+            value = hidden.get("value", "")
+            if name:
+                form_data[name] = value
+        
+        # 2. Select elements (ドロップダウン)
+        for select in soup.find_all("select"):
+            name = select.get("name", "")
+            if name:
+                # 選択されているオプションの値を取得
+                selected_option = select.find("option", selected=True)
+                if selected_option:
+                    form_data[name] = selected_option.get("value", "")
+                else:
+                    # 選択されていない場合は最初のオプションの値
+                    first_option = select.find("option")
+                    if first_option:
+                        form_data[name] = first_option.get("value", "")
+        
+        # 3. Text inputs
+        for text_input in soup.find_all("input", type="text"):
+            name = text_input.get("name", "")
+            value = text_input.get("value", "")
+            if name:
+                form_data[name] = value
+        
+        # 4. Checked checkboxes
+        for checkbox in soup.find_all("input", type="checkbox"):
+            name = checkbox.get("name", "")
+            if name and checkbox.get("checked"):
+                form_data[name] = checkbox.get("value", "on")
+        
+        # 5. Checked radio buttons
+        for radio in soup.find_all("input", type="radio"):
+            name = radio.get("name", "")
+            if name and radio.get("checked"):
+                form_data[name] = radio.get("value", "")
+        
+        self.logger.debug(f"全フォームフィールドを{len(form_data)}個取得しました")
+        return form_data
 
     def _get_dropdown_select(self, soup: BeautifulSoup, dropdown_name: str):
         """ドロップダウン要素を取得"""
@@ -324,13 +399,7 @@ class Scraper:
                 return []
             
             self.logger.debug(f"POSTレスポンス: status_code={response.status_code}")
-            
-            # エンコーディング処理
-            if response.encoding:
-                response.encoding = response.apparent_encoding or 'utf-8'
-            else:
-                response.encoding = 'utf-8'
-            
+            self._set_response_encoding(response)
             response_text = response.text
             
             # ① setListItemSub()をJavaScriptから解析
@@ -339,7 +408,6 @@ class Scraper:
                 self.logger.debug("レスポンスにsetListItemSubが含まれています")
                 options_from_js = self._parse_setListItemSub(response_text, dropdown_name)
                 if options_from_js:
-                    # (value, text)のタプルからtextのリストを返す
                     display_texts = [text for _, text in options_from_js]
                     self.logger.info(f"setListItemSub()から{len(display_texts)}個のオプションを取得しました")
                     return display_texts
@@ -348,15 +416,9 @@ class Scraper:
             else:
                 self.logger.debug("レスポンスにsetListItemSubが含まれていません")
             
-            # ② HTMLから<select><option>を解析（①で取得できなかった場合のみ）
+            # ② HTMLから<select><option>を解析
             self.logger.debug("HTMLから<select><option>の解析を開始")
-            try:
-                soup = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    soup = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
+            soup = self._parse_response_to_soup(response)
             
             options_from_html = self._parse_html_options(soup, dropdown_name)
             if options_from_html:
@@ -695,18 +757,7 @@ class Scraper:
             form_data[parent_dropdown_name1] = parent_value1
             
             response = self.http_client.post(normalized_url, data=form_data)
-            if response.encoding:
-                response.encoding = response.apparent_encoding or 'utf-8'
-            else:
-                response.encoding = 'utf-8'
-            
-            try:
-                soup_after_daibunrui = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    soup_after_daibunrui = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    soup_after_daibunrui = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
+            soup_after_daibunrui = self._parse_response_to_soup(response)
             
             parent_dropdown_name2 = "drpLargeKikanInf2"
             parent_value2 = self._get_dropdown_value_from_text(soup_after_daibunrui, parent_dropdown_name2, chubunrui_value)
@@ -715,42 +766,17 @@ class Scraper:
                 return []
             
             # 中分類を選択してPOST: 小分類のオプションを取得
-            form_data2 = self._get_all_hidden_inputs(soup_after_daibunrui)
-            form_data2["__EVENTTARGET"] = parent_dropdown_name2
-            form_data2["__EVENTARGUMENT"] = ""
-            form_data2[parent_dropdown_name1] = parent_value1
-            form_data2[parent_dropdown_name2] = parent_value2
+            additional_data2 = {
+                parent_dropdown_name1: parent_value1,
+                parent_dropdown_name2: parent_value2,
+                "txtLgKikanInfSelValue_h": f"{chubunrui_value},{parent_value2}"
+            }
+            self._set_chubunrui_select_index(soup_after_daibunrui, additional_data2, parent_value2)
             
-            # createListItem2で設定される値を明示的に設定
-            # txtLgKikanInfSelValue_h = 中分類のテキスト + "," + 中分類のvalue
-            form_data2["txtLgKikanInfSelValue_h"] = f"{chubunrui_value},{parent_value2}"
-            
-            # txtLgKikanInf2SelIndex_h = 中分類の選択インデックス
-            # ドロップダウンから選択インデックスを取得
-            dropdown_chubunrui = self._get_dropdown_select(soup_after_daibunrui, parent_dropdown_name2)
-            if dropdown_chubunrui:
-                options_chubunrui = dropdown_chubunrui.find_all("option")
-                for idx, opt in enumerate(options_chubunrui):
-                    if opt.get("value", "") == parent_value2:
-                        form_data2["txtLgKikanInf2SelIndex_h"] = str(idx)
-                        self.logger.debug(f"中分類の選択インデックス: {idx}")
-                        break
-            
-            response2 = self.http_client.post(normalized_url, data=form_data2)
-            if response2.encoding:
-                response2.encoding = response2.apparent_encoding or 'utf-8'
-            else:
-                response2.encoding = 'utf-8'
-            
+            response2 = self.http_client.post(normalized_url, data={**self._get_all_hidden_inputs(soup_after_daibunrui), "__EVENTTARGET": parent_dropdown_name2, "__EVENTARGUMENT": "", **additional_data2})
+            self._set_response_encoding(response2)
             response_text2 = response2.text
-            
-            try:
-                soup_after_chubunrui = BeautifulSoup(response2.content, "lxml", from_encoding=response2.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    soup_after_chubunrui = BeautifulSoup(response2.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    soup_after_chubunrui = BeautifulSoup(response2.content.decode('utf-8', errors='ignore'), "lxml")
+            soup_after_chubunrui = self._parse_response_to_soup(response2)
             
             # 小分類のオプションを取得（中分類選択後のPOSTレスポンスから）
             # ① setListItemSub()をJavaScriptから解析
@@ -823,18 +849,7 @@ class Scraper:
             form_data[parent_dropdown_name1] = parent_value1
             
             response = self.http_client.post(normalized_url, data=form_data)
-            if response.encoding:
-                response.encoding = response.apparent_encoding or 'utf-8'
-            else:
-                response.encoding = 'utf-8'
-            
-            try:
-                soup_after_daibunrui = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    soup_after_daibunrui = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    soup_after_daibunrui = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
+            soup_after_daibunrui = self._parse_response_to_soup(response)
             
             parent_dropdown_name2 = "drpLargeKikanInf2"
             parent_value2 = self._get_dropdown_value_from_text(soup_after_daibunrui, parent_dropdown_name2, chubunrui_value)
@@ -843,40 +858,13 @@ class Scraper:
                 return []
             
             # 中分類を選択してPOST: 小分類のvalueを取得
-            form_data2 = self._get_all_hidden_inputs(soup_after_daibunrui)
-            form_data2["__EVENTTARGET"] = parent_dropdown_name2
-            form_data2["__EVENTARGUMENT"] = ""
-            form_data2[parent_dropdown_name1] = parent_value1
-            form_data2[parent_dropdown_name2] = parent_value2
-            
-            # createListItem2で設定される値を明示的に設定
-            # txtLgKikanInfSelValue_h = 中分類のテキスト + "," + 中分類のvalue
-            form_data2["txtLgKikanInfSelValue_h"] = f"{chubunrui_value},{parent_value2}"
-            
-            # txtLgKikanInf2SelIndex_h = 中分類の選択インデックス
-            # ドロップダウンから選択インデックスを取得
-            dropdown_chubunrui = self._get_dropdown_select(soup_after_daibunrui, parent_dropdown_name2)
-            if dropdown_chubunrui:
-                options_chubunrui = dropdown_chubunrui.find_all("option")
-                for idx, opt in enumerate(options_chubunrui):
-                    if opt.get("value", "") == parent_value2:
-                        form_data2["txtLgKikanInf2SelIndex_h"] = str(idx)
-                        self.logger.debug(f"中分類の選択インデックス: {idx}")
-                        break
-            
-            response2 = self.http_client.post(normalized_url, data=form_data2)
-            if response2.encoding:
-                response2.encoding = response2.apparent_encoding or 'utf-8'
-            else:
-                response2.encoding = 'utf-8'
-            
-            try:
-                soup_after_chubunrui = BeautifulSoup(response2.content, "lxml", from_encoding=response2.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    soup_after_chubunrui = BeautifulSoup(response2.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    soup_after_chubunrui = BeautifulSoup(response2.content.decode('utf-8', errors='ignore'), "lxml")
+            additional_data2 = {
+                parent_dropdown_name1: parent_value1,
+                parent_dropdown_name2: parent_value2,
+                "txtLgKikanInfSelValue_h": f"{chubunrui_value},{parent_value2}"
+            }
+            self._set_chubunrui_select_index(soup_after_daibunrui, additional_data2, parent_value2)
+            soup_after_chubunrui = self._do_postback(normalized_url, soup_after_daibunrui, parent_dropdown_name2, additional_data2)
             
             parent_dropdown_name3 = "drpMiddleKikanInf"
             parent_value3 = self._get_dropdown_value_from_text(soup_after_chubunrui, parent_dropdown_name3, shoubunrui_value)
@@ -893,20 +881,9 @@ class Scraper:
             form_data3[parent_dropdown_name3] = parent_value3
             
             response3 = self.http_client.post(normalized_url, data=form_data3)
-            if response3.encoding:
-                response3.encoding = response3.apparent_encoding or 'utf-8'
-            else:
-                response3.encoding = 'utf-8'
-            
+            self._set_response_encoding(response3)
             response_text3 = response3.text
-            
-            try:
-                soup_after_shoubunrui = BeautifulSoup(response3.content, "lxml", from_encoding=response3.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    soup_after_shoubunrui = BeautifulSoup(response3.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    soup_after_shoubunrui = BeautifulSoup(response3.content.decode('utf-8', errors='ignore'), "lxml")
+            soup_after_shoubunrui = self._parse_response_to_soup(response3)
             
             # 細分類のオプションを取得（小分類選択後のPOSTレスポンスから）
             # ① setListItemSub()をJavaScriptから解析
@@ -988,24 +965,7 @@ class Scraper:
                 daibunrui_value = self._get_dropdown_value_from_text(soup, "drpTopKikanInf", search_conditions.hachu_daibunrui)
                 if daibunrui_value:
                     self.logger.info(f"大分類を選択: '{search_conditions.hachu_daibunrui}' -> '{daibunrui_value}'")
-                    form_data = self._get_all_hidden_inputs(soup)
-                    form_data["__EVENTTARGET"] = "drpTopKikanInf"
-                    form_data["__EVENTARGUMENT"] = ""
-                    form_data["drpTopKikanInf"] = daibunrui_value
-                    
-                    response = self.http_client.post(normalized_url, data=form_data)
-                    if response.encoding:
-                        response.encoding = response.apparent_encoding or 'utf-8'
-                    else:
-                        response.encoding = 'utf-8'
-                    
-                    try:
-                        soup = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-                    except (UnicodeDecodeError, LookupError):
-                        try:
-                            soup = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                        except UnicodeDecodeError:
-                            soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
+                    soup = self._do_postback(normalized_url, soup, "drpTopKikanInf", {"drpTopKikanInf": daibunrui_value})
                     self.logger.debug("大分類のPOSTバック完了")
                 else:
                     self.logger.warning(f"大分類の値が取得できませんでした: '{search_conditions.hachu_daibunrui}'")
@@ -1015,49 +975,17 @@ class Scraper:
                 chubunrui_value = self._get_dropdown_value_from_text(soup, "drpLargeKikanInf2", search_conditions.hachu_chubunrui)
                 if chubunrui_value:
                     self.logger.info(f"中分類を選択: '{search_conditions.hachu_chubunrui}' -> '{chubunrui_value}'")
-                    form_data = self._get_all_hidden_inputs(soup)
-                    form_data["__EVENTTARGET"] = "drpLargeKikanInf2"
-                    form_data["__EVENTARGUMENT"] = ""
-                    form_data["drpTopKikanInf"] = daibunrui_value
-                    form_data["drpLargeKikanInf2"] = chubunrui_value
-                    
-                    # ブラウザと同様に、すべてのフォームフィールドを設定
-                    form_data["drpMiddleKikanInf"] = "-1"
-                    form_data["drpSmallKikanInf"] = "-1"
-                    
-                    # txtLgKikanInf2SelIndex_hを設定（中分類の選択インデックス）
-                    dropdown = soup.find("select", id="drpLargeKikanInf2")
-                    if dropdown:
-                        options = dropdown.find_all("option")
-                        for idx, opt in enumerate(options):
-                            if opt.get("value", "") == chubunrui_value:
-                                form_data["txtLgKikanInf2SelIndex_h"] = str(idx)
-                                self.logger.debug(f"中分類の選択インデックス: {idx}")
-                                break
-                    
-                    # txtLgKikanInfSelValue_hを設定（中分類のテキスト + "," + 中分類のvalue）
-                    # createListItem2()関数で設定される値
-                    chubunrui_text = search_conditions.hachu_chubunrui
-                    form_data["txtLgKikanInfSelValue_h"] = f"{chubunrui_text},{chubunrui_value}"
-                    self.logger.debug(f"txtLgKikanInfSelValue_hを設定: '{form_data['txtLgKikanInfSelValue_h']}'")
-                    
-                    # txt_ChangeTopKikanとtxt_ChangeLargeKikanを設定
-                    form_data["txt_ChangeTopKikan"] = "true" if daibunrui_value else "false"
-                    form_data["txt_ChangeLargeKikan"] = "true"
-                    
-                    response = self.http_client.post(normalized_url, data=form_data)
-                    if response.encoding:
-                        response.encoding = response.apparent_encoding or 'utf-8'
-                    else:
-                        response.encoding = 'utf-8'
-                    
-                    try:
-                        soup = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-                    except (UnicodeDecodeError, LookupError):
-                        try:
-                            soup = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                        except UnicodeDecodeError:
-                            soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
+                    additional_data = {
+                        "drpTopKikanInf": daibunrui_value,
+                        "drpLargeKikanInf2": chubunrui_value,
+                        "drpMiddleKikanInf": "-1",
+                        "drpSmallKikanInf": "-1",
+                        "txtLgKikanInfSelValue_h": f"{search_conditions.hachu_chubunrui},{chubunrui_value}",
+                        "txt_ChangeTopKikan": "true" if daibunrui_value else "false",
+                        "txt_ChangeLargeKikan": "true"
+                    }
+                    self._set_chubunrui_select_index(soup, additional_data, chubunrui_value)
+                    soup = self._do_postback(normalized_url, soup, "drpLargeKikanInf2", additional_data)
                     self.logger.debug("中分類のPOSTバック完了")
                 else:
                     self.logger.warning(f"中分類の値が取得できませんでした: '{search_conditions.hachu_chubunrui}'")
@@ -1102,37 +1030,15 @@ class Scraper:
             # 4. 小分類を選択してPOSTバック（細分類の選択肢を読み込むため）
             if search_conditions.hachu_shoubunrui and shoubunrui_value:
                 self.logger.info(f"小分類を選択してPOSTバック: '{shoubunrui_value}'")
-                form_data = self._get_all_hidden_inputs(soup)
-                form_data["__EVENTTARGET"] = "drpMiddleKikanInf"
-                form_data["__EVENTARGUMENT"] = ""
-                form_data["drpTopKikanInf"] = daibunrui_value
-                form_data["drpLargeKikanInf2"] = chubunrui_value
-                form_data["drpMiddleKikanInf"] = shoubunrui_value
-                form_data["drpSmallKikanInf"] = "-1"
-                
-                # txtLgKikanInf2SelIndex_hを再設定
+                additional_data = {
+                    "drpTopKikanInf": daibunrui_value,
+                    "drpLargeKikanInf2": chubunrui_value,
+                    "drpMiddleKikanInf": shoubunrui_value,
+                    "drpSmallKikanInf": "-1"
+                }
                 if chubunrui_value:
-                    dropdown = soup.find("select", id="drpLargeKikanInf2")
-                    if dropdown:
-                        options = dropdown.find_all("option")
-                        for idx, opt in enumerate(options):
-                            if opt.get("value", "") == chubunrui_value:
-                                form_data["txtLgKikanInf2SelIndex_h"] = str(idx)
-                                break
-                
-                response = self.http_client.post(normalized_url, data=form_data)
-                if response.encoding:
-                    response.encoding = response.apparent_encoding or 'utf-8'
-                else:
-                    response.encoding = 'utf-8'
-                
-                try:
-                    soup = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-                except (UnicodeDecodeError, LookupError):
-                    try:
-                        soup = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                    except UnicodeDecodeError:
-                        soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
+                    self._set_chubunrui_select_index(soup, additional_data, chubunrui_value)
+                soup = self._do_postback(normalized_url, soup, "drpMiddleKikanInf", additional_data)
                 self.logger.debug("小分類のPOSTバック完了")
             
             # 5. 細分類を選択（必要な場合）
@@ -1171,34 +1077,17 @@ class Scraper:
             if saibunrui_value:
                 form_data["drpSmallKikanInf"] = saibunrui_value
             
-            # txtLgKikanInf2SelIndex_hを再設定（検索時に必要）
+            # 中分類の選択インデックスを再設定（検索時に必要）
             if chubunrui_value:
-                dropdown = soup.find("select", id="drpLargeKikanInf2")
-                if dropdown:
-                    options = dropdown.find_all("option")
-                    for idx, opt in enumerate(options):
-                        if opt.get("value", "") == chubunrui_value:
-                            form_data["txtLgKikanInf2SelIndex_h"] = str(idx)
-                            break
+                self._set_chubunrui_select_index(soup, form_data, chubunrui_value)
             
             # POSTリクエストで検索を実行
             response = self.http_client.post(normalized_url, data=form_data)
+            soup = self._parse_response_to_soup(response)
             
-            # エンコーディング処理
-            if response.encoding:
-                response.encoding = response.apparent_encoding or 'utf-8'
-            else:
-                response.encoding = 'utf-8'
-            
-            try:
-                soup = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    soup = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
-            
-            self.logger.info("検索結果ページを取得しました")
+            # リダイレクト後の最終URLを保存（次ページ取得時に使用）
+            self._last_search_result_url = response.url
+            self.logger.info(f"検索結果ページを取得しました (URL: {response.url})")
             return soup
             
         except Exception as e:
@@ -1232,104 +1121,109 @@ class Scraper:
             if value:
                 form_data["drpSmallKikanInf"] = value
         
-        # 発注機関（複数選択検索）
+        # 発注機関（複数選択検索） - このフィールドは複数選択モードで使用
+        # 注意: 実際のフィールド名はtxt_MultiSearchFlagと関連するhidden値
         if search_conditions.hachu_multi:
             hachu_multi_value = ",".join(search_conditions.hachu_multi)
-            form_data["ctl00$ContentPlaceHolder1$txtHachuMulti"] = hachu_multi_value
+            form_data["txt_MultiSearchFlag"] = hachu_multi_value
         
         # 工事名（文字列検索）
         if search_conditions.koji_name:
-            form_data["ctl00$ContentPlaceHolder1$txtKojiName"] = search_conditions.koji_name
+            # 正しいフィールド名: tbxKojiNm（ブラウザのHTMLから確認）
+            form_data["tbxKojiNm"] = search_conditions.koji_name
         
-        # 工事場所（リスト検索）
+        # 工事場所（リスト検索、正しいフィールド名: drpKojiDistrict, drpKojiPrefecture2, drpKojiCity）
         if search_conditions.place_search_type == "list":
+            # ラジオボタンでリスト検索を選択
+            form_data["KojiRadioGroup"] = "rbKojiDropList"
             if search_conditions.place_chihou:
-                form_data["ctl00$ContentPlaceHolder1$ddlPlaceChihou"] = search_conditions.place_chihou
+                form_data["drpKojiDistrict"] = search_conditions.place_chihou
             if search_conditions.place_todofuken:
-                form_data["ctl00$ContentPlaceHolder1$txtPlaceTodofuken"] = search_conditions.place_todofuken
+                form_data["drpKojiPrefecture2"] = search_conditions.place_todofuken
             if search_conditions.place_shichouson:
-                form_data["ctl00$ContentPlaceHolder1$txtPlaceShichouson"] = search_conditions.place_shichouson
+                form_data["drpKojiCity"] = search_conditions.place_shichouson
         
-        # 工事場所（文字列検索）
+        # 工事場所（文字列検索、正しいフィールド名: tbxKojiPlace）
         if search_conditions.place_search_type == "text" and search_conditions.place_text:
-            form_data["ctl00$ContentPlaceHolder1$txtPlaceText"] = search_conditions.place_text
+            form_data["KojiRadioGroup"] = "rbStrKojiPlace"
+            form_data["tbxKojiPlace"] = search_conditions.place_text
         
-        # 入札契約方式（チェックボックス形式）
+        # 入札契約方式（チェックボックス形式、正しいフィールド名: chkKojiNyusatsu*）
         contract_type_map = {
-            "一般競争入札": "ctl00$ContentPlaceHolder1$chkContractType1",
-            "公募型指名競争入札": "ctl00$ContentPlaceHolder1$chkContractType2",
-            "指名競争入札": "ctl00$ContentPlaceHolder1$chkContractType3",
-            "随意契約": "ctl00$ContentPlaceHolder1$chkContractType4",
-            "その他方式": "ctl00$ContentPlaceHolder1$chkContractType5",
+            "一般競争入札": "chkKojiNyusatsu1",
+            "公募型指名競争入札": "chkKojiNyusatsu2",
+            "指名競争入札": "chkKojiNyusatsu3",
+            "随意契約": "chkKojiNyusatsu4",
+            "その他方式": "chkKojiNyusatsu5",
         }
         for contract_type in search_conditions.contract_types:
             if contract_type in contract_type_map:
                 form_data[contract_type_map[contract_type]] = "on"
         
-        # 最終更新日
+        # 最終更新日（正しいフィールド名: LastUpdate, tbxLastUpdate）
         if search_conditions.update_date_type == "past" and search_conditions.update_date_days:
-            form_data["ctl00$ContentPlaceHolder1$rdoUpdateDateType"] = "past"
-            form_data["ctl00$ContentPlaceHolder1$txtUpdateDateDays"] = str(search_conditions.update_date_days)
+            form_data["LastUpdate"] = "rbtLastUpdate2"
+            form_data["tbxLastUpdate"] = str(search_conditions.update_date_days)
         
-        # 公告日
+        # 公告日（正しいフィールド名: KokokuDateKeika, dateKokokuFromKeika, dateKokokuToKeika）
         if search_conditions.koukoku_date_type == "range":
+            form_data["KokokuDateKeika"] = "rbtKokokuDate2Keika"
             if search_conditions.koukoku_date_start:
-                form_data["ctl00$ContentPlaceHolder1$rdoKoukokuDateType"] = "range"
-                form_data["ctl00$ContentPlaceHolder1$txtKoukokuDateStart"] = search_conditions.koukoku_date_start
+                form_data["dateKokokuFromKeika"] = search_conditions.koukoku_date_start
             if search_conditions.koukoku_date_end:
-                form_data["ctl00$ContentPlaceHolder1$txtKoukokuDateEnd"] = search_conditions.koukoku_date_end
+                form_data["dateKokokuToKeika"] = search_conditions.koukoku_date_end
         
-        # 開札日
+        # 開札日（正しいフィールド名: KaisatsuDate, dateKaisatsuFrom, dateKaisatsuTo）
         if search_conditions.kaisatsu_date_type == "range":
+            form_data["KaisatsuDate"] = "rbtKaisatsuDate2"
             if search_conditions.kaisatsu_date_start:
-                form_data["ctl00$ContentPlaceHolder1$rdoKaisatsuDateType"] = "range"
-                form_data["ctl00$ContentPlaceHolder1$txtKaisatsuDateStart"] = search_conditions.kaisatsu_date_start
+                form_data["dateKaisatsuFrom"] = search_conditions.kaisatsu_date_start
             if search_conditions.kaisatsu_date_end:
-                form_data["ctl00$ContentPlaceHolder1$txtKaisatsuDateEnd"] = search_conditions.kaisatsu_date_end
+                form_data["dateKaisatsuTo"] = search_conditions.kaisatsu_date_end
         
-        # 契約日
+        # 契約日（正しいフィールド名: KeiyakuDate, dateKeiyakuFrom, dateKeiyakuTo）
         if search_conditions.keiyaku_date_type == "range":
+            form_data["KeiyakuDate"] = "rbtKeiyakuDate2"
             if search_conditions.keiyaku_date_start:
-                form_data["ctl00$ContentPlaceHolder1$rdoKeiyakuDateType"] = "range"
-                form_data["ctl00$ContentPlaceHolder1$txtKeiyakuDateStart"] = search_conditions.keiyaku_date_start
+                form_data["dateKeiyakuFrom"] = search_conditions.keiyaku_date_start
             if search_conditions.keiyaku_date_end:
-                form_data["ctl00$ContentPlaceHolder1$txtKeiyakuDateEnd"] = search_conditions.keiyaku_date_end
+                form_data["dateKeiyakuTo"] = search_conditions.keiyaku_date_end
         
-        # 工事種別
+        # 工事種別（正しいフィールド名: drpKojiKbn）
         if search_conditions.koji_shubetsu:
-            form_data["ctl00$ContentPlaceHolder1$ddlKojiShubetsu"] = search_conditions.koji_shubetsu
+            form_data["drpKojiKbn"] = search_conditions.koji_shubetsu
         
-        # 工事の業種
+        # 工事の業種（正しいフィールド名: drpKojiGyosyu）
         if search_conditions.koji_gyoushu:
-            form_data["ctl00$ContentPlaceHolder1$ddlKojiGyoushu"] = search_conditions.koji_gyoushu
+            form_data["drpKojiGyosyu"] = search_conditions.koji_gyoushu
         
-        # 予定価格
+        # 予定価格（正しいフィールド名: tbxYoteiPriceFrom, tbxYoteiPriceTo）
         if search_conditions.yotei_price_min is not None:
-            form_data["ctl00$ContentPlaceHolder1$txtYoteiPriceMin"] = str(search_conditions.yotei_price_min)
+            form_data["tbxYoteiPriceFrom"] = str(search_conditions.yotei_price_min)
         if search_conditions.yotei_price_max is not None:
-            form_data["ctl00$ContentPlaceHolder1$txtYoteiPriceMax"] = str(search_conditions.yotei_price_max)
+            form_data["tbxYoteiPriceTo"] = str(search_conditions.yotei_price_max)
         
-        # 落札価格／契約価格
+        # 落札価格／契約価格（正しいフィールド名: tbxRakusatsuPriceFrom, tbxRakusatsuPriceTo）
         if search_conditions.rakusatsu_price_min is not None:
-            form_data["ctl00$ContentPlaceHolder1$txtRakusatsuPriceMin"] = str(search_conditions.rakusatsu_price_min)
+            form_data["tbxRakusatsuPriceFrom"] = str(search_conditions.rakusatsu_price_min)
         if search_conditions.rakusatsu_price_max is not None:
-            form_data["ctl00$ContentPlaceHolder1$txtRakusatsuPriceMax"] = str(search_conditions.rakusatsu_price_max)
+            form_data["tbxRakusatsuPriceTo"] = str(search_conditions.rakusatsu_price_max)
         
-        # 落札者名／契約者名
+        # 落札者名／契約者名（正しいフィールド名: tbxRakusatsuNm）
         if search_conditions.rakusatsu_name:
-            form_data["ctl00$ContentPlaceHolder1$txtRakusatsuName"] = search_conditions.rakusatsu_name
+            form_data["tbxRakusatsuNm"] = search_conditions.rakusatsu_name
         
-        # 電子入札
+        # 電子入札（正しいフィールド名: chkElectronicNyusatsu）
         if search_conditions.denshi:
-            form_data["ctl00$ContentPlaceHolder1$chkDenshi"] = "on"
+            form_data["chkElectronicNyusatsu"] = "on"
         
-        # 公開文書
+        # 公開文書（正しいフィールド名: chkKokaiBunsyo）
         if search_conditions.koukai:
-            form_data["ctl00$ContentPlaceHolder1$chkKoukai"] = "on"
+            form_data["chkKokaiBunsyo"] = "on"
         
-        # 表示件数
+        # 表示件数（正しいフィールド名: drpCount）
         if search_conditions.display_count:
-            form_data["ctl00$ContentPlaceHolder1$ddlDisplayCount"] = str(search_conditions.display_count)
+            form_data["drpCount"] = str(search_conditions.display_count)
         
         # 検索ボタンをクリック
         form_data["btnSearch"] = "検索開始"
@@ -1339,14 +1233,178 @@ class Scraper:
     def extract_file_links_from_search_results(
         self, soup: BeautifulSoup, base_url: str, file_types: List[str], search_conditions: SearchConditions = None
     ) -> List[FileInfo]:
-        """検索結果ページからファイルリンクを抽出（案件詳細ページへのリンクも含む）
+        """検索結果ページからファイルリンクを抽出（全ページを処理、ページネーション対応）
         
         Args:
             soup: 検索結果ページのBeautifulSoupオブジェクト
             base_url: ベースURL
             file_types: ファイルタイプのリスト
             search_conditions: 検索条件（工事名でフィルタリングする場合に使用）
+        
+        Note:
+            処理後、self.last_search_total_koji_count に検索結果の工事件数が設定されます
         """
+        all_file_links = []
+        current_soup = soup
+        page_number = 1
+        max_pages = 100  # 無限ループ防止
+        total_koji_count = 0  # 全ページの工事件数をカウント
+        
+        while page_number <= max_pages:
+            self.logger.info(f"検索結果ページ {page_number} を処理中...")
+            
+            # 現在のページの工事件数をカウント（詳細ページアクセス前に）
+            page_koji_count = self._count_koji_in_page(current_soup, search_conditions)
+            total_koji_count += page_koji_count
+            self.logger.info(f"ページ {page_number} の工事件数: {page_koji_count}件 (累計: {total_koji_count}件)")
+            
+            # 現在のページからファイルリンクを抽出
+            page_files = self._extract_file_links_from_single_page(
+                current_soup, base_url, file_types, search_conditions
+            )
+            all_file_links.extend(page_files)
+            
+            # 次のページが存在するか確認
+            next_page_soup = self._get_next_page(current_soup, base_url)
+            if next_page_soup is None:
+                self.logger.info(f"全{page_number}ページの処理が完了しました")
+                break
+            
+            current_soup = next_page_soup
+            page_number += 1
+        
+        # 工事件数を属性として保存（service.pyから参照可能）
+        self.last_search_total_koji_count = total_koji_count
+        
+        self.logger.info(f"検索結果から合計{len(all_file_links)}個のファイルリンクを抽出しました（工事件数: {total_koji_count}件）")
+        return all_file_links
+    
+    def _count_koji_in_page(self, soup: BeautifulSoup, search_conditions: SearchConditions = None) -> int:
+        """現在のページの工事件数をカウント"""
+        result_table = soup.find("table", id="dgrSearchList")
+        if not result_table:
+            return 0
+        
+        rows = result_table.find_all("tr")[1:]  # ヘッダー行を除く
+        count = 0
+        
+        for row in rows:
+            # 工事名のリンクを探す
+            detail_link = row.find("a", href=lambda x: x and "__doPostBack" in x)
+            if not detail_link:
+                continue
+            
+            # 工事名を取得
+            koji_name = detail_link.get_text(strip=True)
+            if not koji_name:
+                cells = row.find_all("td")
+                for cell in cells:
+                    text = cell.get_text(strip=True)
+                    if text:
+                        koji_name = text
+                        break
+            
+            if not koji_name:
+                continue
+            
+            # 検索条件で工事名が指定されている場合、フィルタリング
+            if search_conditions and search_conditions.koji_name:
+                if search_conditions.koji_name not in koji_name:
+                    continue
+            
+            count += 1
+        
+        return count
+    
+    def _get_next_page(self, current_soup: BeautifulSoup, base_url: str) -> Optional[BeautifulSoup]:
+        """次のページを取得（存在しない場合はNoneを返す）"""
+        # 「次ページ」ボタンを探す（inputタイプのsubmit）
+        next_button = current_soup.find("input", {"type": "submit", "value": "次ページ"})
+        
+        # IDで探す（btnNext1, btnNext2）
+        if not next_button:
+            next_button = current_soup.find("input", {"id": "btnNext1"})
+        if not next_button:
+            next_button = current_soup.find("input", {"id": "btnNext2"})
+        
+        # buttonタイプも確認
+        if not next_button:
+            next_button = current_soup.find("button", string=lambda x: x and "次ページ" in x)
+        
+        # inputタイプのbutton（id="btnNext"など）も確認
+        if not next_button:
+            next_button = current_soup.find("input", {"id": lambda x: x and "Next" in str(x)})
+        
+        if not next_button:
+            self.logger.debug("次ページボタンが見つかりません（検索結果に全件表示済みの可能性）")
+            return None
+        
+        # ボタンがdisabledの場合は次のページがない
+        if next_button.get("disabled"):
+            self.logger.debug("次ページボタンが無効化されています（最終ページです）")
+            return None
+        
+        # ボタンの名前を取得
+        button_name = next_button.get("name", "")
+        if not button_name:
+            self.logger.warning(f"次ページボタンの名前が取得できません: {next_button}")
+            return None
+        
+        self.logger.info(f"次ページに移動中... (ボタン名: {button_name})")
+        
+        # POSTバックで次のページを取得（全フォームフィールドの値を送信）
+        form_data = self._get_all_form_inputs(current_soup)
+        self.logger.debug(f"Form inputs: __VIEWSTATE={len(form_data.get('__VIEWSTATE', ''))}, __EVENTVALIDATION={len(form_data.get('__EVENTVALIDATION', ''))}, total_fields={len(form_data)}")
+        form_data[button_name] = next_button.get("value", "次ページ")
+        
+        # フォームのaction属性からPOST先URLを取得（これが最も重要！）
+        form = current_soup.find("form")
+        if form and form.get("action"):
+            form_action = form.get("action")
+            # 相対URLを絶対URLに変換
+            # 重要: 基準URLは「最後にアクセスしたページのURL」を使用する
+            # （元の検索条件ページのURLではない）
+            from urllib.parse import urljoin
+            current_page_url = getattr(self, '_last_search_result_url', base_url)
+            actual_url = urljoin(current_page_url, form_action)
+            self.logger.info(f"フォームaction属性から取得したURL: {actual_url} (基準URL: {current_page_url})")
+        else:
+            # フォームaction属性がない場合は、保存されたURLを使用
+            actual_url = getattr(self, '_last_search_result_url', base_url)
+            self.logger.debug(f"フォームaction属性なし、保存されたURLを使用: {actual_url}")
+        
+        try:
+            response = self.http_client.post(actual_url, data=form_data)
+            self.logger.debug(f"次ページ応答: status={response.status_code}, content_length={len(response.content)}")
+            next_soup = self._parse_response_to_soup(response)
+            
+            # 次ページのURLも更新
+            self._last_search_result_url = response.url
+            
+            if not next_soup:
+                self.logger.warning("次ページの解析に失敗しました")
+                return None
+            
+            # 検索結果テーブルが存在するか確認
+            result_table = next_soup.find("table", id="dgrSearchList")
+            if result_table:
+                rows = result_table.find_all("tr")[1:]  # ヘッダー以外
+                self.logger.debug(f"次ページで検索結果テーブルを発見: {len(rows)}行")
+                return next_soup
+            else:
+                # ページタイトルを確認
+                title = next_soup.find("title")
+                title_text = title.get_text() if title else "不明"
+                self.logger.warning(f"次ページに検索結果テーブルがありません (ページタイトル: {title_text})")
+                return None
+        except Exception as e:
+            self.logger.error(f"次ページの取得に失敗: {str(e)}", exc_info=True)
+            return None
+    
+    def _extract_file_links_from_single_page(
+        self, soup: BeautifulSoup, base_url: str, file_types: List[str], search_conditions: SearchConditions = None
+    ) -> List[FileInfo]:
+        """単一の検索結果ページからファイルリンクを抽出"""
         file_links = []
         
         # dgrSearchListテーブルを探す
@@ -1421,7 +1479,7 @@ class Scraper:
         direct_files = self.extract_file_links(soup, base_url, file_types)
         file_links.extend(direct_files)
         
-        self.logger.info(f"検索結果から{len(file_links)}個のファイルリンクを抽出しました")
+        self.logger.info(f"このページから{len(file_links)}個のファイルリンクを抽出しました")
         return file_links
 
     def _extract_files_from_detail_page_via_postback(
@@ -1439,12 +1497,15 @@ class Scraper:
             event_argument = match.group(2)
             
             # 現在のページのformのaction属性を取得（検索結果ページのURL）
+            # 重要: base_urlではなく、最後にアクセスしたページのURLを基準にする
+            current_page_url = getattr(self, '_last_search_result_url', base_url)
+            
             form = current_soup.find("form")
             if form and form.get("action"):
-                # 相対パスを絶対URLに変換
-                post_url = urljoin(base_url, form.get("action"))
+                # 相対パスを絶対URLに変換（現在のページURLを基準にする）
+                post_url = urljoin(current_page_url, form.get("action"))
             else:
-                post_url = base_url
+                post_url = current_page_url
             
             # 詳細ページのURLとして使用（page_urlに設定するため）
             detail_url = post_url
@@ -1456,18 +1517,7 @@ class Scraper:
             
             # POSTリクエストで詳細ページを取得
             response = self.http_client.post(post_url, data=form_data)
-            if response.encoding:
-                response.encoding = response.apparent_encoding or 'utf-8'
-            else:
-                response.encoding = 'utf-8'
-            
-            try:
-                detail_soup = BeautifulSoup(response.content, "lxml", from_encoding=response.encoding)
-            except (UnicodeDecodeError, LookupError):
-                try:
-                    detail_soup = BeautifulSoup(response.content, "lxml", from_encoding='utf-8')
-                except UnicodeDecodeError:
-                    detail_soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), "lxml")
+            detail_soup = self._parse_response_to_soup(response)
             
             if not detail_soup:
                 return []
@@ -1544,19 +1594,7 @@ class Scraper:
                     try:
                         download_response = self.http_client.get(download_url)
                         if download_response.status_code == 200:
-                            if download_response.encoding:
-                                download_response.encoding = download_response.apparent_encoding or 'utf-8'
-                            else:
-                                download_response.encoding = 'utf-8'
-                            
-                            try:
-                                download_soup = BeautifulSoup(download_response.content, "lxml", from_encoding=download_response.encoding)
-                            except (UnicodeDecodeError, LookupError):
-                                try:
-                                    download_soup = BeautifulSoup(download_response.content, "lxml", from_encoding='utf-8')
-                                except UnicodeDecodeError:
-                                    download_soup = BeautifulSoup(download_response.content.decode('utf-8', errors='ignore'), "lxml")
-                            
+                            download_soup = self._parse_response_to_soup(download_response)
                             if download_soup:
                                 # UserEntry_Download.aspxページからファイルリンクを抽出
                                 # dgrKokoku/dgrKeikaテーブル走査ロジックを使用（詳細ページと同じロジック）

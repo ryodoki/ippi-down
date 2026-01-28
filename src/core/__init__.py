@@ -1,4 +1,4 @@
-"""コア機能モジュール"""
+﻿"""コア機能モジュール"""
 
 from .scraper import Scraper
 from .downloader import Downloader

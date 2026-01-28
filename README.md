@@ -1,4 +1,4 @@
-# ippi-down
+﻿# ippi-down
 
 建設情報サービス「ppi.jp」から条件に基づいてファイルを自動ダウンロードするツール
 
@@ -12,7 +12,6 @@ ppi.jpのWebサイトを解析し、ユーザーが指定した条件に一致�
 - 条件に基づくファイルの自動ダウンロード
 - HTML構造に基づく自動ファイル命名
 - ローカルフォルダへの保存
-- Boxクラウドストレージへの保存
 - 定期実行（スケジューリング）
 - HTTPレート制限（429エラー）の自動処理
 - Windowsパス長制限（260文字）の自動対応
@@ -108,9 +107,6 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 # または
 .venv\Scripts\activate.bat
-
-# Linux/macOS
-source .venv/bin/activate
 ```
 
 4. 依存関係をインストール
@@ -129,9 +125,6 @@ pip install -r requirements.txt
 
    # Windows (PowerShell)
    Copy-Item config\config.example.yaml config\config.yaml
-
-   # Linux/macOS
-   cp config/config.example.yaml config/config.yaml
    ```
 
 6. 設定ファイルを編集（必要に応じて）
@@ -232,9 +225,6 @@ PyInstallerを使用して実行ファイル（.exe）を作成できます。
    
    # Windows (PowerShell)
    .venv\Scripts\Activate.ps1
-   
-   # Linux/macOS
-   source .venv/bin/activate
 
    # PyInstallerでビルド
    pyinstaller build.spec
@@ -325,7 +315,7 @@ Windowsのパス長制限（260文字）を超えるファイル名は自動的�
 **重要**: 
 - Gitで管理されるのは `config/config.example.yaml`（テンプレート）のみです
 - 実際に使用する `config/config.yaml` はローカルで作成し、Gitで追跡されません
-- `config/config.yaml` には機密情報（Box認証情報など）を含める可能性があるため、Gitに含めません
+- `config/config.yaml` には機密情報を含める可能性があるため、Gitに含めません
 
 初回セットアップ時は、`config/config.example.yaml` をコピーして `config/config.yaml` を作成してください。
 

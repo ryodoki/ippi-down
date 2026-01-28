@@ -1,4 +1,4 @@
-"""設定検証を行うクラス"""
+﻿"""設定検証を行うクラス"""
 
 from typing import Tuple, List
 from urllib.parse import urlparse
@@ -43,11 +43,6 @@ class ConfigValidator:
                 errors.append("カスタムスケジュールの場合、cron形式を指定してください")
             elif config.schedule.interval != "custom" and not config.schedule.time:
                 errors.append("スケジュール時間が指定されていません")
-
-        # Box設定の検証
-        if config.save_paths.box.get("enabled", False):
-            if not config.box.client_id or not config.box.client_secret:
-                errors.append("Boxが有効な場合、client_idとclient_secretが必要です")
 
         return len(errors) == 0, errors
 

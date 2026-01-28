@@ -43,9 +43,6 @@ filters:
 save:
   local_dir: string  # 必須: ローカル保存先パス
                       # 例: "./downloads"
-  box:
-    enabled: boolean  # オプション: Box保存を有効化（デフォルト: false）
-    folder_id: string | null  # オプション: BoxフォルダID
 
 # ファイル命名規則
 naming:
@@ -89,14 +86,6 @@ logging:
   failures_path: string  # オプション: 失敗ログファイルパス（JSON Lines形式、デフォルト: "./logs/failures.jsonl"）
   max_bytes: integer  # オプション: 最大ファイルサイズ（バイト、デフォルト: 10485760 = 10MB）
   backup_count: integer  # オプション: ローテーション世代数（デフォルト: 5）
-
-# Box認証情報（将来拡張）
-# 注意: 認証情報は環境変数から読み込むことを推奨
-box:
-  client_id: string  # 環境変数 BOX_CLIENT_ID から読み込む
-  client_secret: string  # 環境変数 BOX_CLIENT_SECRET から読み込む
-  access_token: string  # OAuth認証後に保存
-  refresh_token: string  # OAuth認証後に保存
 ```
 
 ### 2.2 設定ファイル例

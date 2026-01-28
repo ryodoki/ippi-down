@@ -1,1 +1,1 @@
-"""Extractorモジュール"""
+﻿"""Extractorモジュール"""

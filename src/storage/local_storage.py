@@ -1,4 +1,4 @@
-"""ローカルファイルシステムへの保存を行うクラス"""
+﻿"""ローカルファイルシステムへの保存を行うクラス"""
 
 from pathlib import Path
 from typing import Optional, BinaryIO

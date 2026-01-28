@@ -1,4 +1,4 @@
-"""定期実行管理を行うクラス"""
+﻿"""定期実行管理を行うクラス"""
 
 import schedule
 import time

@@ -11,7 +11,6 @@ from ..core.scraper import Scraper
 from ..core.filter import Filter
 from ..core.downloader import Downloader
 from ..core.naming import Naming
-from ..storage.box_client import BoxClient
 from .run_result import RunResult
 from .events import ProgressEvent, EventType
 
@@ -27,7 +26,6 @@ class ApplicationService:
         self._filter: Optional[Filter] = None
         self._naming: Optional[Naming] = None
         self._downloader: Optional[Downloader] = None
-        self._box_client: Optional[BoxClient] = None
 
     def run(
         self,
@@ -96,10 +94,6 @@ class ApplicationService:
                     message="ダウンロードがキャンセルされました"
                 )
 
-            # Boxへのアップロード
-            if self._box_client and config.save_paths.box.get("enabled", False):
-                self._upload_to_box(result, config)
-
             # 結果メッセージ
             result_message = (
                 f"ダウンロード完了: 成功={result.success}, "
@@ -153,16 +147,6 @@ class ApplicationService:
         )
         self._downloader = Downloader(self._http_client, self.logger)
 
-        # Boxクライアント（オプション）
-        if config.save_paths.box.get("enabled", False):
-            self._box_client = BoxClient(
-                config.box.client_id,
-                config.box.client_secret,
-                config.box.access_token,
-                config.box.refresh_token,
-                self.logger,
-            )
-
     def _extract_files(
         self,
         config: AppConfig,
@@ -202,7 +186,22 @@ class ApplicationService:
                         soup, url, config.download_conditions.file_types, config.search_conditions
                     )
                     all_files.extend(files)
-                    self.logger.info(f"検索結果から{len(files)}個のファイルリンクを発見")
+                    # 工事件数（スクレイパーから取得）とファイル数を表示
+                    koji_count = getattr(self._scraper, 'last_search_total_koji_count', None)
+                    if koji_count is None:
+                        # フォールバック: ファイルから取得したユニークな工事名の数
+                        koji_names = set()
+                        for f in files:
+                            if f.metadata and f.metadata.get("koji_name"):
+                                koji_names.add(f.metadata["koji_name"])
+                        koji_count = len(koji_names) if koji_names else "不明"
+                    self.logger.info(f"検索結果: 工事件数={koji_count}件, ファイル数={len(files)}件")
+                    if progress_callback:
+                        progress_callback(ProgressEvent(
+                            type=EventType.MESSAGE,
+                            message=f"検索結果: 工事件数={koji_count}件, ファイル数={len(files)}件",
+                            metadata={"type": "info"}
+                        ))
                 else:
                     self.logger.error(f"検索の実行に失敗しました: {url}")
             else:
@@ -263,12 +262,20 @@ class ApplicationService:
     ):
         """ファイルをフィルタリング"""
         filtered = self._filter.filter_files(files)
-        self.logger.info(f"フィルタリング後: {len(filtered)}件")
+        
+        # 工事件数（ユニークな工事名の数）とファイル数を表示
+        koji_names = set()
+        for f in filtered:
+            if f.metadata and f.metadata.get("koji_name"):
+                koji_names.add(f.metadata["koji_name"])
+        koji_count = len(koji_names) if koji_names else "不明"
+        
+        self.logger.info(f"フィルタリング後: 工事件数={koji_count}件, ファイル数={len(filtered)}件")
         
         if progress_callback:
             progress_callback(ProgressEvent(
                 type=EventType.MESSAGE,
-                message=f"フィルタリング後: {len(filtered)}件",
+                message=f"フィルタリング後: 工事件数={koji_count}件, ファイル数={len(filtered)}件",
                 metadata={"type": "info"}
             ))
         
@@ -304,18 +311,6 @@ class ApplicationService:
             progress_wrapper,
             folder_name=None
         )
-
-    def _upload_to_box(self, result: DownloadResult, config: AppConfig):
-        """Boxにアップロード"""
-        if not self._box_client:
-            return
-
-        self._box_client.authenticate()
-        box_folder_id = config.save_paths.box.get("folder_id")
-        if box_folder_id:
-            for task in result.tasks:
-                if task.status == "completed":
-                    self._box_client.upload_file(task.local_path, box_folder_id)
 
     def _cleanup(self):
         """リソースをクリーンアップ"""

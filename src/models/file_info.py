@@ -1,4 +1,4 @@
-"""ファイル情報を保持するデータモデル"""
+﻿"""ファイル情報を保持するデータモデル"""
 
 from dataclasses import dataclass
 from typing import Dict, Any, Optional

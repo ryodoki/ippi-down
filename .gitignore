@@ -28,7 +28,6 @@ ENV/
 env/
 
 # PyInstaller生成物
-*.spec
 build/
 dist/
 *.exe
@@ -64,6 +63,7 @@ config/config.yaml
 # ダウンロードファイル（運用生成物）
 downloads/
 !downloads/.gitkeep
+test_downloads/
 
 # 環境変数
 .env

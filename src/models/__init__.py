@@ -1,4 +1,4 @@
-"""データモデルモジュール"""
+﻿"""データモデルモジュール"""
 
 from .file_info import FileInfo
 from .download_task import DownloadTask
@@ -10,7 +10,6 @@ from .config_model import (
     SavePaths,
     ScheduleConfig,
     LoggingConfig,
-    BoxConfig,
 )
 
 __all__ = [
@@ -23,6 +22,5 @@ __all__ = [
     "SavePaths",
     "ScheduleConfig",
     "LoggingConfig",
-    "BoxConfig",
 ]
 

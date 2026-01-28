@@ -1,4 +1,4 @@
-"""Search Result Parser（検索結果→案件一覧抽出）"""
+﻿"""Search Result Parser（検索結果→案件一覧抽出）"""
 
 from typing import List, Optional
 from bs4 import BeautifulSoup

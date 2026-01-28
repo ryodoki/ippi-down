@@ -1,4 +1,4 @@
-"""HTTPClientのテスト"""
+﻿"""HTTPClientのテスト"""
 
 import pytest
 from pathlib import Path

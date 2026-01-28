@@ -1,4 +1,4 @@
-"""実行結果データモデル"""
+﻿"""実行結果データモデル"""
 
 from dataclasses import dataclass
 from typing import Optional

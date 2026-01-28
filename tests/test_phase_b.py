@@ -1,4 +1,4 @@
-"""Phase B リファクタリング動作確認テスト"""
+﻿"""Phase B リファクタリング動作確認テスト"""
 
 import pytest
 import sys
@@ -18,7 +18,6 @@ def test_custom_exceptions():
         NetworkError,
         RateLimitError,
         FilesystemError,
-        BoxApiError,
         ConfigError,
         ScrapingError,
         ValidationError
@@ -40,10 +39,6 @@ def test_custom_exceptions():
     # FilesystemError
     fs_error = FilesystemError("ファイルシステムエラー")
     assert isinstance(fs_error, PpiDownloaderError)
-    
-    # BoxApiError
-    box_error = BoxApiError("Box APIエラー")
-    assert isinstance(box_error, PpiDownloaderError)
     
     # ConfigError
     config_error = ConfigError("設定エラー")
@@ -256,36 +251,3 @@ def test_metadata_extractor():
     assert file_info.file_type == ".pdf"
     assert file_info.metadata["koji_name"] == "テスト工事"
     assert file_info.metadata["document_name"] == "文書名"
-
-
-def test_box_storage():
-    """BoxStorageの動作確認"""
-    from src.storage.box_storage import BoxStorage
-    from src.storage.box_client import BoxClient
-    from src.utils.logger import Logger
-    from unittest.mock import MagicMock
-    
-    logger = Logger()
-    
-    # BoxClientのモック
-    box_client = MagicMock(spec=BoxClient)
-    box_client.logger = logger
-    box_client.file_exists.return_value = False
-    box_client.upload_file.return_value = True
-    box_client.create_folder.return_value = "folder_id_123"
-    
-    # BoxStorage作成
-    storage = BoxStorage(box_client, "base_folder_id", logger)
-    
-    # exists
-    assert storage.exists("test.pdf") is False
-    
-    # save
-    stream = BytesIO(b"test content")
-    result = storage.save(stream, "test.pdf")
-    assert result is True
-    box_client.upload_file.assert_called_once()
-    
-    # ensure_path
-    storage.ensure_path("new_folder")
-    box_client.create_folder.assert_called_once_with("new_folder", "base_folder_id")

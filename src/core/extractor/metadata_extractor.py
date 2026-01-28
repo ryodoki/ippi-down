@@ -1,4 +1,4 @@
-"""Metadata Extractor（FileInfoへメタデータ正規化）"""
+﻿"""Metadata Extractor（FileInfoへメタデータ正規化）"""
 
 from typing import Optional, Dict, Any
 from ...models.file_info import FileInfo

@@ -1,4 +1,4 @@
-"""ファイル名を生成するクラス"""
+﻿"""ファイル名を生成するクラス"""
 
 from typing import Dict, Any, Optional
 from datetime import datetime

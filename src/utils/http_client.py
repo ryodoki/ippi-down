@@ -1,4 +1,4 @@
-"""HTTP通信を行うクラス（セッション管理含む）"""
+﻿"""HTTP通信を行うクラス（セッション管理含む）"""
 
 import requests
 from requests.adapters import HTTPAdapter

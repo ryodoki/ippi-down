@@ -6,14 +6,24 @@ import os
 from pathlib import Path
 from typing import Optional
 from ..models.config_model import LoggingConfig
+from .path_utils import get_logs_path
 
 
 class Logger:
     """ログ管理を行うクラス"""
 
     def __init__(self, config: Optional[LoggingConfig] = None):
-        """初期化"""
-        self.config = config or LoggingConfig()
+        """初期化
+        
+        Args:
+            config: ログ設定。Noneの場合はデフォルト設定を使用。
+                    デフォルトのログファイルパスはexeの場所を基準にする。
+        """
+        if config is None:
+            # デフォルト設定（exe配布時も正しいパスを使用）
+            config = LoggingConfig(file=str(get_logs_path("app.log")))
+        self.config = config
+        
         self.logger = logging.getLogger("ppi_file_downloader")
         self.logger.setLevel(getattr(logging, self.config.level.upper(), logging.INFO))
         self.logger.handlers.clear()  # 既存のハンドラーをクリア

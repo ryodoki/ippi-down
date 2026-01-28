@@ -1,4 +1,4 @@
-"""設定データモデル"""
+﻿"""設定データモデル"""
 
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -97,7 +97,6 @@ class SavePaths:
     """保存先パス"""
 
     local: str = "./downloads"
-    box: dict = field(default_factory=lambda: {"enabled": False, "folder_id": None})
 
 
 @dataclass
@@ -144,16 +143,6 @@ class LoggingConfig:
 
 
 @dataclass
-class BoxConfig:
-    """Box設定"""
-
-    client_id: str = ""
-    client_secret: str = ""
-    access_token: str = ""
-    refresh_token: str = ""
-
-
-@dataclass
 class AppConfig:
     """アプリケーション設定のデータモデル"""
 
@@ -168,5 +157,4 @@ class AppConfig:
     naming_rule: str = "{category}_{title}_{date}_{index}"
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
-    box: BoxConfig = field(default_factory=BoxConfig)
 

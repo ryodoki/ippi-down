@@ -164,6 +164,54 @@ class Downloader:
         return False
 
     def check_duplicate(self, file_path: str) -> bool:
-        """ファイルが既に存在するかチェック"""
-        return Path(file_path).exists()
+        """ファイルが既に存在するかチェック（有効なファイルのみ）
+        
+        以下の場合は重複とみなさない（再ダウンロードが必要）：
+        - ファイルが存在しない
+        - ファイルサイズが0
+        - ファイルがHTMLコンテンツ（ダウンロード失敗の痕跡）
+        """
+        path = Path(file_path)
+        
+        if not path.exists():
+            return False
+        
+        # ファイルサイズが0の場合は再ダウンロード
+        if path.stat().st_size == 0:
+            self.logger.debug(f"空ファイルを検出、再ダウンロードします: {file_path}")
+            try:
+                path.unlink()  # 空ファイルを削除
+            except:
+                pass
+            return False
+        
+        # ファイルの先頭バイトをチェック（HTMLかどうか）
+        try:
+            with open(file_path, 'rb') as f:
+                first_bytes = f.read(100)
+            
+            # HTMLファイルの場合は再ダウンロード
+            if first_bytes.startswith(b'<html') or first_bytes.startswith(b'<!DOCTYPE') or first_bytes.startswith(b'<HTML'):
+                self.logger.debug(f"HTMLファイルを検出、再ダウンロードします: {file_path}")
+                try:
+                    path.unlink()  # HTMLファイルを削除
+                except:
+                    pass
+                return False
+            
+            # .part ファイルの場合も削除
+            if file_path.endswith('.part'):
+                self.logger.debug(f".partファイルを検出、削除します: {file_path}")
+                try:
+                    path.unlink()
+                except:
+                    pass
+                return False
+            
+            # 有効なファイルとして存在
+            return True
+            
+        except Exception as e:
+            self.logger.warning(f"ファイルチェックエラー: {file_path} - {str(e)}")
+            return False
 

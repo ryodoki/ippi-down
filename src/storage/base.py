@@ -1,4 +1,4 @@
-"""Storage抽象化インターフェース"""
+﻿"""Storage抽象化インターフェース"""
 
 from abc import ABC, abstractmethod
 from typing import Optional, BinaryIO

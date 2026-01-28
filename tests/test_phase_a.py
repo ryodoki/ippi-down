@@ -1,4 +1,4 @@
-"""Phase A リファクタリング動作確認テスト"""
+﻿"""Phase A リファクタリング動作確認テスト"""
 
 import pytest
 import sys

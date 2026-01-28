@@ -1,4 +1,4 @@
-# システム設計書
+﻿# システム設計書
 
 ## 1. 設計方針
 
@@ -32,18 +32,18 @@
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
 │  │   Scraper    │  │  Downloader  │  │  Scheduler  │ │
 │  └──────────────┘  └──────────────┘  └──────────────┘ │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │ Box Client   │  │   Naming     │  │   Config     │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│  ┌──────────────┐  ┌──────────────┐                   │
+│  │   Naming     │  │   Config     │                   │
+│  └──────────────┘  └──────────────┘                   │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
 │              Data Access Layer                           │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │ HTTP Client  │  │ File System │  │ Box API     │ │
-│  │ (requests)   │  │             │  │             │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│  ┌──────────────┐  ┌──────────────┐                     │
+│  │ HTTP Client  │  │ File System │                     │
+│  │ (requests)   │  │             │                     │
+│  └──────────────┘  └──────────────┘                     │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -60,7 +60,7 @@
 - GUI層からの指示を受け取り、処理を実行
 
 #### 2.2.3 Data Access Layer（データアクセス層）
-- 外部リソース（Web、ファイルシステム、Box API）へのアクセス
+- 外部リソース（Web、ファイルシステム）へのアクセス
 - 低レベルの通信処理を担当
 
 ## 3. モジュール構成
@@ -91,8 +91,7 @@ ppi-file-downloader/
 │   │
 │   ├── storage/                # ストレージモジュール
 │   │   ├── __init__.py
-│   │   ├── local_storage.py   # ローカル保存
-│   │   └── box_client.py      # Box API連携
+│   │   └── local_storage.py   # ローカル保存
 │   │
 │   ├── scheduler/              # スケジューリングモジュール
 │   │   ├── __init__.py
@@ -175,12 +174,6 @@ ppi-file-downloader/
     │
     ▼
 [Local Storage: ローカルに保存]
-    │
-    ▼
-[Box Client: Boxにアップロード（オプション）]
-    │  ┌─────────────────┐
-    │  │ Box API          │
-    │  └─────────────────┘
     │
     ▼
 [GUI: 進捗表示・完了通知]
@@ -280,20 +273,6 @@ class LocalStorage:
     def get_save_path(self, file_info: FileInfo, naming: Naming) -> str
 ```
 
-#### 5.2.2 BoxClient（Boxクライアント）
-
-```python
-class BoxClient:
-    """Box API連携を行うクラス"""
-    
-    def __init__(self, client_id: str, client_secret: str, logger: Logger)
-    def authenticate(self) -> bool
-    def upload_file(self, local_path: str, box_folder_id: str, 
-                   box_filename: str = None) -> bool
-    def create_folder(self, folder_name: str, parent_folder_id: str = None) -> str
-    def file_exists(self, box_folder_id: str, filename: str) -> bool
-```
-
 ### 5.3 設定管理モジュール
 
 #### 5.3.1 ConfigManager（設定マネージャー）
@@ -321,7 +300,6 @@ class AppConfig:
     naming_rule: str
     schedule: ScheduleConfig
     logging: LoggingConfig
-    box: BoxConfig
 ```
 
 ### 5.4 GUIモジュール
@@ -407,7 +385,6 @@ class DownloadTask:
     """ダウンロードタスクを保持するデータモデル"""
     file_info: FileInfo
     local_path: str
-    box_folder_id: str = None
     status: str = "pending"    # pending, downloading, completed, failed
     error_message: str = ""
     retry_count: int = 0
@@ -449,9 +426,6 @@ download_conditions:
 # 保存先
 save_paths:
   local: ./downloads
-  box:
-    enabled: false
-    folder_id: null
 
 # ファイル命名規則
 naming_rule: "{category}_{title}_{date}_{index}"
@@ -470,11 +444,6 @@ logging:
   max_bytes: 10485760  # 10MB
   backup_count: 5
 
-# Box設定
-box:
-  client_id: ""      # 環境変数から読み込む
-  client_secret: ""   # 環境変数から読み込む
-  access_token: ""    # OAuth認証後に保存
 ```
 
 ### 7.2 GUI画面設計
@@ -537,10 +506,6 @@ box:
    - 設定ファイル読み込み失敗
    - 設定値の検証エラー
 
-4. **Box APIエラー**
-   - 認証エラー
-   - アップロードエラー
-
 ### 8.2 エラー処理方針
 
 - エラーはログに記録
@@ -550,13 +515,7 @@ box:
 
 ## 9. セキュリティ設計
 
-### 9.1 認証情報の管理
-
-- Box APIの認証情報は環境変数から読み込む
-- 設定ファイルには平文で保存しない
-- 必要に応じて暗号化して保存
-
-### 9.2 入力検証
+### 9.1 入力検証
 
 - URLの検証
 - ファイルパスの検証（パストラバーサル対策）

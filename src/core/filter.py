@@ -1,4 +1,4 @@
-"""ダウンロード条件でフィルタリングを行うクラス"""
+﻿"""ダウンロード条件でフィルタリングを行うクラス"""
 
 from typing import List
 from datetime import datetime

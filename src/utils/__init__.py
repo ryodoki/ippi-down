@@ -1,4 +1,4 @@
-"""ユーティリティモジュール"""
+﻿"""ユーティリティモジュール"""
 
 from .logger import Logger
 from .http_client import HTTPClient

@@ -1,4 +1,4 @@
-"""進捗イベント定義"""
+﻿"""進捗イベント定義"""
 
 from dataclasses import dataclass
 from typing import Optional, Any

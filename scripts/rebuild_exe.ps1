@@ -47,7 +47,7 @@ Write-Host "実行ファイルをビルドしています..." -ForegroundColor Y
 Write-Host "これには数分かかる場合があります..." -ForegroundColor Yellow
 Write-Host ""
 
-pyinstaller build.spec
+pyinstaller scripts\build.spec
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""

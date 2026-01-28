@@ -39,7 +39,7 @@ echo.
 echo 実行ファイルをビルドしています...
 echo これには数分かかる場合があります...
 echo.
-pyinstaller build.spec
+pyinstaller scripts\build.spec
 
 if errorlevel 1 (
     echo.

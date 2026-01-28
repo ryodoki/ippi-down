@@ -1,4 +1,4 @@
-"""スケジューリングモジュール"""
+﻿"""スケジューリングモジュール"""
 
 from .scheduler import Scheduler
 

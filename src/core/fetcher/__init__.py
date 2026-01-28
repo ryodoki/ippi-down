@@ -1,1 +1,1 @@
-"""Page Fetcherモジュール"""
+﻿"""Page Fetcherモジュール"""

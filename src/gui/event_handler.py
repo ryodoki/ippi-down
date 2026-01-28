@@ -1,4 +1,4 @@
-"""GUIイベントハンドラー（スレッドセーフ）"""
+﻿"""GUIイベントハンドラー（スレッドセーフ）"""
 
 import queue
 import tkinter as tk

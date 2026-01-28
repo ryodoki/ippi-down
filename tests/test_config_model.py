@@ -1,4 +1,4 @@
-"""ConfigModelのテスト"""
+﻿"""ConfigModelのテスト"""
 
 import pytest
 from pathlib import Path
