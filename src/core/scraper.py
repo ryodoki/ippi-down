@@ -624,17 +624,42 @@ class Scraper:
                 if link:
                     href = link.get("href")
                     if href:
+                        # DEBUG: javascript:__doPostBack(...)形式のリンクを検出
+                        if href.startswith("javascript:") and "__doPostBack" in href:
+                            self.logger.debug(
+                                f"PostBackリンクを検出（未対応）: 文書名='{document_name}', "
+                                f"href='{href[:100]}...' (テーブル: {table_id})"
+                            )
+                            # TODO: PostBackリンクの処理を実装
+                            continue
+                        
                         # 相対URLを絶対URLに変換
                         absolute_url = urljoin(base_url, href)
                         
                         # ファイルタイプをチェック（URLに拡張子が含まれている場合）
                         # または、KokaiBunshoServletのようなファイルダウンロードURLの場合
                         is_file_link = False
+                        rejection_reason = None
+                        
                         if any(href.lower().endswith(ext) for ext in file_types):
                             is_file_link = True
+                            self.logger.debug(
+                                f"ファイルリンクを採用: 文書名='{document_name}', "
+                                f"理由=拡張子一致 ({href[-10:] if len(href) > 10 else href})"
+                            )
                         elif "KokaiBunshoServlet" in href or "Publish" in href or "Download" in href:
                             # ファイルダウンロードURLの可能性が高い
                             is_file_link = True
+                            self.logger.debug(
+                                f"ファイルリンクを採用: 文書名='{document_name}', "
+                                f"理由=servlet/Download/Publish文字列検出"
+                            )
+                        else:
+                            rejection_reason = "拡張子なし/servlet文字列なし"
+                            self.logger.debug(
+                                f"ファイルリンクを不採用: 文書名='{document_name}', "
+                                f"理由={rejection_reason}, href='{href[:80]}...'"
+                            )
                         
                         if is_file_link:
                             # ファイル名をURLから抽出（拡張子がある場合）
@@ -1558,92 +1583,156 @@ class Scraper:
                             file_info.metadata = {}
                         file_info.metadata["koji_name"] = metadata["koji_name"]
             
-            # ファイルが見つかった場合は、UserEntry_Download.aspxを試さない
-            # （UserEntry_Download.aspxにはテーブルが存在しないため、試しても0件になる）
+            # DEBUG: 詳細ページからの抽出結果をログ出力
             if files:
-                self.logger.info(f"詳細ページから{len(files)}個のファイルリンクを抽出しました（UserEntry_Download.aspxはスキップ）")
-                return files
+                self.logger.info(f"詳細ページから{len(files)}個のファイルリンクを抽出しました")
+                for idx, f in enumerate(files, 1):
+                    self.logger.debug(
+                        f"  ファイル[{idx}]: 文書名='{f.metadata.get('title', 'N/A')}', "
+                        f"URL='{f.url[:80]}...', type={f.file_type}"
+                    )
+            else:
+                self.logger.debug("詳細ページからファイルリンクを抽出できませんでした")
             
-            # ファイルが見つからなかった場合のみ、従来の方法（UserEntry_Download.aspx）を試す
-            # ただし、実際にはUserEntry_Download.aspxにはテーブルがないため、効果がない可能性が高い
-            if not files:
-                # 詳細ページからAnkenkanriNoとHachushaIdを抽出
-                ankenkanri_no = None
-                hachusha_id = None
-                
-                # JavaScriptコードからAnkenkanriNoとHachushaIdを抽出
-                import re
-                script_tags = detail_soup.find_all("script")
-                for script in script_tags:
-                    script_text = script.string
-                    if script_text and "AnkenkanriNo" in script_text:
-                        # var AnkenkanriNo = "021020002022412000000486"; のような形式を抽出
-                        match = re.search(r'var\s+AnkenkanriNo\s*=\s*"([^"]+)"', script_text)
-                        if match:
-                            ankenkanri_no = match.group(1)
-                            self.logger.debug(f"AnkenkanriNoを抽出: {ankenkanri_no}")
-                        
-                        match = re.search(r'var\s+HachushaId\s*=\s*"([^"]+)"', script_text)
-                        if match:
-                            hachusha_id = match.group(1)
-                            self.logger.debug(f"HachushaIdを抽出: {hachusha_id}")
-                
-                # UserEntry_Download.aspxからファイルリンクを取得
-                if ankenkanri_no and hachusha_id:
-                    download_url = f"https://www.i-ppi.jp/IPPI/DownloadServices/Web/UserEntry_Download.aspx?data1={ankenkanri_no}&data2={hachusha_id}"
-                    self.logger.debug(f"UserEntry_Download.aspxにアクセス: {download_url}")
+            # 重要: 詳細ページでファイルが見つかっても、UserEntry_Download.aspxを必ず探索する
+            # （入札調書など、UserEntry_Download.aspxにのみ存在するファイルがある可能性があるため）
+            # 詳細ページのファイルとUserEntry_Download.aspxのファイルをマージする
+            userentry_files = []
+            
+            # UserEntry_Download.aspxからファイルリンクを取得（詳細ページにファイルがあっても実行）
+            # 詳細ページからAnkenkanriNoとHachushaIdを抽出
+            ankenkanri_no = None
+            hachusha_id = None
+            
+            # JavaScriptコードからAnkenkanriNoとHachushaIdを抽出
+            import re
+            script_tags = detail_soup.find_all("script")
+            for script in script_tags:
+                script_text = script.string
+                if script_text and "AnkenkanriNo" in script_text:
+                    # var AnkenkanriNo = "021020002022412000000486"; のような形式を抽出
+                    match = re.search(r'var\s+AnkenkanriNo\s*=\s*"([^"]+)"', script_text)
+                    if match:
+                        ankenkanri_no = match.group(1)
+                        self.logger.debug(f"AnkenkanriNoを抽出: {ankenkanri_no}")
                     
-                    try:
-                        download_response = self.http_client.get(download_url)
-                        if download_response.status_code == 200:
-                            download_soup = self._parse_response_to_soup(download_response)
-                            if download_soup:
-                                # UserEntry_Download.aspxページからファイルリンクを抽出
-                                # dgrKokoku/dgrKeikaテーブル走査ロジックを使用（詳細ページと同じロジック）
-                                files = self._extract_files_from_tables(download_soup, download_url, file_types)
-                                if not files:
-                                    # フォールバック: 通常のextract_file_linksも試す
-                                    files = self.extract_file_links(download_soup, download_url, file_types)
-                                self.logger.info(f"UserEntry_Download.aspxから{len(files)}個のファイルリンクを抽出しました")
-                                
-                                # 詳細ページの文書情報（dgrKokoku、dgrKeika）を取得してメタデータに追加
-                                document_names = []
-                                kokoku_table = download_soup.find("table", id="dgrKokoku")
-                                if kokoku_table:
-                                    rows = kokoku_table.find_all("tr")[1:]  # ヘッダー行をスキップ
-                                    for row in rows:
-                                        cells = row.find_all("td")
-                                        if len(cells) > 0:
-                                            doc_name = cells[0].get_text(strip=True)
-                                            if doc_name:
-                                                document_names.append(doc_name)
-                                
-                                keika_table = download_soup.find("table", id="dgrKeika")
-                                if keika_table:
-                                    rows = keika_table.find_all("tr")[1:]  # ヘッダー行をスキップ
-                                    for row in rows:
-                                        cells = row.find_all("td")
-                                        if len(cells) > 0:
-                                            doc_name = cells[0].get_text(strip=True)
-                                            if doc_name:
-                                                document_names.append(doc_name)
-                                
-                                # メタデータを追加
-                                metadata = self.extract_metadata(detail_soup)
-                                if document_names:
-                                    metadata["document_names"] = document_names
-                                
-                                # 工事名を優先的に設定（検索結果ページから取得した工事名があれば使用）
-                                if koji_name:
-                                    metadata["koji_name"] = koji_name
-                                
-                                for file_info in files:
-                                    if file_info.metadata:
-                                        file_info.metadata.update(metadata)
-                                    else:
-                                        file_info.metadata = metadata
-                    except Exception as e:
-                        self.logger.warning(f"UserEntry_Download.aspxからのファイル抽出エラー: {str(e)}")
+                    match = re.search(r'var\s+HachushaId\s*=\s*"([^"]+)"', script_text)
+                    if match:
+                        hachusha_id = match.group(1)
+                        self.logger.debug(f"HachushaIdを抽出: {hachusha_id}")
+            
+            # UserEntry_Download.aspxからファイルリンクを取得
+            if ankenkanri_no and hachusha_id:
+                download_url = f"https://www.i-ppi.jp/IPPI/DownloadServices/Web/UserEntry_Download.aspx?data1={ankenkanri_no}&data2={hachusha_id}"
+                self.logger.debug(f"UserEntry_Download.aspxにアクセス（詳細ページに{len(files)}件のファイルがある場合でも実行）: {download_url}")
+                
+                try:
+                    download_response = self.http_client.get(download_url)
+                    self.logger.debug(
+                        f"UserEntry_Download.aspx レスポンス: status={download_response.status_code}, "
+                        f"Content-Type={download_response.headers.get('Content-Type', 'N/A')}"
+                    )
+                    
+                    if download_response.status_code == 200:
+                        download_soup = self._parse_response_to_soup(download_response)
+                        if download_soup:
+                            # UserEntry_Download.aspxページからファイルリンクを抽出
+                            # dgrKokoku/dgrKeikaテーブル走査ロジックを使用（詳細ページと同じロジック）
+                            userentry_files = self._extract_files_from_tables(download_soup, download_url, file_types)
+                            if not userentry_files:
+                                # フォールバック: 通常のextract_file_linksも試す
+                                userentry_files = self.extract_file_links(download_soup, download_url, file_types)
+                            
+                            if userentry_files:
+                                self.logger.info(f"UserEntry_Download.aspxから{len(userentry_files)}個のファイルリンクを抽出しました")
+                                for idx, f in enumerate(userentry_files, 1):
+                                    self.logger.debug(
+                                        f"  UserEntryファイル[{idx}]: 文書名='{f.metadata.get('title', 'N/A')}', "
+                                        f"URL='{f.url[:80]}...', type={f.file_type}"
+                                    )
+                            
+                            # 詳細ページの文書情報（dgrKokoku、dgrKeika）を取得してメタデータに追加
+                            document_names = []
+                            kokoku_table = download_soup.find("table", id="dgrKokoku")
+                            if kokoku_table:
+                                rows = kokoku_table.find_all("tr")[1:]  # ヘッダー行をスキップ
+                                for row in rows:
+                                    cells = row.find_all("td")
+                                    if len(cells) > 0:
+                                        doc_name = cells[0].get_text(strip=True)
+                                        if doc_name:
+                                            document_names.append(doc_name)
+                            
+                            keika_table = download_soup.find("table", id="dgrKeika")
+                            if keika_table:
+                                rows = keika_table.find_all("tr")[1:]  # ヘッダー行をスキップ
+                                for row in rows:
+                                    cells = row.find_all("td")
+                                    if len(cells) > 0:
+                                        doc_name = cells[0].get_text(strip=True)
+                                        if doc_name:
+                                            document_names.append(doc_name)
+                            
+                            # メタデータを追加
+                            metadata = self.extract_metadata(detail_soup)
+                            if document_names:
+                                metadata["document_names"] = document_names
+                            
+                            # 工事名を優先的に設定（検索結果ページから取得した工事名があれば使用）
+                            if koji_name:
+                                metadata["koji_name"] = koji_name
+                            
+                            for file_info in userentry_files:
+                                if file_info.metadata:
+                                    file_info.metadata.update(metadata)
+                                else:
+                                    file_info.metadata = metadata
+                    else:
+                        self.logger.warning(
+                            f"UserEntry_Download.aspx アクセス失敗: status={download_response.status_code}"
+                        )
+                except Exception as e:
+                    self.logger.warning(f"UserEntry_Download.aspxからのファイル抽出エラー: {str(e)}", exc_info=True)
+            else:
+                if not ankenkanri_no:
+                    self.logger.debug("AnkenkanriNoを抽出できませんでした（UserEntry_Download.aspxをスキップ）")
+                if not hachusha_id:
+                    self.logger.debug("HachushaIdを抽出できませんでした（UserEntry_Download.aspxをスキップ）")
+            
+            # 詳細ページのファイルとUserEntry_Download.aspxのファイルをマージ（重複除去）
+            # 重複判定: URLが同一、または（文書名 + ファイルタイプ）が同一
+            all_files = files.copy()  # 詳細ページのファイル
+            existing_urls = {f.url for f in files}
+            existing_keys = {(f.metadata.get("title", ""), f.file_type) for f in files}
+            
+            for uf in userentry_files:
+                # URL重複チェック
+                if uf.url in existing_urls:
+                    self.logger.debug(f"重複ファイルをスキップ（URL同一）: {uf.url[:80]}...")
+                    continue
+                
+                # （文書名 + ファイルタイプ）重複チェック
+                uf_key = (uf.metadata.get("title", ""), uf.file_type)
+                if uf_key in existing_keys:
+                    self.logger.debug(
+                        f"重複ファイルをスキップ（文書名+タイプ同一）: "
+                        f"文書名='{uf.metadata.get('title', 'N/A')}', type={uf.file_type}"
+                    )
+                    continue
+                
+                # 重複なし: 追加
+                all_files.append(uf)
+                existing_urls.add(uf.url)
+                existing_keys.add(uf_key)
+                self.logger.debug(f"UserEntryファイルを追加: 文書名='{uf.metadata.get('title', 'N/A')}', URL='{uf.url[:80]}...'")
+            
+            self.logger.info(
+                f"ファイル抽出完了: 詳細ページ={len(files)}件, "
+                f"UserEntry_Download.aspx={len(userentry_files)}件, "
+                f"マージ後={len(all_files)}件（重複除去済み）"
+            )
+            
+            return all_files
             
             # 詳細ページに直接ファイルリンクがある場合も抽出
             if not files:

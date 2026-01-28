@@ -218,6 +218,14 @@ class HTTPClient:
         
         for attempt in range(max_retries):
             try:
+                # DEBUG: ダウンロード開始情報をログ出力
+                self.logger.debug(
+                    f"ダウンロード開始: URL='{url[:100]}...', "
+                    f"保存先='{save_path}', "
+                    f"試行={attempt + 1}/{max_retries}, "
+                    f"Referer='{referer[:80] if referer else 'N/A'}...'"
+                )
+                
                 # 接続タイムアウトと読み取りタイムアウトを分離
                 # 接続タイムアウト: 10秒、読み取りタイムアウト: download_timeout秒
                 timeout_tuple = (10, self.download_timeout)
@@ -228,6 +236,14 @@ class HTTPClient:
                     timeout=timeout_tuple,
                     headers=download_headers,
                     allow_redirects=True  # リダイレクトを確実に追従
+                )
+                
+                # DEBUG: レスポンス情報をログ出力
+                self.logger.debug(
+                    f"ダウンロードレスポンス: status={response.status_code}, "
+                    f"Content-Type={response.headers.get('Content-Type', 'N/A')}, "
+                    f"Content-Disposition={response.headers.get('Content-Disposition', 'N/A')}, "
+                    f"Content-Length={response.headers.get('Content-Length', 'N/A')}"
                 )
                 
                 # HTTPステータス429（レート制限）の処理
@@ -248,8 +264,13 @@ class HTTPClient:
                 # Content-Typeをチェック（HTMLの場合は失敗扱い）
                 content_type = response.headers.get("Content-Type", "").lower()
                 if "text/html" in content_type:
-                    self.logger.warning(f"ダウンロードしたファイルがHTMLです: {url} (Content-Type: {content_type})")
+                    self.logger.warning(
+                        f"ダウンロードしたファイルがHTMLです: URL='{url[:100]}...', "
+                        f"Content-Type={content_type}, "
+                        f"保存先='{save_path}'"
+                    )
                     if attempt == max_retries - 1:
+                        self.logger.error(f"ダウンロード失敗（HTMLレスポンス）: URL='{url[:100]}...'")
                         return False
                     wait_time = retry_delay * (2 ** attempt)
                     self.logger.warning(f"HTMLレスポンス。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
@@ -315,6 +336,14 @@ class HTTPClient:
                     time.sleep(wait_time)
                     continue
 
+                # DEBUG: ダウンロード完了情報をログ出力
+                file_size = save_path_obj.stat().st_size if save_path_obj.exists() else 0
+                self.logger.debug(
+                    f"ダウンロード完了: URL='{url[:100]}...', "
+                    f"保存先='{save_path}', "
+                    f"ファイルサイズ={file_size:,} bytes, "
+                    f"Content-Type={content_type}"
+                )
                 self.logger.info(f"ファイルダウンロード完了: {save_path}")
                 return True
 

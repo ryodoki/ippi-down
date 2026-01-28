@@ -106,7 +106,11 @@ class Downloader:
                 filename = naming.generate_filename(file_info, file_info.metadata, index)
                 save_path = str(file_save_dir / filename)
 
-                # 重複チェック
+                # 重要: 一意なパスを確保してから重複チェックを行う
+                # （同名ファイルが存在する場合、ensure_uniqueで連番が付与されるため）
+                save_path = naming.ensure_unique(save_path)
+
+                # 重複チェック（ユニーク化されたパスで実行）
                 if self.check_duplicate(save_path):
                     self.logger.info(f"スキップ（既に存在）: {save_path}")
                     task = DownloadTask(
@@ -117,9 +121,6 @@ class Downloader:
                     result.add_task(task)
                     result.update_status(task)
                     continue
-
-                # 一意なパスを確保
-                save_path = naming.ensure_unique(save_path)
 
                 # 進捗コールバック
                 def progress_wrapper(downloaded, total):
