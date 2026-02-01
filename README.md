@@ -4,19 +4,23 @@
 
 ## 概要
 
-ppi.jpのWebサイトを解析し、ユーザーが指定した条件に一致するファイルを自動的にダウンロードして、指定したフォルダ（ローカルまたはBox）に整理して保存します。
+ppi.jpのWebサイトを解析し、ユーザーが指定した条件に一致するファイルを自動的にダウンロードして、指定したフォルダ（ローカル）に整理して保存します。
+
+**注意**: Box保存機能は将来対応予定です。現在はローカル保存のみサポートしています。
 
 ## 主な機能
 
 - HTML構造の解析
 - 条件に基づくファイルの自動ダウンロード
-- HTML構造に基づく自動ファイル命名
+- HTML構造に基づく自動ファイル命名（テンプレート文字列対応）
 - ローカルフォルダへの保存
-- 定期実行（スケジューリング）
+- 定期実行（スケジューリング、cron形式対応）
 - HTTPレート制限（429エラー）の自動処理
 - Windowsパス長制限（260文字）の自動対応
 - ダウンロード中のキャンセル機能
 - 詳細なメタデータ抽出（発注機関、工事名、日付など）
+- 日付範囲フィルタリング
+- PostBackリンク対応（javascript:__doPostBack形式）
 
 ## プロジェクト構成
 
@@ -26,7 +30,7 @@ ippi-down/
 │   ├── main.py           # エントリーポイント（GUI版）
 │   ├── gui/              # GUIモジュール
 │   ├── core/             # コア機能（scraper, downloader等）
-│   ├── storage/          # ストレージ（local, box）
+│   ├── storage/          # ストレージ（local、Boxは将来対応予定）
 │   ├── config/           # 設定管理
 │   ├── utils/            # ユーティリティ
 │   ├── models/           # データモデル
@@ -69,6 +73,7 @@ ippi-down/
 ├── pytest.ini           # pytest設定
 ├── pyrightconfig.json   # Pyright設定
 └── README.md             # プロジェクト概要
+
 ```
 
 ## セットアップ
@@ -118,7 +123,21 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-5. 設定ファイルをコピーして作成
+5. 開発環境のセットアップ（開発・テストを行う場合）
+
+開発・テストを行う場合は、追加の依存関係をインストールしてください:
+
+```powershell
+# 開発用依存関係をインストール
+pip install -r requirements-dev.txt
+```
+
+これにより、pytest-timeout などの開発ツールがインストールされます。
+
+**重要**: テストを実行する場合は、必ず `requirements-dev.txt` をインストールしてください。  
+`pytest.ini` の `addopts` に `--timeout` オプションが含まれているため、`pytest-timeout` が必要です。
+
+6. 設定ファイルをコピーして作成
 
    **重要**: Gitで管理されるのは `config/config.example.yaml` のみです。  
    実際に使用する設定ファイル `config/config.yaml` はローカルで作成してください。
@@ -246,18 +265,40 @@ PyInstallerを使用して実行ファイル（.exe）を作成できます。
 
 pytestを使用したテストスイートが用意されています。
 
+### テスト環境のセットアップ
+
+テストを実行する前に、開発用依存関係をインストールしてください：
+
+```powershell
+# 開発用依存関係をインストール（pytest-timeout等を含む）
+pip install -r requirements-dev.txt
+```
+
+**重要**: `pytest.ini` の `addopts` に `--timeout` オプションが含まれているため、`pytest-timeout` が必要です。  
+`requirements-dev.txt` をインストールすることで、必要な依存関係がすべてインストールされます。
+
 ### テストの実行
 
-```bash
-# すべてのテストを実行
-pytest tests/ -v
+**推奨**: `python -m pytest` を使用してください（コマンドPATH依存を避けるため）
+
+```powershell
+# すべてのテストを実行（GUI除外）
+python -m pytest -q -m "not gui"
+
+# すべてのテストを実行（詳細表示）
+python -m pytest tests/ -v
 
 # カバレッジレポート付きで実行
-pytest tests/ --cov=src --cov-report=html
+python -m pytest tests/ --cov=src --cov-report=html
 
 # 特定のテストファイルを実行
-pytest tests/test_file_utils.py -v
+python -m pytest tests/test_file_utils.py -v
+
+# GUIテストを含むすべてのテストを実行
+python -m pytest tests/ -v
 ```
+
+**注意**: デフォルトでは `pytest.ini` の設定により、GUI依存テスト・ネットワーク依存テスト・統合テストはスキップされます。
 
 ### テストカバレッジ
 
@@ -266,7 +307,39 @@ pytest tests/test_file_utils.py -v
 - ConfigModel: スケジュール設定の検証
 - HTTPClient: 初期化、タイムアウト設定
 
+## 設定項目の説明
+
+### 使用される設定項目
+
+- **target_urls**: 対象URLリスト（使用中）
+- **download_conditions.file_types**: ファイルタイプフィルタ（使用中）
+- **download_conditions.keywords**: キーワードフィルタ（使用中）
+- **download_conditions.date_range**: 日付範囲フィルタ（**実装済み**）
+- **save_paths.local**: ローカル保存先（使用中）
+- **naming_rule**: ファイル命名規則テンプレート（**実装済み**）
+- **schedule.enabled**: スケジュール有効化（使用中）
+- **schedule.interval**: 実行間隔（daily/weekly/monthly/custom、**custom cron対応済み**）
+- **schedule.time**: 実行時刻（HH:MM形式、使用中）
+- **schedule.cron**: cron形式（interval="custom"の場合、**実装済み**）
+- **logging.level**: ログレベル（使用中）
+- **logging.file**: ログファイルパス（使用中）
+
+### 使用されていない設定項目
+
+- **tqdm**: 進捗表示ライブラリ（現在未使用、requirements.txtでコメントアウト）
+
 ## 最近の改善点
+
+### v0.3.0 (2025-01-XX)
+
+- ✅ naming_rule テンプレート文字列の実装
+- ✅ date_range フィルタリングの実装
+- ✅ custom cron 形式のスケジュール対応（croniter導入）
+- ✅ PostBackリンク対応（javascript:__doPostBack形式）
+- ✅ リトライ設計の見直し（tenacity の実効性向上）
+- ✅ ログ設計の統一（handlers.clear の副作用排除）
+- ✅ Accept-Encoding の矛盾解消（br を削除）
+- ✅ 配布/レビューZIP作成スクリプトの不具合修正
 
 ### v0.2.0 (2026-01-08)
 
@@ -359,22 +432,41 @@ Get-ChildItem -Recurse -Directory -Filter "__pycache__" | ForEach-Object { git r
 Get-ChildItem -Recurse -Filter "*.pyc" | ForEach-Object { git rm --cached $_.FullName -ErrorAction SilentlyContinue }
 ```
 
-### クリーンなzip配布用パッケージの作成
+### 配布/レビューZIPの作成
 
-配布用のzipファイルを作成する際は、不要なファイルを除外してください。
-
-**推奨方法**: `scripts/tools/make_release_zip.ps1` スクリプトを使用します。
+共有用ZIPを作成する場合は、`pack_for_review2.ps1` を使用してください:
 
 ```powershell
-# PowerShellで実行
-.\scripts\tools\make_release_zip.ps1
+# 実行ポリシーを設定（初回のみ）
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+
+# レビュー用ZIPを作成
+powershell -ExecutionPolicy Bypass -File .\pack_for_review2.ps1
 ```
 
-このスクリプトは以下を自動的に除外します：
-- `.git/` - Gitメタ情報（配布物としては不要）
-- `.venv/` - 仮想環境
-- `__pycache__/`, `*.pyc` - Pythonキャッシュ
-- `.pytest_cache/` - pytestキャッシュ
+**注意:**
+- `pack_for_review2.ps1` は `config/config.yaml`（実設定ファイル）を自動的に除外します
+- テンプレートファイル（`config.example.yaml`）のみが含まれます
+- `.git`, `.venv`, `dist`, `logs`, `downloads` などの不要なファイルは自動的に除外されます
+
+**生成物の確認:**
+```powershell
+# MANIFEST.txt で除外/同梱状況を確認
+Get-Content .\_review_pack\MANIFEST.txt
+
+# 不要物が含まれていないことを確認
+Get-ChildItem .\_review_pack -Recurse -Directory | Where-Object { $_.Name -in @(".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".idea", ".vscode", "node_modules", "dist", "build", ".git", "logs") }
+
+# config.yaml が含まれていないことを確認
+Get-ChildItem .\_review_pack -Recurse -Filter "config.yaml" | Select-Object FullName
+
+# config.example.yaml が含まれていることを確認
+Get-ChildItem .\_review_pack -Recurse -Filter "config.example.yaml" | Select-Object FullName
+```
+
+**非推奨:**
+- `pack_for_review.ps1` は `config` ディレクトリを含めるため、`config.yaml` が混入するリスクがあります
+- 可能な限り `pack_for_review2.ps1` を使用してください
 - `build/`, `dist/` - PyInstaller生成物
 - `logs/`, `downloads/` - 実行結果
 - `config/config.yaml` - ローカル設定

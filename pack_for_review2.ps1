@@ -73,7 +73,8 @@ $ExcludeDirNames = @(
     "node_modules",
     "dist",
     "build",
-    ".git"
+    ".git",
+    "logs"
 )
 
 # 生成物/機密系の除外パターン（ファイル名ベース）
@@ -193,6 +194,16 @@ if ($IncludeConfigDir) {
         $configDst = Join-Path $OutDir "config"
         New-Item -ItemType Directory -Path $configDst -Force | Out-Null
 
+        # テンプレートファイルのパターン定義
+        $templatePatterns = @(
+            "*.example.*",
+            "*.sample.*",
+            "*.template.*",
+            "*example*",
+            "*sample*",
+            "*template*"
+        )
+
         # まずテンプレだけ集める（example / sample / template を優先）
         $templates = @()
         foreach ($pat in $templatePatterns) {
@@ -308,7 +319,12 @@ if (Test-Path $ZipPath) {
 Write-Step "ZIP作成: $ZipName"
 Compress-Archive -Path (Join-Path $OutDir "*") -DestinationPath $ZipPath -Force
 
+# MANIFEST.txt の内容を表示
+Write-Step "MANIFEST.txt の内容:"
+Get-Content -LiteralPath $ManifestPath | ForEach-Object { Write-Info $_ }
+
 Write-Step "完了"
+Write-Host ""
 Write-Host "出力フォルダ: $OutDir"
 Write-Host "MANIFEST:   $ManifestPath"
 Write-Host "ZIP:        $ZipPath"

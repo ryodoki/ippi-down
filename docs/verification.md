@@ -112,10 +112,13 @@ notepad .\debug_output.json
 
 #### 2.3 期待される出力例
 
+**通常のURLの場合:**
 ```json
 {
   "url": "https://www.i-ppi.jp/...",
   "file_types": [".pdf", ".xlsx", ".docx"],
+  "postback_detected": false,
+  "postback_reason": null,
   "files_count": 5,
   "files": [
     {
@@ -132,6 +135,22 @@ notepad .\debug_output.json
   ]
 }
 ```
+
+**PostBackリンクが検出された場合:**
+```json
+{
+  "url": "https://www.i-ppi.jp/...",
+  "file_types": [".pdf", ".xlsx", ".docx"],
+  "postback_detected": true,
+  "postback_reason": "抽出されたファイルにPostBackリンクが含まれています: javascript:__doPostBack(...)",
+  "files_count": 3,
+  "files": [
+    ...
+  ]
+}
+```
+
+**注意**: `postback_detected: true`の場合、PostBackリンクのファイルは抽出されていません。P0-1の実装（PostBackリンク対応）が必要です。
 
 ### 3. 入札調書ダウンロードの確認
 
@@ -153,7 +172,9 @@ GUIで以下を設定:
 - 詳細ページからファイルが抽出される
 - **重要**: 詳細ページにファイルがあっても、`UserEntry_Download.aspx`も探索される
 - 両方のソースから取得したファイルがマージされる（重複除去済み）
-- 入札調書が含まれている場合、ダウンロードされる
+- **PostBackリンク対応**: PostBackリンク（`javascript:__doPostBack(...)`）形式のリンクは検出され、`FileInfo.metadata`にpostback情報が保持されます。ダウンロード時に`Downloader._download_postback_file()`でPostBackを実行してファイルを取得します。
+- 通常のURL形式の入札調書が含まれている場合、ダウンロードされる
+- PostBackリンクの入札調書もダウンロードされる（P0-1の実装完了）
 
 #### 3.4 確認ポイント
 
@@ -218,4 +239,71 @@ GUIで以下を設定:
 
 - 本修正は段階的に実装されているため、各修正を個別に検証することが推奨されます
 - ログレベルをDEBUGに設定すると、ログファイルが大きくなる可能性があります
-- デバッグスクリプトは簡易的な実装のため、PostBackリンクの処理には対応していません
+- **PostBackリンク対応**: PostBackリンク（`javascript:__doPostBack(...)`）形式のリンクは検出され、`FileInfo.metadata`にpostback情報が保持されます。ダウンロード時に`Downloader._download_postback_file()`でPostBackを実行してファイルを取得します（P0-1の実装完了）。
+- デバッグスクリプト（`scripts/debug_extract_files.py`）はPostBackリンクを検出してJSONに`postback_detected: true`と`postback_reason`を出力します。
+
+## スモーク実行コマンド
+
+### ファイル抽出のみ（デバッグスクリプト）
+
+```powershell
+# 仮想環境を使用する場合
+.\venv\Scripts\Activate.ps1
+
+# デバッグスクリプトを実行（PostBackリンク検出情報を含む）
+python scripts\debug_extract_files.py --url "https://www.i-ppi.jp/IPPI/SearchServices/Web/..." --out debug_output.json --debug-log
+
+# 結果を確認
+Get-Content .\debug_output.json | ConvertFrom-Json | Select-Object postback_detected, postback_reason, files_count | Format-List
+```
+
+### ダウンロードまで含むスモーク実行（GUI経由）
+
+```powershell
+# 仮想環境を使用する場合
+.\venv\Scripts\Activate.ps1
+
+# 1. 設定ファイルを準備（config/config.yaml）
+#    - 検索条件を設定（発注機関、工事名など）
+#    - ファイルタイプを設定（.pdfなど）
+#    - 保存先を設定
+
+# 2. GUIを起動
+python src\main.py
+
+# 3. GUI上で以下を実行:
+#    - 検索条件を設定（必要に応じて）
+#    - 「ダウンロード開始」ボタンをクリック
+#    - 進捗バーとログで結果を確認
+
+# 4. ログを確認（PostBackリンク検出・ダウンロードを確認）
+Get-Content .\logs\app.log -Tail 100 | Select-String -Pattern "PostBack|入札調書|UserEntry_Download|PostBackでダウンロード"
+
+# 5. 保存先フォルダを確認
+Get-ChildItem .\downloads -Recurse -File | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize
+```
+
+### 期待されるログ出力（PostBackリンクダウンロード時）
+
+```
+[DEBUG] PostBackリンクを検出（FileInfo作成）: 文書名='入札調書', event_target='dgrKokoku', event_argument='$0'
+[INFO] PostBackでダウンロード開始: 文書名='入札調書', event_target='dgrKokoku', event_argument='$0'
+[DEBUG] PostBackを実行: URL='https://www.i-ppi.jp/...', event_target='dgrKokoku'
+[DEBUG] PostBackレスポンス: status=200, Content-Type=application/pdf, Content-Disposition=attachment; filename="入札調書.pdf"
+[INFO] PostBackでダウンロード完了: 保存先='./downloads/...', ファイルサイズ=123,456 bytes, Content-Type=application/pdf
+```
+
+### 期待されるログ出力（PostBackリンク検出・ダウンロード時）
+
+**検出時:**
+```
+[DEBUG] PostBackリンクを検出（FileInfo作成）: 文書名='入札調書', event_target='dgrKokoku', event_argument='$0'
+```
+
+**ダウンロード時:**
+```
+[INFO] PostBackでダウンロード開始: 文書名='入札調書', event_target='dgrKokoku', event_argument='$0'
+[DEBUG] PostBackを実行: URL='https://www.i-ppi.jp/...', event_target='dgrKokoku'
+[DEBUG] PostBackレスポンス: status=200, Content-Type=application/pdf, Content-Disposition=attachment; filename="入札調書.pdf"
+[INFO] PostBackでダウンロード完了: 保存先='./downloads/...', ファイルサイズ=123,456 bytes, Content-Type=application/pdf
+```

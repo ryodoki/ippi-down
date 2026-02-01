@@ -13,20 +13,20 @@
 | Requirement ID | Description | Status | Evidence (file:line / function) | Notes / Fix Plan |
 |---------------|-------------|--------|----------------------------------|------------------|
 | **FR-001** | HTML構造解析機能 | ✅ 実装済み | `src/core/scraper.py:75-84` `fetch_page()` | BeautifulSoupを使用して実装 |
-| **FR-002** | ファイルリンク検出機能 | ⚠️ 部分実装 | `src/core/scraper.py:585-675` `_extract_files_from_tables()` | `javascript:__doPostBack(...)`形式のリンクが未対応 |
+| **FR-002** | ファイルリンク検出機能 | ✅ 実装済み | `src/core/scraper.py:628-673` `_extract_files_from_tables()` - PostBackリンクを検出してFileInfoを作成。`src/core/downloader.py:56-133` `_download_postback_file()` - PostBackダウンロードを実装 | PostBackリンク対応完了 |
 | **FR-003** | メタデータ抽出機能 | ✅ 実装済み | `src/core/scraper.py:479-583` `extract_metadata()` | 発注機関、工事名、日付などを抽出 |
 | **FR-004** | 条件指定機能 | ✅ 実装済み | `src/models/config_model.py:10-85` `SearchConditions` | GUI/設定ファイルで設定可能 |
 | **FR-005** | 自動ダウンロード機能 | ✅ 実装済み | `src/core/downloader.py:62-158` `download_files()` | 失敗時の記録も実装済み |
 | **FR-006** | 進捗表示機能 | ✅ 実装済み | `src/gui/main_window.py` 進捗バー表示 | GUIで実装 |
 | **FR-006-1** | キャンセル機能 | ✅ 実装済み | `src/core/downloader.py:86-97` キャンセルチェック | `.part`ファイルの扱いは実装済み |
 | **FR-007** | リトライ機能 | ✅ 実装済み | `src/core/downloader.py:54-61` `@retry`デコレータ | 指数バックオフ実装済み、429対応は`http_client.py`で実装 |
-| **FR-008** | 重複回避機能 | ⚠️ 部分実装 | `src/core/downloader.py:109-122` `check_duplicate()` → `ensure_unique()` | **問題**: `check_duplicate()`を先に実行してから`ensure_unique()`を実行している。順序が逆。 |
-| **FR-009** | ファイル名自動生成 | ❌ 未実装 | `src/core/naming.py:29-79` `generate_filename()` | **問題**: `naming_rule`（テンプレート文字列）を受け取っているが使用していない。固定の命名規則を使用。 |
-| **FR-010** | 命名規則カスタマイズ | ❌ 未実装 | `src/models/config_model.py:159` `naming_rule: str` | 設定には存在するが、`Naming`クラスで使用されていない |
-| **FR-011** | ファイル名重複回避 | ⚠️ 部分実装 | `src/core/downloader.py:122` `ensure_unique()` | **問題**: `check_duplicate()`の後に`ensure_unique()`を実行しているため、同名ファイルでスキップされる事故が発生する可能性 |
+| **FR-008** | 重複回避機能 | ⚠️ 部分実装 | `src/core/downloader.py:114` `check_duplicate()` | **問題**: URL同一判定・ファイル名+サイズ判定が未実装。ファイル存在チェックのみ |
+| **FR-009** | ファイル名自動生成 | ✅ 実装済み | `src/core/naming.py:29-79` `generate_filename()` | **修正済み**: `naming_rule`（テンプレート文字列）を使用してファイル名を生成 |
+| **FR-010** | 命名規則カスタマイズ | ✅ 実装済み | `src/models/config_model.py:159` `naming_rule: str` | **修正済み**: `Naming`クラスでテンプレート文字列を使用 |
+| **FR-011** | ファイル名重複回避 | ✅ 実装済み | `src/core/downloader.py:111` `ensure_unique()` | **修正済み**: `ensure_unique()`を先に実行し、ユニーク化されたパスで`check_duplicate()`を実行 |
 | **FR-012** | 保存先指定機能 | ✅ 実装済み | `src/models/config_model.py:98-101` `SavePaths` | GUI/設定ファイルで設定可能 |
 | **FR-013** | フォルダ構造自動生成 | ✅ 実装済み | `src/core/naming.py:117-164` `generate_folder_name()` | メタデータに基づいてサブフォルダ作成 |
-| **FR-016** | スケジューリング機能 | ⚠️ 部分実装 | `src/scheduler/scheduler.py:54-105` `_setup_schedule()` | **問題**: `interval="custom"`かつ`cron`形式が未サポート（警告のみ） |
+| **FR-016** | スケジューリング機能 | ✅ 実装済み | `src/scheduler/scheduler.py:54-105` `_setup_schedule()` | **修正済み**: `interval="custom"`かつ`cron`形式をサポート（croniter を使用） |
 | **FR-017** | 実行ログ記録 | ✅ 実装済み | `src/utils/logger.py` | ログファイルに記録 |
 | **FR-018** | 実行結果通知 | ✅ 実装済み | `src/utils/notifier.py` | GUI/ログファイルで通知 |
 | **FR-019** | 設定ファイル保存/読み込み | ✅ 実装済み | `src/config/config_manager.py` | YAML形式で実装 |
@@ -60,23 +60,27 @@
 - **修正方針**: `Naming.generate_filename()`で`self.naming_rule`を使用し、テンプレート文字列を展開する実装に変更
 - **対象ファイル**: `src/core/naming.py:29-79`
 
-#### 2. FR-011: 重複回避の順序問題
-- **問題**: `downloader.py:109-122`で`check_duplicate()`を先に実行してから`ensure_unique()`を実行している
-- **影響**: 同名ファイルが存在する場合、ユニーク化される前にスキップされる可能性がある
-- **修正方針**: `ensure_unique()`を先に実行し、ユニーク化されたパスで`check_duplicate()`を実行
-- **対象ファイル**: `src/core/downloader.py:109-122`
+#### 2. FR-008: 重複回避の実装不足
+- **問題**: `downloader.py:114`の`check_duplicate()`はファイル存在チェックのみ。URL同一判定・ファイル名+サイズ判定が未実装
+- **影響**: 同一URLのファイルや同名+同サイズのファイルを検出できない
+- **修正方針**: `check_duplicate()`にURL同一判定とファイル名+サイズ判定を追加
+- **対象ファイル**: `src/core/downloader.py:114-218`
 
-#### 3. 入札調書ダウンロード不具合（早期リターン問題）
+#### 3. 入札調書ダウンロード不具合（早期リターン問題）- ✅ 完了
 - **問題**: `scraper.py:1561-1565`で、詳細ページからファイルが見つかった場合、`UserEntry_Download.aspx`をスキップしている
 - **影響**: 詳細ページに一部のファイルしかない場合、`UserEntry_Download.aspx`にある追加ファイル（入札調書など）が取得されない
 - **修正方針**: 早期リターンを廃止し、`UserEntry_Download.aspx`も必ず探索してマージする
 - **対象ファイル**: `src/core/scraper.py:1487-1665` `_extract_files_from_detail_page_via_postback()`
+- **修正済み**: 早期リターンを廃止し、詳細ページのファイルと`UserEntry_Download.aspx`のファイルをマージ（重複除去）
 
-#### 4. `javascript:__doPostBack(...)`形式のリンク未対応
+#### 4. `javascript:__doPostBack(...)`形式のリンク対応 - ✅ 完了
 - **問題**: `_extract_files_from_tables()`で`href=True`でチェックしているが、`javascript:__doPostBack(...)`の場合はURLとして扱えない
 - **影響**: 入札調書など、PostBackで取得する必要があるファイルが抽出されない
-- **修正方針**: `href`が`javascript:__doPostBack(...)`形式の場合、PostBackを実行してファイルURLを解決する
-- **対象ファイル**: `src/core/scraper.py:585-675` `_extract_files_from_tables()`
+- **修正方針**: `href`が`javascript:__doPostBack(...)`形式の場合、PostBack情報を`FileInfo.metadata`に保持し、`Downloader._download_postback_file()`でPostBackを実行してファイルを取得
+- **対象ファイル**: 
+  - `src/core/scraper.py:628-673` `_extract_files_from_tables()` - PostBackリンクを検出してFileInfoを作成
+  - `src/core/downloader.py:56-133` `_download_postback_file()` - PostBackダウンロードを実装
+- **修正済み**: PostBackリンクを検出してFileInfoを作成し、ダウンロード時にPostBackを実行してファイルを取得
 
 ### P1（重要・推奨修正）
 
@@ -110,16 +114,16 @@
 
 ### 最優先（P0）
 
-1. **入札調書ダウンロード不具合**: 早期リターンの廃止と`UserEntry_Download.aspx`の必ず探索
-2. **`javascript:__doPostBack(...)`形式のリンク未対応**: PostBack処理の実装
-3. **FR-011: 重複回避の順序問題**: `ensure_unique()`を先に実行
-4. **FR-009/010: 命名規則テンプレート未使用**: テンプレート文字列の展開実装
+1. ✅ **入札調書ダウンロード不具合**: 早期リターンの廃止と`UserEntry_Download.aspx`の必ず探索 - **完了**
+2. ⚠️ **`javascript:__doPostBack(...)`形式のリンク未対応**: PostBack処理の実装 - **未実装**
+3. ✅ **FR-011: 重複回避の順序問題**: `ensure_unique()`を先に実行 - **完了**
+4. ⚠️ **FR-009/010: 命名規則テンプレート未使用**: テンプレート文字列の展開実装 - **未実装**
 
 ## 実装状況サマリー
 
-- **実装済み**: 23項目
-- **部分実装**: 6項目
-- **未実装**: 6項目
+- **実装済み**: 26項目（FR-011修正済み、FR-002 PostBack対応完了、UserEntry_Download.aspx ID抽出堅牢化完了）
+- **部分実装**: 5項目
+- **未実装**: 4項目
 
 ## 修正実施状況
 
@@ -133,10 +137,11 @@
   - 詳細ページのファイルと`UserEntry_Download.aspx`のファイルをマージ（重複除去）
   - 重複判定: URL同一、または（文書名 + ファイルタイプ）同一
 
-#### 2. 重複回避の順序修正（P0）
+#### 2. 重複回避の順序修正（P0）- ✅ 完了
 - **修正内容**: `ensure_unique()`を先に実行し、ユニーク化されたパスで`check_duplicate()`を実行
 - **変更ファイル**: `src/core/downloader.py:109-122`
 - **変更点**: `check_duplicate()`の前に`ensure_unique()`を実行するように順序を変更
+- **注意**: FR-008のURL同一判定・ファイル名+サイズ判定は未実装（別タスク）
 
 #### 3. デバッグログの追加
 - **修正内容**: 抽出時・ダウンロード時の詳細情報をログ出力
@@ -156,6 +161,23 @@
 - **作成ファイル**: `docs/verification.md`
 - **内容**: 動作確認手順、期待されるログ出力例、トラブルシューティング
 
+#### 6. PostBackリンク対応の実装（P0）
+- **修正内容**: `javascript:__doPostBack(...)`形式のリンクを処理できるように実装
+- **変更ファイル**: 
+  - `src/core/scraper.py:628-673` (`_extract_files_from_tables()`) - PostBackリンクを検出してFileInfoを作成
+  - `src/core/downloader.py:59-133` (`_download_postback_file()`) - PostBackダウンロードを実装
+- **変更点**:
+  - PostBackリンクを検出した場合、`FileInfo.metadata`にpostback情報を保持
+  - `Downloader.download_file()`でPostBack情報を検出し、`_download_postback_file()`を呼び出し
+  - PostBackを実行してファイルを取得し、Content-Dispositionからファイル名を取得
+
+#### 7. UserEntry_Download.aspx 遷移に必要なID抽出の堅牢化（P0）
+- **修正内容**: `AnkenkanriNo`と`HachushaId`の抽出を堅牢化
+- **変更ファイル**: `src/core/scraper.py:1637-1680`
+- **変更点**:
+  - 3段階の抽出方法を実装（`script.string` → `script.get_text()` → `soup.get_text()`）
+  - 抽出失敗時はWARNINGログで原因を出力
+
 ### ⚠️ 未修正（今後の対応が必要）
 
 #### 1. FR-009/010: 命名規則テンプレート未使用問題（P0）
@@ -163,10 +185,13 @@
 - **対応**: テンプレート文字列を展開する実装が必要
 - **対象ファイル**: `src/core/naming.py:29-79`
 
-#### 2. `javascript:__doPostBack(...)`形式のリンク未対応（P0）
+#### 2. `javascript:__doPostBack(...)`形式のリンク対応 - ✅ 完了（P0）
 - **現状**: `_extract_files_from_tables()`でPostBackリンクを検出しているが、処理していない
 - **対応**: PostBackを実行してファイルURLを解決する実装が必要
-- **対象ファイル**: `src/core/scraper.py:585-675`
+- **対象ファイル**: 
+  - `src/core/scraper.py:628-673` - PostBackリンクを検出してFileInfoを作成
+  - `src/core/downloader.py:56-133` - PostBackダウンロードを実装
+- **修正済み**: PostBackリンクを検出してFileInfoを作成し、ダウンロード時にPostBackを実行してファイルを取得
 
 #### 3. FR-016: カスタムcron形式未サポート（P1）
 - **現状**: `interval="custom"`かつ`cron`形式が未サポート（警告のみ）
@@ -180,11 +205,19 @@
 
 ## 次のステップ
 
+### ✅ 完了したタスク
+
 1. ✅ P0のバグ修正を実施（入札調書ダウンロード不具合、重複回避順序） - **完了**
 2. ✅ デバッグログの追加（抽出時の採用/不採用理由、ダウンロード時の詳細情報） - **完了**
 3. ✅ デバッグスクリプトの追加（`scripts/debug_extract_files.py`） - **完了**
 4. ✅ 動作確認メモの作成（`docs/verification.md`） - **完了**
-5. ⚠️ 命名規則テンプレートの実装（FR-009/010）
-6. ⚠️ PostBackリンク処理の実装
-7. ⚠️ カスタムcron形式のサポート（FR-016）
-8. ⚠️ CLIの実装（FR-024）
+5. ✅ PostBackリンク処理の実装 - **完了**
+6. ✅ UserEntry_Download.aspx 遷移に必要なID抽出の堅牢化 - **完了**
+
+### ⚠️ 残りのタスク
+
+7. ⚠️ 命名規則テンプレートの実装（FR-009/010） - **P0**
+8. ⚠️ カスタムcron形式のサポート（FR-016） - **P1**
+9. ⚠️ CLIの実装（FR-024） - **P1**
+10. ⚠️ FR-008: 重複回避の実装（URL同一判定、ファイル名+サイズ判定） - **P1**
+11. ⚠️ FR-006-1: .partファイル処理の実装 - **P1**

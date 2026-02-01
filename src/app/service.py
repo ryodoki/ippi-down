@@ -96,11 +96,23 @@ class ApplicationService:
                     message="ダウンロードがキャンセルされました"
                 )
 
+            # 失敗理由別サマリーを取得（FR-005）
+            failure_summary = result.summarize_failures()
+            failure_summary_text = ", ".join([
+                f"{k}={v}" for k, v in failure_summary.items() if v > 0
+            ])
+            
             # 結果メッセージ
             result_message = (
                 f"ダウンロード完了: 成功={result.success}, "
                 f"失敗={result.failed}, スキップ={result.skipped}"
             )
+            if failure_summary_text:
+                result_message += f" (失敗理由: {failure_summary_text})"
+            
+            # ログに失敗理由別サマリーを出力（FR-005）
+            if result.failed > 0:
+                self.logger.info(f"失敗理由別サマリー: {failure_summary_text}")
 
             # イベント発行: 完了
             if progress_callback:
@@ -108,7 +120,8 @@ class ApplicationService:
                     type=EventType.COMPLETE,
                     message=result_message,
                     current=result.total,
-                    total=result.total
+                    total=result.total,
+                    metadata={"result": result}  # CLIで使用
                 ))
 
             return RunResult(
@@ -311,7 +324,11 @@ class ApplicationService:
             config.save_paths.local,
             self._naming,
             progress_wrapper,
-            folder_name=None
+            folder_name=None,
+            cancel_flag=cancel_flag,
+            use_subfolders=config.save_paths.use_subfolders,
+            enable_hash_check=config.save_paths.enable_hash_check,
+            keep_part_on_cancel=config.save_paths.keep_part_on_cancel,
         )
 
     def _cleanup(self):

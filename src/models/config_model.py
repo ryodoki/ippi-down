@@ -99,6 +99,9 @@ class SavePaths:
     """保存先パス"""
 
     local: str = "./downloads"
+    use_subfolders: bool = True  # サブフォルダ自動生成（FR-013、デフォルトはTrueで既存挙動を維持）
+    enable_hash_check: bool = False  # ハッシュ判定を有効化（FR-008、オプション）
+    keep_part_on_cancel: bool = True  # キャンセル時に.partファイルを残す（FR-006-1、デフォルトはTrue）
 
 
 @dataclass

@@ -626,11 +626,43 @@ class Scraper:
                     if href:
                         # DEBUG: javascript:__doPostBack(...)形式のリンクを検出
                         if href.startswith("javascript:") and "__doPostBack" in href:
-                            self.logger.debug(
-                                f"PostBackリンクを検出（未対応）: 文書名='{document_name}', "
-                                f"href='{href[:100]}...' (テーブル: {table_id})"
-                            )
-                            # TODO: PostBackリンクの処理を実装
+                            # PostBackリンクを解析
+                            import re
+                            match = re.search(r"__doPostBack\('([^']+)','([^']+)'\)", href)
+                            if match:
+                                event_target = match.group(1)
+                                event_argument = match.group(2)
+                                
+                                # PostBack情報をmetadataに保持
+                                postback_info = {
+                                    "postback": True,
+                                    "postback_info": {
+                                        "event_target": event_target,
+                                        "event_argument": event_argument,
+                                        "postback_href": href,
+                                        "document_name": document_name,
+                                    },
+                                }
+                                
+                                # FileInfoを作成（URLはPostBack実行後に解決されるため、仮のURLを設定）
+                                # 実際のダウンロード時には、PostBackを実行してファイルURLを取得する
+                                file_info = FileInfo(
+                                    url=f"postback://{event_target}/{event_argument}",  # 仮のURL（PostBack識別用）
+                                    filename=document_name or "postback_file",
+                                    file_type=".pdf",  # デフォルト（Content-Dispositionから取得可能な場合に上書き）
+                                    page_url=base_url,
+                                    metadata={"title": document_name, **postback_info} if document_name else postback_info
+                                )
+                                files.append(file_info)
+                                self.logger.debug(
+                                    f"PostBackリンクを検出（FileInfo作成）: 文書名='{document_name}', "
+                                    f"event_target='{event_target}', event_argument='{event_argument}' (テーブル: {table_id})"
+                                )
+                            else:
+                                self.logger.warning(
+                                    f"PostBackリンクの解析に失敗: 文書名='{document_name}', "
+                                    f"href='{href[:100]}...' (テーブル: {table_id})"
+                                )
                             continue
                         
                         # 相対URLを絶対URLに変換
@@ -1217,12 +1249,20 @@ class Scraper:
                 form_data["dateKeiyakuTo"] = search_conditions.keiyaku_date_end
         
         # 工事種別（正しいフィールド名: drpKojiKbn）
+        # ラベルまたはコードをコードに変換してPOST値に設定
         if search_conditions.koji_shubetsu:
-            form_data["drpKojiKbn"] = search_conditions.koji_shubetsu
+            from .ppi_dropdowns import label_to_code
+            code = label_to_code("koji_shubetsu", search_conditions.koji_shubetsu, self.logger)
+            if code:
+                form_data["drpKojiKbn"] = code
         
         # 工事の業種（正しいフィールド名: drpKojiGyosyu）
+        # ラベルまたはコードをコードに変換してPOST値に設定
         if search_conditions.koji_gyoushu:
-            form_data["drpKojiGyosyu"] = search_conditions.koji_gyoushu
+            from .ppi_dropdowns import label_to_code
+            code = label_to_code("koji_gyoushu", search_conditions.koji_gyoushu, self.logger)
+            if code:
+                form_data["drpKojiGyosyu"] = code
         
         # 予定価格（正しいフィールド名: tbxYoteiPriceFrom, tbxYoteiPriceTo）
         if search_conditions.yotei_price_min is not None:
@@ -1604,8 +1644,11 @@ class Scraper:
             ankenkanri_no = None
             hachusha_id = None
             
-            # JavaScriptコードからAnkenkanriNoとHachushaIdを抽出
+            # JavaScriptコードからAnkenkanriNoとHachushaIdを抽出（堅牢化）
+            # script.stringだけでなく、script.get_text()やsoup.get_text()も使用
             import re
+            
+            # 方法1: script.stringから抽出（従来の方法）
             script_tags = detail_soup.find_all("script")
             for script in script_tags:
                 script_text = script.string
@@ -1614,12 +1657,53 @@ class Scraper:
                     match = re.search(r'var\s+AnkenkanriNo\s*=\s*"([^"]+)"', script_text)
                     if match:
                         ankenkanri_no = match.group(1)
-                        self.logger.debug(f"AnkenkanriNoを抽出: {ankenkanri_no}")
+                        self.logger.debug(f"AnkenkanriNoを抽出（script.string）: {ankenkanri_no}")
                     
                     match = re.search(r'var\s+HachushaId\s*=\s*"([^"]+)"', script_text)
                     if match:
                         hachusha_id = match.group(1)
-                        self.logger.debug(f"HachushaIdを抽出: {hachusha_id}")
+                        self.logger.debug(f"HachushaIdを抽出（script.string）: {hachusha_id}")
+            
+            # 方法2: script.get_text()から抽出（script.stringがNoneの場合）
+            if not ankenkanri_no or not hachusha_id:
+                for script in script_tags:
+                    script_text = script.get_text()
+                    if script_text and "AnkenkanriNo" in script_text:
+                        match = re.search(r'var\s+AnkenkanriNo\s*=\s*"([^"]+)"', script_text)
+                        if match and not ankenkanri_no:
+                            ankenkanri_no = match.group(1)
+                            self.logger.debug(f"AnkenkanriNoを抽出（script.get_text()）: {ankenkanri_no}")
+                        
+                        match = re.search(r'var\s+HachushaId\s*=\s*"([^"]+)"', script_text)
+                        if match and not hachusha_id:
+                            hachusha_id = match.group(1)
+                            self.logger.debug(f"HachushaIdを抽出（script.get_text()）: {hachusha_id}")
+            
+            # 方法3: soup.get_text()から抽出（scriptタグから取得できない場合）
+            if not ankenkanri_no or not hachusha_id:
+                page_text = detail_soup.get_text()
+                if "AnkenkanriNo" in page_text:
+                    match = re.search(r'var\s+AnkenkanriNo\s*=\s*"([^"]+)"', page_text)
+                    if match and not ankenkanri_no:
+                        ankenkanri_no = match.group(1)
+                        self.logger.debug(f"AnkenkanriNoを抽出（soup.get_text()）: {ankenkanri_no}")
+                    
+                    match = re.search(r'var\s+HachushaId\s*=\s*"([^"]+)"', page_text)
+                    if match and not hachusha_id:
+                        hachusha_id = match.group(1)
+                        self.logger.debug(f"HachushaIdを抽出（soup.get_text()）: {hachusha_id}")
+            
+            # 抽出失敗時のログ出力（INFO/WARNレベル）
+            if not ankenkanri_no:
+                self.logger.warning(
+                    "AnkenkanriNoを抽出できませんでした（UserEntry_Download.aspxをスキップ）。"
+                    "詳細ページのHTML構造が変更されている可能性があります。"
+                )
+            if not hachusha_id:
+                self.logger.warning(
+                    "HachushaIdを抽出できませんでした（UserEntry_Download.aspxをスキップ）。"
+                    "詳細ページのHTML構造が変更されている可能性があります。"
+                )
             
             # UserEntry_Download.aspxからファイルリンクを取得
             if ankenkanri_no and hachusha_id:
@@ -1694,10 +1778,8 @@ class Scraper:
                 except Exception as e:
                     self.logger.warning(f"UserEntry_Download.aspxからのファイル抽出エラー: {str(e)}", exc_info=True)
             else:
-                if not ankenkanri_no:
-                    self.logger.debug("AnkenkanriNoを抽出できませんでした（UserEntry_Download.aspxをスキップ）")
-                if not hachusha_id:
-                    self.logger.debug("HachushaIdを抽出できませんでした（UserEntry_Download.aspxをスキップ）")
+                # 抽出失敗時は既にWARNINGログを出力しているため、ここでは何もしない
+                pass
             
             # 詳細ページのファイルとUserEntry_Download.aspxのファイルをマージ（重複除去）
             # 重複判定: URLが同一、または（文書名 + ファイルタイプ）が同一

@@ -13,6 +13,7 @@ from ..gui.event_handler import EventHandler
 from ..utils.http_client import HTTPClient
 from ..core.scraper import Scraper
 from ..config.config_manager import ConfigManager
+from ..core.ppi_dropdowns import get_labels, code_to_label, label_to_code
 
 
 class MainWindow:
@@ -441,18 +442,13 @@ class MainWindow:
         koji_shubetsu_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
         row += 1
 
-        koji_shubetsu_options = [
-            "",
-            "一般土木工事", "アスファルト舗装工事", "鋼橋上部工事", "造園工事", "建築工事",
-            "木造建築工事", "電気設備工事", "暖冷房衛生設備工事", "セメント・コンクリート舗装工事",
-            "プレストレスト・コンクリート工事", "法面処理工事", "塗装工事", "維持修繕工事",
-            "浚渫工事", "グラウト工事", "杭打工事", "さく井工事", "プレハブ建築工事",
-            "機械設備工事", "通信設備工事", "受変電設備工事", "港湾土木工事", "農林土木工事",
-            "農林建築工事", "橋梁補修工事", "その他"
-        ]
+        # 工事種別のオプションを一元管理された定義から取得
+        koji_shubetsu_options = get_labels("koji_shubetsu")
         koji_shubetsu_input_frame = ttk.Frame(koji_shubetsu_frame)
         koji_shubetsu_input_frame.pack(fill=tk.X)
-        self.koji_shubetsu_var = tk.StringVar(value=search_conditions.koji_shubetsu)
+        # コードまたはラベルをラベルに変換して表示
+        display_value = code_to_label("koji_shubetsu", search_conditions.koji_shubetsu, self.logger)
+        self.koji_shubetsu_var = tk.StringVar(value=display_value)
         ttk.Label(koji_shubetsu_input_frame, text="▽以下から選択").pack(side=tk.LEFT, padx=5)
         ttk.Combobox(
             koji_shubetsu_input_frame,
@@ -473,18 +469,13 @@ class MainWindow:
         koji_gyoushu_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
         row += 1
 
-        koji_gyoushu_options = [
-            "",
-            "土木一式工事", "建築一式工事", "大工工事", "左官工事", "とび・土工・コンクリート工事",
-            "石工事", "屋根工事", "電気工事", "管工事", "タイル・れんが・ブロック工事",
-            "鋼構造物工事", "鉄筋工事", "舗装工事", "浚渫工事", "板金工事",
-            "ガラス工事", "塗装工事", "防水工事", "内装仕上工事", "機械器具設置工事",
-            "熱絶縁工事", "電気通信工事", "造園工事", "さく井工事", "建具工事",
-            "水道施設工事", "消防施設工事", "清掃施設工事", "解体工事", "その他"
-        ]
+        # 工事の業種のオプションを一元管理された定義から取得
+        koji_gyoushu_options = get_labels("koji_gyoushu")
         koji_gyoushu_input_frame = ttk.Frame(koji_gyoushu_frame)
         koji_gyoushu_input_frame.pack(fill=tk.X)
-        self.koji_gyoushu_var = tk.StringVar(value=search_conditions.koji_gyoushu)
+        # コードまたはラベルをラベルに変換して表示
+        display_value = code_to_label("koji_gyoushu", search_conditions.koji_gyoushu, self.logger)
+        self.koji_gyoushu_var = tk.StringVar(value=display_value)
         ttk.Label(koji_gyoushu_input_frame, text="▽以下から選択").pack(side=tk.LEFT, padx=5)
         ttk.Combobox(
             koji_gyoushu_input_frame,
@@ -751,8 +742,8 @@ class MainWindow:
                 self.download_callback(self)
         except Exception as e:
             if not self.cancel_flag.is_set():
-            self.logger.error(f"ダウンロードエラー: {str(e)}")
-            self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
+                self.logger.error(f"ダウンロードエラー: {str(e)}")
+                self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
         finally:
             self.root.after(0, lambda: self._reset_download_ui())
 
@@ -855,9 +846,9 @@ class MainWindow:
         self.keiyaku_date_type_var.set(search_conditions.keiyaku_date_type)
         self.keiyaku_date_start_var.set(search_conditions.keiyaku_date_start or "")
 
-        # 工事種別、工事の業種
-        self.koji_shubetsu_var.set(search_conditions.koji_shubetsu)
-        self.koji_gyoushu_var.set(search_conditions.koji_gyoushu)
+        # 工事種別、工事の業種（コードまたはラベルをラベルに変換して表示）
+        self.koji_shubetsu_var.set(code_to_label("koji_shubetsu", search_conditions.koji_shubetsu, self.logger))
+        self.koji_gyoushu_var.set(code_to_label("koji_gyoushu", search_conditions.koji_gyoushu, self.logger))
 
         # 価格
         if search_conditions.yotei_price_min:
@@ -929,8 +920,9 @@ class MainWindow:
         search_conditions.keiyaku_date_start = self.keiyaku_date_start_var.get() or None
 
         # 工事種別、工事の業種（単一選択）
-        search_conditions.koji_shubetsu = self.koji_shubetsu_var.get()
-        search_conditions.koji_gyoushu = self.koji_gyoushu_var.get()
+        # GUIから取得したラベルをコードに変換して保存
+        search_conditions.koji_shubetsu = label_to_code("koji_shubetsu", self.koji_shubetsu_var.get(), self.logger)
+        search_conditions.koji_gyoushu = label_to_code("koji_gyoushu", self.koji_gyoushu_var.get(), self.logger)
 
         # 価格
         try:

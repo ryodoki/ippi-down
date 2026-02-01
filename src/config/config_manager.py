@@ -123,8 +123,12 @@ class ConfigManager:
 
         # デフォルトのダウンロードパスはexeの場所を基準にする
         default_downloads = str(get_downloads_path())
+        save_paths_dict = config_dict.get("save_paths", {})
         save_paths = SavePaths(
-            local=config_dict.get("save_paths", {}).get("local", default_downloads),
+            local=save_paths_dict.get("local", default_downloads),
+            use_subfolders=save_paths_dict.get("use_subfolders", True),  # デフォルトTrueで既存挙動を維持
+            enable_hash_check=save_paths_dict.get("enable_hash_check", False),
+            keep_part_on_cancel=save_paths_dict.get("keep_part_on_cancel", True),  # デフォルトTrue
         )
 
         schedule = ScheduleConfig(
@@ -247,6 +251,9 @@ class ConfigManager:
             },
             "save_paths": {
                 "local": config.save_paths.local,
+                "use_subfolders": config.save_paths.use_subfolders,
+                "enable_hash_check": config.save_paths.enable_hash_check,
+                "keep_part_on_cancel": config.save_paths.keep_part_on_cancel,
             },
             "naming_rule": config.naming_rule,
             "schedule": {

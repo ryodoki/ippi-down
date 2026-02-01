@@ -29,7 +29,50 @@ class Naming:
     def generate_filename(
         self, file_info: FileInfo, metadata: Dict[str, Any] = None, index: int = 0
     ) -> str:
-        """ファイル名を生成: 大分類_中分類_小分類_細分類_工事名_ファイル名"""
+        """ファイル名を生成
+        
+        naming_rule が設定されている場合はテンプレート文字列を使用し、
+        設定されていない場合は従来の固定ロジックを使用する。
+        """
+        # コンテキストを構築
+        context = self._build_context_from_search_conditions(file_info, metadata, index)
+        
+        # naming_rule が設定されている場合はテンプレート文字列を使用
+        if self.naming_rule and self.naming_rule.strip():
+            try:
+                # テンプレート文字列を展開
+                filename = self.naming_rule.format_map(context)
+                self.logger.debug(f"テンプレート文字列を使用: '{self.naming_rule}' -> '{filename}'")
+            except KeyError as e:
+                # 欠けているキーがある場合は警告を出してデフォルト値を使用
+                missing_key = str(e).strip("'")
+                self.logger.warning(f"テンプレートに欠けているキー: {missing_key}。デフォルト値（空文字）を使用します。")
+                # 欠けているキーを空文字で補完
+                safe_context = {**context, missing_key: ""}
+                filename = self.naming_rule.format_map(safe_context)
+            except Exception as e:
+                # その他のエラー（フォーマットエラー等）の場合は従来ロジックにフォールバック
+                self.logger.warning(f"テンプレート文字列の展開に失敗: {str(e)}。従来のロジックを使用します。")
+                filename = self._generate_filename_legacy(file_info, metadata, index)
+        else:
+            # naming_rule が設定されていない場合は従来の固定ロジックを使用
+            filename = self._generate_filename_legacy(file_info, metadata, index)
+        
+        # 無効な文字を削除
+        filename = self.file_utils.sanitize_filename(filename)
+        
+        # 拡張子を追加（元のファイルの拡張子）
+        extension = file_info.get_file_extension()
+        if extension and not filename.endswith(extension):
+            filename += extension
+
+        self.logger.debug(f"生成されたファイル名: '{filename}'")
+        return filename
+
+    def _generate_filename_legacy(
+        self, file_info: FileInfo, metadata: Dict[str, Any] = None, index: int = 0
+    ) -> str:
+        """従来の固定ロジックでファイル名を生成: 大分類_中分類_小分類_細分類_工事名_ファイル名"""
         # 検索条件から分類情報を取得してファイル名を構築
         parts = []
         
@@ -62,31 +105,34 @@ class Naming:
             original_filename = original_filename.rsplit(".", 1)[0]
         parts.append(original_filename)
         
-        self.logger.debug(f"ファイル名生成 - パーツ: {parts}")
+        self.logger.debug(f"ファイル名生成（従来ロジック） - パーツ: {parts}")
         
         # 結合
         filename = "_".join(parts)
-        
-        # 無効な文字を削除
-        filename = self.file_utils.sanitize_filename(filename)
-        
-        # 拡張子を追加（元のファイルの拡張子）
-        extension = file_info.get_file_extension()
-        if extension and not filename.endswith(extension):
-            filename += extension
-
-        self.logger.debug(f"生成されたファイル名: '{filename}'")
         return filename
 
     def _build_context_from_search_conditions(
         self, file_info: FileInfo, metadata: Dict[str, Any] = None, index: int = 0
     ) -> Dict[str, Any]:
-        """検索条件からコンテキストを構築"""
+        """検索条件からコンテキストを構築（テンプレート文字列用）"""
+        # メタデータをマージ
+        merged_metadata = {}
+        if metadata:
+            merged_metadata.update(metadata)
+        if file_info.metadata:
+            merged_metadata.update(file_info.metadata)
+        
+        # 元のファイル名（拡張子を除く）
+        original_filename = file_info.filename
+        if "." in original_filename:
+            original_filename = original_filename.rsplit(".", 1)[0]
+        
+        # 基本コンテキスト
         context = {
-            "filename": file_info.filename,
+            "filename": original_filename,
             "file_type": file_info.get_file_extension().replace(".", ""),
-            "category": metadata.get("category", "") if metadata else "",
-            "title": metadata.get("title", "") if metadata else "",
+            "category": merged_metadata.get("category", ""),
+            "title": merged_metadata.get("title", ""),
             "date": datetime.now().strftime("%Y%m%d"),
             "index": str(index),
         }
@@ -98,21 +144,33 @@ class Naming:
             context["chubunrui"] = sc.hachu_chubunrui or ""
             context["shoubunrui"] = sc.hachu_shoubunrui or ""
             context["saibunrui"] = sc.hachu_saibunrui or ""
-            context["koji_name"] = sc.koji_name or ""
+            context["koji_name"] = merged_metadata.get("koji_name", sc.koji_name or "")
         else:
             context["daibunrui"] = ""
             context["chubunrui"] = ""
             context["shoubunrui"] = ""
             context["saibunrui"] = ""
-            context["koji_name"] = ""
+            context["koji_name"] = merged_metadata.get("koji_name", "")
         
-        # メタデータから追加情報を取得
-        if metadata:
-            context.update(metadata)
-        if file_info.metadata:
-            context.update(file_info.metadata)
+        # メタデータから追加情報を取得（既存のキーを上書きしない）
+        for key, value in merged_metadata.items():
+            if key not in context:
+                # 値が文字列でない場合は文字列に変換
+                context[key] = str(value) if value is not None else ""
         
-        return context
+        # すべての値を文字列に変換（安全のため）
+        safe_context = {}
+        for key, value in context.items():
+            if value is None:
+                safe_context[key] = ""
+            elif isinstance(value, (int, float)):
+                safe_context[key] = str(value)
+            elif isinstance(value, datetime):
+                safe_context[key] = value.strftime("%Y%m%d")
+            else:
+                safe_context[key] = str(value)
+        
+        return safe_context
 
     def generate_folder_name(self, file_info: FileInfo) -> str:
         """フォルダ名を生成: 大分類_中分類_小分類_細分類_工事名

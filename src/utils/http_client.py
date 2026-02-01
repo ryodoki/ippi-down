@@ -180,15 +180,26 @@ class HTTPClient:
         progress_callback: Optional[Callable[[int, int], None]] = None,
         max_retries: int = 3,
         referer: Optional[str] = None,
-    ) -> bool:
+        cancel_flag: Optional[Callable[[], bool]] = None,
+    ) -> tuple[bool, dict]:
         """ファイルをダウンロード
         
         Args:
             url: ダウンロードURL
-            save_path: 保存先パス
+            save_path: 保存先パス（.part拡張子は自動付与、成功時にリネーム）
             progress_callback: 進捗コールバック関数
             max_retries: 最大リトライ回数
             referer: リファラーヘッダー（元のページURL）
+            cancel_flag: キャンセルチェック関数（Trueを返すと中断）
+        
+        Returns:
+            (success: bool, error_info: dict)
+            - success: ダウンロード成功時True
+            - error_info: 失敗時のエラー情報（成功時は空辞書）
+                - http_status: HTTPステータスコード
+                - error_type: エラー種別（network, rate_limit, http_4xx, http_5xx, filesystem, other）
+                - exception_type: 例外クラス名
+                - retry_attempts: 実際に試行した回数
         """
         retry_delay = 1
         
@@ -197,7 +208,7 @@ class HTTPClient:
         download_headers = {
             "Accept": "application/pdf,application/octet-stream,*/*",
             "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "gzip, deflate",  # br を削除（Brotli 対応なし）
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
             "Cache-Control": "no-cache",
@@ -271,7 +282,12 @@ class HTTPClient:
                     )
                     if attempt == max_retries - 1:
                         self.logger.error(f"ダウンロード失敗（HTMLレスポンス）: URL='{url[:100]}...'")
-                        return False
+                        return (False, {
+                            "http_status": response.status_code,
+                            "error_type": "other",
+                            "exception_type": "HTMLResponse",
+                            "retry_attempts": attempt + 1,
+                        })
                     wait_time = retry_delay * (2 ** attempt)
                     self.logger.warning(f"HTMLレスポンス。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
                     time.sleep(wait_time)
@@ -280,6 +296,10 @@ class HTTPClient:
                 # 保存先ディレクトリを作成
                 save_path_obj = Path(save_path)
                 save_path_obj.parent.mkdir(parents=True, exist_ok=True)
+                
+                # .partファイルとして保存（FR-006-1）
+                part_path = str(save_path_obj) + ".part"
+                part_path_obj = Path(part_path)
 
                 total_size = int(response.headers.get("content-length", 0))
                 downloaded_size = 0
@@ -290,8 +310,15 @@ class HTTPClient:
                 # 先頭数バイトをチェック（HTMLの場合は失敗扱い）
                 first_chunk_received = False
                 html_detected = False
-                with open(save_path, "wb") as f:
+                cancelled = False
+                with open(part_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
+                        # キャンセルチェック（FR-006-1）
+                        if cancel_flag and cancel_flag():
+                            self.logger.info(f"ダウンロードがキャンセルされました: {url}")
+                            cancelled = True
+                            break
+                        
                         if chunk:
                             # 最初のチャンクでHTML判定
                             if not first_chunk_received:
@@ -299,7 +326,7 @@ class HTTPClient:
                                 if chunk.startswith(b"<html") or chunk.startswith(b"<!DOCTYPE") or chunk.startswith(b"<HTML"):
                                     self.logger.warning(f"ダウンロードしたファイルがHTMLです（先頭バイト判定）: {url}")
                                     f.close()
-                                    save_path_obj.unlink(missing_ok=True)  # ファイルを削除
+                                    part_path_obj.unlink(missing_ok=True)  # ファイルを削除
                                     html_detected = True
                                     break  # リトライループに戻る
                             
@@ -327,14 +354,42 @@ class HTTPClient:
                                 last_progress_size = downloaded_size
                                 last_progress_time = current_time
                 
+                # キャンセルされた場合（.partファイルの扱いは呼び出し側で制御、FR-006-1）
+                if cancelled:
+                    # .partファイルは残す（呼び出し側でkeep_part_on_cancelに従って削除）
+                    return (False, {
+                        "http_status": response.status_code,
+                        "error_type": "other",
+                        "exception_type": "Cancelled",
+                        "retry_attempts": attempt + 1,
+                    })
+                
                 # HTML判定で中断された場合はリトライループに戻る
                 if html_detected:
                     if attempt == max_retries - 1:
-                        return False
+                        return (False, {
+                            "http_status": response.status_code,
+                            "error_type": "other",
+                            "exception_type": "HTMLResponse",
+                            "retry_attempts": attempt + 1,
+                        })
                     wait_time = retry_delay * (2 ** attempt)
                     self.logger.warning(f"HTMLレスポンス（先頭バイト）。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
                     time.sleep(wait_time)
                     continue
+
+                # 成功時: .partファイルをリネーム（FR-006-1）
+                try:
+                    if part_path_obj.exists():
+                        part_path_obj.rename(save_path_obj)
+                except Exception as e:
+                    self.logger.error(f".partファイルのリネームに失敗: {part_path} -> {save_path} - {str(e)}")
+                    return (False, {
+                        "http_status": response.status_code,
+                        "error_type": "filesystem",
+                        "exception_type": type(e).__name__,
+                        "retry_attempts": attempt + 1,
+                    })
 
                 # DEBUG: ダウンロード完了情報をログ出力
                 file_size = save_path_obj.stat().st_size if save_path_obj.exists() else 0
@@ -345,9 +400,10 @@ class HTTPClient:
                     f"Content-Type={content_type}"
                 )
                 self.logger.info(f"ファイルダウンロード完了: {save_path}")
-                return True
+                return (True, {})
 
-            except RateLimitError:
+            except RateLimitError as e:
+                # 429エラーは既に処理済み（上記でreturnしている）
                 raise
             except requests.exceptions.Timeout as e:
                 # タイムアウトエラーの詳細な処理
@@ -357,7 +413,12 @@ class HTTPClient:
                         f"ファイルダウンロードタイムアウト: {url} - {error_type} "
                         f"(タイムアウト設定: {self.download_timeout}秒)"
                     )
-                    return False
+                    return (False, {
+                        "http_status": None,
+                        "error_type": "network",
+                        "exception_type": type(e).__name__,
+                        "retry_attempts": attempt + 1,
+                    })
                 # リトライ前に待機（指数バックオフ）
                 wait_time = retry_delay * (2 ** attempt)
                 self.logger.warning(
@@ -371,10 +432,38 @@ class HTTPClient:
                     self.logger.error(
                         f"ファイルダウンロード接続エラー: {url} - {str(e)}"
                     )
-                    return False
+                    return (False, {
+                        "http_status": None,
+                        "error_type": "network",
+                        "exception_type": type(e).__name__,
+                        "retry_attempts": attempt + 1,
+                    })
                 wait_time = retry_delay * (2 ** attempt)
                 self.logger.warning(
                     f"ダウンロード接続エラー。{wait_time}秒後にリトライします... "
+                    f"(試行 {attempt + 1}/{max_retries})"
+                )
+                time.sleep(wait_time)
+            except requests.exceptions.HTTPError as e:
+                # HTTPエラー（4xx, 5xx）
+                status_code = e.response.status_code if e.response else None
+                if attempt == max_retries - 1:
+                    self.logger.error(
+                        f"ファイルダウンロードHTTPエラー: {url} - {status_code} - {str(e)}"
+                    )
+                    error_type = "rate_limit" if status_code == 429 else \
+                                "http_5xx" if status_code and 500 <= status_code < 600 else \
+                                "http_4xx" if status_code and 400 <= status_code < 500 else \
+                                "other"
+                    return (False, {
+                        "http_status": status_code,
+                        "error_type": error_type,
+                        "exception_type": type(e).__name__,
+                        "retry_attempts": attempt + 1,
+                    })
+                wait_time = retry_delay * (2 ** attempt)
+                self.logger.warning(
+                    f"ダウンロードHTTPエラー ({status_code})。{wait_time}秒後にリトライします... "
                     f"(試行 {attempt + 1}/{max_retries})"
                 )
                 time.sleep(wait_time)
@@ -384,7 +473,12 @@ class HTTPClient:
                         f"ファイルダウンロードエラー: {url} - {str(e)} "
                         f"(エラータイプ: {type(e).__name__})"
                     )
-                    return False
+                    return (False, {
+                        "http_status": None,
+                        "error_type": "network",
+                        "exception_type": type(e).__name__,
+                        "retry_attempts": attempt + 1,
+                    })
                 # リトライ前に待機（指数バックオフ）
                 wait_time = retry_delay * (2 ** attempt)
                 self.logger.warning(
@@ -400,10 +494,25 @@ class HTTPClient:
                 )
                 # FilesystemErrorとして再発生させる（呼び出し側で処理可能）
                 if attempt == max_retries - 1:
-                    raise FilesystemError(f"ファイル保存エラー: {save_path} - {str(e)}")
-                return False
+                    return (False, {
+                        "http_status": None,
+                        "error_type": "filesystem",
+                        "exception_type": type(e).__name__,
+                        "retry_attempts": attempt + 1,
+                    })
+                return (False, {
+                    "http_status": None,
+                    "error_type": "filesystem",
+                    "exception_type": type(e).__name__,
+                    "retry_attempts": attempt + 1,
+                })
         
-        return False
+        return (False, {
+            "http_status": None,
+            "error_type": "other",
+            "exception_type": "",
+            "retry_attempts": max_retries,
+        })
 
     def get_session(self) -> requests.Session:
         """セッションを取得"""

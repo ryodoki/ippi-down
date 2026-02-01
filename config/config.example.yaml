@@ -12,23 +12,35 @@ download_conditions:
     - .docx
   keywords: []  # 空の場合はすべて
   date_range:
-    start: null  # YYYY-MM-DD形式
-    end: null
+    start: null  # YYYY-MM-DD形式（実装済み、メタデータから日付を取得してフィルタ）
+    end: null    # YYYY-MM-DD形式（実装済み、メタデータから日付を取得してフィルタ）
 
 # 保存先
 save_paths:
   local: ./downloads
+  use_subfolders: true  # サブフォルダ自動生成（FR-013、デフォルト: true）
+  enable_hash_check: false  # ハッシュ判定を有効化（FR-008、オプション、デフォルト: false）
+  keep_part_on_cancel: true  # キャンセル時に.partファイルを残す（FR-006-1、デフォルト: true）
 
 # ファイル命名規則
-# 使用可能な変数: {filename}, {file_type}, {category}, {title}, {date}, {index}
+# 使用可能な変数:
+#   - {filename}: 元のファイル名（拡張子を除く）
+#   - {file_type}: ファイルタイプ（拡張子、.を除く）
+#   - {category}: カテゴリ（メタデータから取得）
+#   - {title}: タイトル（メタデータから取得）
+#   - {date}: 日付（YYYYMMDD形式、現在日時）
+#   - {index}: インデックス（0から始まる）
+#   - {daibunrui}, {chubunrui}, {shoubunrui}, {saibunrui}: 検索条件の分類
+#   - {koji_name}: 工事名（メタデータまたは検索条件から取得）
+# 空文字列または未設定の場合は従来の固定ロジックを使用
 naming_rule: "{category}_{title}_{date}_{index}"
 
 # スケジュール設定
 schedule:
   enabled: false
-  interval: "daily"  # daily, weekly, custom
-  time: "09:00"      # HH:MM形式
-  cron: null         # cron形式（intervalがcustomの場合）
+  interval: "daily"  # daily, weekly, monthly, custom（実装済み）
+  time: "09:00"      # HH:MM形式（intervalがcustom以外の場合に使用）
+  cron: null         # cron形式（intervalがcustomの場合に使用、実装済み、croniter使用）
 
 # ログ設定
 logging:

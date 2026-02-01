@@ -19,9 +19,9 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from src.core.scraper import Scraper
-from src.utils.http_client import HTTPClient
-from src.utils.logger import Logger, LoggingConfig
+from src.core.scraper import Scraper  # pyright: ignore[reportMissingImports]
+from src.utils.http_client import HTTPClient  # pyright: ignore[reportMissingImports]
+from src.utils.logger import Logger, LoggingConfig  # pyright: ignore[reportMissingImports]
 
 
 def main():
@@ -44,24 +44,41 @@ def main():
     logger.info(f"ファイル抽出を開始: URL={args.url}")
     logger.info(f"対象ファイルタイプ: {args.file_types}")
     
+    postback_detected = False
+    postback_reason = None
+    
     try:
         # PostBackリンクか通常のURLかを判定
         if args.url.startswith("javascript:") and "__doPostBack" in args.url:
             # PostBackリンクの場合
+            postback_detected = True
+            postback_reason = "PostBackリンクの処理には検索結果ページのsoupが必要です。通常のURLを指定してください。"
             logger.info("PostBackリンクとして処理します")
-            # 注意: PostBackリンクの処理には検索結果ページのsoupが必要
-            # このスクリプトでは簡易的に処理できないため、警告を出す
-            logger.warning("PostBackリンクの処理には検索結果ページが必要です。通常のURLを指定してください。")
-            return 1
+            logger.warning(postback_reason)
+            files = []  # PostBackリンクの場合は空リスト
         else:
             # 通常のURLの場合
             logger.info("通常のURLとして処理します")
             files = scraper._extract_files_from_detail_page(args.url, args.file_types)
+            
+            # 抽出されたファイルにPostBackリンクが含まれているかチェック
+            # （_extract_files_from_tables内でPostBackリンクが検出された場合の情報を取得）
+            # 注意: 現状の実装では、_extract_files_from_detail_page内でPostBackリンクが検出されても
+            # ファイルリストには含まれないため、ログから判定する必要がある
+            # 簡易的な実装として、URLにPostBackが含まれている場合は検出とみなす
+            for file_info in files:
+                if file_info.url and "javascript:" in file_info.url and "__doPostBack" in file_info.url:
+                    postback_detected = True
+                    postback_reason = f"抽出されたファイルにPostBackリンクが含まれています: {file_info.url[:100]}..."
+                    logger.warning(postback_reason)
+                    break
         
         # 結果をJSON形式で出力
         output_data = {
             "url": args.url,
             "file_types": args.file_types,
+            "postback_detected": postback_detected,
+            "postback_reason": postback_reason,
             "files_count": len(files),
             "files": []
         }
@@ -89,6 +106,9 @@ def main():
         
         logger.info(f"結果を保存しました: {output_path}")
         logger.info(f"抽出されたファイル数: {len(files)}")
+        if postback_detected:
+            logger.warning(f"PostBackリンクが検出されました: {postback_reason}")
+            logger.warning("注意: PostBackリンクは現在未対応のため、ファイルが抽出されない可能性があります。")
         
         return 0
         

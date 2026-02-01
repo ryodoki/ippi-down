@@ -20,12 +20,12 @@ if (Test-Path $OutDir) {
 New-Item -ItemType Directory -Path $OutDir | Out-Null
 
 # 2) 含める対象（必要に応じて調整）
+# 注意: config ディレクトリは含めない（config.yaml が混入するリスクがあるため）
 $IncludeDirs = @(
     "src",
     "tests",
     "docs",
     "scripts",
-    "config.example.yaml",
     "assets",
     "resources",
     "templates"
@@ -34,6 +34,7 @@ $IncludeDirs = @(
 $IncludeFiles = @(
     "README.md",
     "README.txt",
+    "config.example.yaml",
     "pyproject.toml",
     "poetry.lock",
     "uv.lock",
@@ -69,6 +70,7 @@ $ExcludeFilePatterns = @(
     "*.pyc",
     "*.pyo",
     "*.log",
+    "config.yaml",  # 実設定ファイルを除外
     "*.pfx",
     "*.pem",
     "*.key",
@@ -118,9 +120,21 @@ Write-Step "単体ファイルのコピー開始"
 foreach ($f in $IncludeFiles) {
     $src = Join-Path $ProjectRoot $f
     if (Test-Path $src) {
+        # config.yaml は除外（実設定ファイル）
+        if ($f -eq "config.yaml") {
+            Write-Step "スキップ（実設定ファイル）: $f"
+            continue
+        }
         Copy-Item -LiteralPath $src -Destination $OutDir -Force
         Write-Step "コピー: $f"
     }
+}
+
+# config.example.yaml のみ手動でコピー（テンプレート）
+$configExample = Join-Path $ProjectRoot "config.example.yaml"
+if (Test-Path $configExample) {
+    Copy-Item -LiteralPath $configExample -Destination $OutDir -Force
+    Write-Step "コピー: config.example.yaml（テンプレート）"
 }
 
 # 6) ZIP化

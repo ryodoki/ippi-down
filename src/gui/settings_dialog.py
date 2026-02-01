@@ -18,6 +18,7 @@ from ..models.config_model import (
 from ..config.config_manager import ConfigManager
 from ..config.config_validator import ConfigValidator
 from ..utils.logger import Logger
+from ..core.ppi_dropdowns import get_labels, code_to_label, label_to_code
 
 
 class SettingsDialog:
@@ -528,38 +529,11 @@ class SettingsDialog:
         koji_shubetsu_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.koji_shubetsu_var = tk.StringVar()
+        # 工事種別のオプションを一元管理された定義から取得
         koji_shubetsu_combo = ttk.Combobox(
             koji_shubetsu_frame,
             textvariable=self.koji_shubetsu_var,
-            values=[
-                "",
-                "一般土木工事",
-                "アスファルト舗装工事",
-                "鋼橋上部工事",
-                "造園工事",
-                "建築工事",
-                "木造建築工事",
-                "電気設備工事",
-                "暖冷房衛生設備工事",
-                "セメント・コンクリート舗装工事",
-                "プレストレスト・コンクリート工事",
-                "法面処理工事",
-                "塗装工事",
-                "維持修繕工事",
-                "浚渫工事",
-                "グラウト工事",
-                "杭打工事",
-                "さく井工事",
-                "プレハブ建築工事",
-                "機械設備工事",
-                "通信設備工事",
-                "受変電設備工事",
-                "港湾土木工事",
-                "農林土木工事",
-                "農林建築工事",
-                "橋梁補修工事",
-                "その他",
-            ],
+            values=get_labels("koji_shubetsu"),
             state="readonly",
             width=40,
         )
@@ -570,42 +544,11 @@ class SettingsDialog:
         koji_gyoushu_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.koji_gyoushu_var = tk.StringVar()
+        # 工事の業種のオプションを一元管理された定義から取得
         koji_gyoushu_combo = ttk.Combobox(
             koji_gyoushu_frame,
             textvariable=self.koji_gyoushu_var,
-            values=[
-                "",
-                "土木一式工事",
-                "建築一式工事",
-                "大工工事",
-                "左官工事",
-                "とび・土工・コンクリート工事",
-                "石工事",
-                "屋根工事",
-                "電気工事",
-                "管工事",
-                "タイル・れんが・ブロック工事",
-                "鋼構造物工事",
-                "鉄筋工事",
-                "舗装工事",
-                "浚渫工事",
-                "板金工事",
-                "ガラス工事",
-                "塗装工事",
-                "防水工事",
-                "内装仕上工事",
-                "機械器具設置工事",
-                "熱絶縁工事",
-                "電気通信工事",
-                "造園工事",
-                "さく井工事",
-                "建具工事",
-                "水道施設工事",
-                "消防施設工事",
-                "清掃施設工事",
-                "解体工事",
-                "その他",
-            ],
+            values=get_labels("koji_gyoushu"),
             state="readonly",
             width=40,
         )
@@ -807,9 +750,9 @@ class SettingsDialog:
             if sc.keiyaku_date_end:
                 self.keiyaku_date_end_var.set(sc.keiyaku_date_end)
 
-            # 工事種別・業種
-            self.koji_shubetsu_var.set(sc.koji_shubetsu or "")
-            self.koji_gyoushu_var.set(sc.koji_gyoushu or "")
+            # 工事種別・業種（コードまたはラベルをラベルに変換して表示）
+            self.koji_shubetsu_var.set(code_to_label("koji_shubetsu", sc.koji_shubetsu or "", self.logger))
+            self.koji_gyoushu_var.set(code_to_label("koji_gyoushu", sc.koji_gyoushu or "", self.logger))
 
             # 価格
             if sc.yotei_price_min:
@@ -932,8 +875,8 @@ class SettingsDialog:
             keiyaku_date_type=self.keiyaku_date_radio_var.get(),
             keiyaku_date_start=self.keiyaku_date_start_var.get() or None,
             keiyaku_date_end=self.keiyaku_date_end_var.get() or None,
-            koji_shubetsu=self.koji_shubetsu_var.get(),
-            koji_gyoushu=self.koji_gyoushu_var.get(),
+            koji_shubetsu=label_to_code("koji_shubetsu", self.koji_shubetsu_var.get(), self.logger),
+            koji_gyoushu=label_to_code("koji_gyoushu", self.koji_gyoushu_var.get(), self.logger),
             yotei_price_min=safe_int(self.yotei_price_min_var.get()),
             yotei_price_max=safe_int(self.yotei_price_max_var.get()),
             rakusatsu_price_min=safe_int(self.rakusatsu_price_min_var.get()),

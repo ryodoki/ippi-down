@@ -20,7 +20,7 @@ class DownloadResult:
     def add_task(self, task: DownloadTask):
         """タスクを追加"""
         self.tasks.append(task)
-        self.total += 1
+        # totalは初期化時に設定済みのため、ここではインクリメントしない
 
     def update_status(self, task: DownloadTask):
         """タスクのステータスを更新"""
@@ -39,3 +39,33 @@ class DownloadResult:
             return 0.0
         return (self.success / self.total) * 100
 
+    def summarize_failures(self) -> dict[str, int]:
+        """失敗理由別件数サマリーを生成（FR-005）
+        
+        Returns:
+            失敗理由別の件数辞書
+            - network: ネットワークエラー（タイムアウト、接続エラー）
+            - rate_limit: 429（Too Many Requests）
+            - http_5xx: サーバーエラー（500-599）
+            - http_4xx: クライアントエラー（400-499、429以外）
+            - filesystem: ファイルシステムエラー
+            - other: その他
+        """
+        summary = {
+            "network": 0,
+            "rate_limit": 0,
+            "http_5xx": 0,
+            "http_4xx": 0,
+            "filesystem": 0,
+            "other": 0,
+        }
+        
+        for task in self.tasks:
+            if task.status == "failed" and task.error_type:
+                error_type = task.error_type
+                if error_type in summary:
+                    summary[error_type] += 1
+                else:
+                    summary["other"] += 1
+        
+        return summary
