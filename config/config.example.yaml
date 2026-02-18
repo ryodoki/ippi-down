@@ -1,4 +1,4 @@
-﻿# ppi-file-downloader 設定ファイル例
+# ppi-file-downloader 設定ファイル例
 
 # 対象URL
 target_urls:
@@ -18,21 +18,24 @@ download_conditions:
 # 保存先
 save_paths:
   local: ./downloads
-  use_subfolders: true  # サブフォルダ自動生成（FR-013、デフォルト: true）
-  enable_hash_check: false  # ハッシュ判定を有効化（FR-008、オプション、デフォルト: false）
-  keep_part_on_cancel: true  # キャンセル時に.partファイルを残す（FR-006-1、デフォルト: true）
+  use_subfolders: true
+  run_subfolder_mode: none  # none | datetime | search
+  enable_hash_check: false
+  keep_part_on_cancel: true
+  # 発注機関ごとのルートフォルダ（OFFのときは従来どおり）
+  enable_agency_root_folders: false
+  agency_root_label: "発注機関"
+  agency_folder_levels: ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]
+  include_search_tab_folder: true   # 工事/業務でフォルダを分ける
+  search_tab_labels:               # tab種別→フォルダ名（表示用）
+    works: "工事_入札公告等"
+    services: "業務_入札公告等"
+  date_partition: none  # none | yyyy | yyyy_mm | yyyy_mm_dd
 
-# ファイル命名規則
-# 使用可能な変数:
-#   - {filename}: 元のファイル名（拡張子を除く）
-#   - {file_type}: ファイルタイプ（拡張子、.を除く）
-#   - {category}: カテゴリ（メタデータから取得）
-#   - {title}: タイトル（メタデータから取得）
-#   - {date}: 日付（YYYYMMDD形式、現在日時）
-#   - {index}: インデックス（0から始まる）
-#   - {daibunrui}, {chubunrui}, {shoubunrui}, {saibunrui}: 検索条件の分類
-#   - {koji_name}: 工事名（メタデータまたは検索条件から取得）
-# 空文字列または未設定の場合は従来の固定ロジックを使用
+# ファイル命名規則（テンプレート）
+# 使用可能: {category},{title},{date},{index},{filename},{file_type},{ext},{koji_name},{daibunrui},{chubunrui},{shoubunrui},{saibunrui}
+# - file_type: ドットなし（例: pdf）。ext: ドット付き（例: .pdf）。{index}{ext} で "0.pdf" に
+# 未知の変数は設定保存時にエラー。空の場合は従来ロジックを使用。
 naming_rule: "{category}_{title}_{date}_{index}"
 
 # スケジュール設定

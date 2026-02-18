@@ -1,223 +1,46 @@
-# 要件定義 vs 実装 ギャップレポート
+# 要件ギャップレポート（FR-001〜FR-026）
 
-作成日: 2025-01-XX  
-対象: ippi-down リポジトリ  
-解析対象: `docs/requirements.md`, `docs/settings_requirements.md`
+docs/requirements.md に基づく機能要件と実装・テストの突合結果。状態は OK/Partial/NG。
 
-## 概要
+| FR-ID | 要件 | 実装ファイル/関数 | テスト | 状態 | コメント（根拠） |
+|-------|------|-------------------|--------|------|------------------|
+| FR-001 | HTML構造解析 | src/core/scraper.py (fetch_page, BeautifulSoup) | 統合 | OK | 検索・詳細ページの解析 |
+| FR-002 | ファイルリンク検出 | scraper (_extract_files_from_tables, extract_file_links) | 統合 | OK | PDF/Excel/Word/PostBack対応 |
+| FR-003 | メタデータ抽出 | scraper.extract_metadata, metadata_extractor | 統合 | OK | 発注機関・工事名・日付 |
+| FR-004 | 条件指定・YAML保存 | config_manager, settings_dialog | test_config_model, test_settings | OK | GUI/設定ファイル対応 |
+| FR-005 | 自動ダウンロード・失敗記録・サマリー | downloader, service, download_result.summarize_failures | test_application_service | OK | 失敗理由別件数出力 |
+| FR-006 | 進捗表示 | gui/main_window, event_handler, ProgressEvent | GUI | OK | 進捗バー・成功/失敗/スキップ |
+| FR-006-1 | キャンセル・.part扱い | downloader (keep_part_on_cancel) | 手動 | OK | 設定で keep/delete |
+| FR-007 | リトライ（回数・指数バックオフ・429） | utils/http_client (tenacity, Retry-After) | test_http_client | OK | 3回・対象外4xx |
+| FR-008 | 重複スキップ（URL/同名+サイズ/ハッシュ） | downloader.check_duplicate, download_history | test_downloader | OK | スキップ理由をタスクに記録するよう整備済み |
+| FR-009 | テンプレート文字列でファイル名生成 | core/naming.py (generate_filename, format_map) | test_naming | OK | 欠損値は "unknown"、ext 対応 |
+| FR-010 | 命名規則カスタマイズ・保存 | settings_dialog, config_manager, naming_rule | test_settings | OK | YAML に保存 |
+| FR-011 | ファイル名重複回避（連番） | file_utils.ensure_unique, naming.ensure_unique | test_file_utils | OK | _1, _2 付与 |
+| FR-012 | 指定フォルダに保存 | downloader (save_dir, folder_name), service | test_downloader | OK | folder_name をベース下に反映 |
+| FR-013 | サブフォルダ自動生成 | downloader (use_subfolders), naming.generate_folder_name | test_downloader | OK | メタデータに基づくフォルダ名 |
+| FR-016 | 定期実行（間隔/時刻/cron） | scheduler/, ScheduleConfig, croniter | test_config_model, test_schedule_cron | OK | 起動中のみ・croniter で cron 対応 |
+| FR-017 | 実行ログ記録 | utils/logger.py, LoggingConfig | - | OK | 開始/終了/件数 |
+| FR-018 | 実行結果通知（ログ・GUI） | logger, event_handler, Notifier | - | OK | ログ＋GUI表示 |
+| FR-019 | 設定YAML保存・読み込み | config_manager.load_config/save_config | - | OK | 起動時自動読み込み |
+| FR-020 | 複数プロファイル | - | - | Partial | 将来拡張。単一 config.yaml |
+| FR-021 | ログ保存先・ローテーション | LoggingConfig (max_bytes, backup_count) | - | OK | 10MB・5世代 |
+| FR-022 | エラーログ（スタックトレース） | logger.error(exc_info=True) | - | OK | |
+| FR-023 | ログレベル設定 | LoggingConfig.level | - | OK | DEBUG/INFO/WARNING/ERROR |
+| FR-024 | CLI（設定・1回実行） | src/cli/main.py (--config, --once, --dry-run) | 手動 | OK | 開発・検証用 |
+| FR-025 | GUI必須 | src/main.py, gui/main_window, settings_dialog | GUI手動 | OK | 設定・進捗・ログ表示 |
+| FR-026 | 実行ファイル（.exe）配布 | scripts/build/build.spec, PyInstaller | 手動ビルド | OK | Windows 10/11 64bit |
 
-本レポートは、要件定義書に記載されている機能要件と実装コードの差分を分析し、未実装・部分実装・実装済みを分類したものです。
+## 修正済み・対応方針
 
-## 要件ギャップ一覧表
+- **FR-009/FR-010**: テンプレートの欠損キーを空文字ではなく "unknown" に統一。プレースホルダ {ext} をコンテキストに追加。
+- **FR-008**: check_duplicate の戻り値を (bool, Optional[str]) とし、スキップ時に "url" / "filename_size" / "hash" を DownloadTask に記録。
+- **FR-016**: cron は croniter で実装済み。次回実行時刻の算出と不正 cron 検出のテストを追加。
 
-| Requirement ID | Description | Status | Evidence (file:line / function) | Notes / Fix Plan |
-|---------------|-------------|--------|----------------------------------|------------------|
-| **FR-001** | HTML構造解析機能 | ✅ 実装済み | `src/core/scraper.py:75-84` `fetch_page()` | BeautifulSoupを使用して実装 |
-| **FR-002** | ファイルリンク検出機能 | ✅ 実装済み | `src/core/scraper.py:628-673` `_extract_files_from_tables()` - PostBackリンクを検出してFileInfoを作成。`src/core/downloader.py:56-133` `_download_postback_file()` - PostBackダウンロードを実装 | PostBackリンク対応完了 |
-| **FR-003** | メタデータ抽出機能 | ✅ 実装済み | `src/core/scraper.py:479-583` `extract_metadata()` | 発注機関、工事名、日付などを抽出 |
-| **FR-004** | 条件指定機能 | ✅ 実装済み | `src/models/config_model.py:10-85` `SearchConditions` | GUI/設定ファイルで設定可能 |
-| **FR-005** | 自動ダウンロード機能 | ✅ 実装済み | `src/core/downloader.py:62-158` `download_files()` | 失敗時の記録も実装済み |
-| **FR-006** | 進捗表示機能 | ✅ 実装済み | `src/gui/main_window.py` 進捗バー表示 | GUIで実装 |
-| **FR-006-1** | キャンセル機能 | ✅ 実装済み | `src/core/downloader.py:86-97` キャンセルチェック | `.part`ファイルの扱いは実装済み |
-| **FR-007** | リトライ機能 | ✅ 実装済み | `src/core/downloader.py:54-61` `@retry`デコレータ | 指数バックオフ実装済み、429対応は`http_client.py`で実装 |
-| **FR-008** | 重複回避機能 | ⚠️ 部分実装 | `src/core/downloader.py:114` `check_duplicate()` | **問題**: URL同一判定・ファイル名+サイズ判定が未実装。ファイル存在チェックのみ |
-| **FR-009** | ファイル名自動生成 | ✅ 実装済み | `src/core/naming.py:29-79` `generate_filename()` | **修正済み**: `naming_rule`（テンプレート文字列）を使用してファイル名を生成 |
-| **FR-010** | 命名規則カスタマイズ | ✅ 実装済み | `src/models/config_model.py:159` `naming_rule: str` | **修正済み**: `Naming`クラスでテンプレート文字列を使用 |
-| **FR-011** | ファイル名重複回避 | ✅ 実装済み | `src/core/downloader.py:111` `ensure_unique()` | **修正済み**: `ensure_unique()`を先に実行し、ユニーク化されたパスで`check_duplicate()`を実行 |
-| **FR-012** | 保存先指定機能 | ✅ 実装済み | `src/models/config_model.py:98-101` `SavePaths` | GUI/設定ファイルで設定可能 |
-| **FR-013** | フォルダ構造自動生成 | ✅ 実装済み | `src/core/naming.py:117-164` `generate_folder_name()` | メタデータに基づいてサブフォルダ作成 |
-| **FR-016** | スケジューリング機能 | ✅ 実装済み | `src/scheduler/scheduler.py:54-105` `_setup_schedule()` | **修正済み**: `interval="custom"`かつ`cron`形式をサポート（croniter を使用） |
-| **FR-017** | 実行ログ記録 | ✅ 実装済み | `src/utils/logger.py` | ログファイルに記録 |
-| **FR-018** | 実行結果通知 | ✅ 実装済み | `src/utils/notifier.py` | GUI/ログファイルで通知 |
-| **FR-019** | 設定ファイル保存/読み込み | ✅ 実装済み | `src/config/config_manager.py` | YAML形式で実装 |
-| **FR-020** | 設定プロファイル管理 | ❌ 未実装 | - | 要件定義では「将来拡張」とされているが、実装なし |
-| **FR-021** | ログ記録機能 | ✅ 実装済み | `src/utils/logger.py` | ログレベル、ローテーション実装済み |
-| **FR-021-1** | ログ保存先設定 | ✅ 実装済み | `src/models/config_model.py:141-144` `LoggingConfig` | 設定ファイルで変更可能 |
-| **FR-021-2** | ログローテーション | ✅ 実装済み | `src/utils/logger.py` `RotatingFileHandler` | サイズベースローテーション実装 |
-| **FR-022** | エラーログ記録 | ✅ 実装済み | `src/utils/logger.py` | スタックトレース含む詳細情報を記録 |
-| **FR-023** | ログレベル設定 | ✅ 実装済み | `src/models/config_model.py:141` `level: str` | DEBUG/INFO/WARNING/ERROR対応 |
-| **FR-024** | CLI提供 | ❌ 未実装 | `src/main.py:127-183` `main()` | GUIのみ実装。要件定義では「開発・デバッグ用」とされているが未実装 |
-| **FR-025** | GUI提供 | ✅ 実装済み | `src/gui/main_window.py` | tkinterで実装 |
-| **FR-026** | 実行ファイル形式 | ✅ 実装済み | `scripts/build/build.spec` PyInstaller設定 | Windows 10/11対応 |
-| **FR-SET-001** | 設定ダイアログ表示 | ⚠️ 部分実装 | `src/gui/settings_dialog.py` | 実装されているが、一部機能が未実装の可能性 |
-| **FR-SET-002** | 設定項目表示 | ⚠️ 部分実装 | `src/gui/settings_dialog.py` | 基本設定は実装済み、詳細設定は要確認 |
-| **FR-SET-003** | 設定値検証 | ✅ 実装済み | `src/config/config_validator.py` | 実装済み |
-| **FR-SET-004** | 設定保存 | ✅ 実装済み | `src/gui/settings_dialog.py` | 実装済み |
-| **FR-SET-005** | 設定読み込み | ✅ 実装済み | `src/gui/settings_dialog.py` | 実装済み |
-| **FR-SET-006** | 設定キャンセル | ✅ 実装済み | `src/gui/settings_dialog.py` | 実装済み |
-| **FR-SET-007** | 設定リセット | ⚠️ 要確認 | `src/gui/settings_dialog.py` | 実装状況要確認 |
-| **FR-SET-008** | 設定プロファイル管理 | ❌ 未実装 | - | 要件定義では「中優先度」だが未実装 |
-| **FR-SET-009** | 設定インポート/エクスポート | ❌ 未実装 | - | 要件定義では「低優先度」で未実装 |
-| **FR-SET-010** | 設定プレビュー | ❌ 未実装 | - | 要件定義では「低優先度」で未実装 |
+## Partial の扱い
 
-## 優先度別修正提案
+- FR-020（複数プロファイル）: 要件上「将来拡張」のため Partial のまま。README に現状を明記。
 
-### P0（緊急・必須修正）
+---
 
-#### 1. FR-009/010: 命名規則テンプレート未使用問題
-- **問題**: `AppConfig.naming_rule`にテンプレート文字列（例: `"{category}_{title}_{date}_{index}"`）が設定されているが、`Naming.generate_filename()`で使用されていない
-- **影響**: ユーザーが設定で命名規則をカスタマイズしても反映されない
-- **修正方針**: `Naming.generate_filename()`で`self.naming_rule`を使用し、テンプレート文字列を展開する実装に変更
-- **対象ファイル**: `src/core/naming.py:29-79`
-
-#### 2. FR-008: 重複回避の実装不足
-- **問題**: `downloader.py:114`の`check_duplicate()`はファイル存在チェックのみ。URL同一判定・ファイル名+サイズ判定が未実装
-- **影響**: 同一URLのファイルや同名+同サイズのファイルを検出できない
-- **修正方針**: `check_duplicate()`にURL同一判定とファイル名+サイズ判定を追加
-- **対象ファイル**: `src/core/downloader.py:114-218`
-
-#### 3. 入札調書ダウンロード不具合（早期リターン問題）- ✅ 完了
-- **問題**: `scraper.py:1561-1565`で、詳細ページからファイルが見つかった場合、`UserEntry_Download.aspx`をスキップしている
-- **影響**: 詳細ページに一部のファイルしかない場合、`UserEntry_Download.aspx`にある追加ファイル（入札調書など）が取得されない
-- **修正方針**: 早期リターンを廃止し、`UserEntry_Download.aspx`も必ず探索してマージする
-- **対象ファイル**: `src/core/scraper.py:1487-1665` `_extract_files_from_detail_page_via_postback()`
-- **修正済み**: 早期リターンを廃止し、詳細ページのファイルと`UserEntry_Download.aspx`のファイルをマージ（重複除去）
-
-#### 4. `javascript:__doPostBack(...)`形式のリンク対応 - ✅ 完了
-- **問題**: `_extract_files_from_tables()`で`href=True`でチェックしているが、`javascript:__doPostBack(...)`の場合はURLとして扱えない
-- **影響**: 入札調書など、PostBackで取得する必要があるファイルが抽出されない
-- **修正方針**: `href`が`javascript:__doPostBack(...)`形式の場合、PostBack情報を`FileInfo.metadata`に保持し、`Downloader._download_postback_file()`でPostBackを実行してファイルを取得
-- **対象ファイル**: 
-  - `src/core/scraper.py:628-673` `_extract_files_from_tables()` - PostBackリンクを検出してFileInfoを作成
-  - `src/core/downloader.py:56-133` `_download_postback_file()` - PostBackダウンロードを実装
-- **修正済み**: PostBackリンクを検出してFileInfoを作成し、ダウンロード時にPostBackを実行してファイルを取得
-
-### P1（重要・推奨修正）
-
-#### 5. FR-016: カスタムcron形式未サポート
-- **問題**: `scheduler.py:67-71`で`interval="custom"`かつ`cron`形式が未サポート（警告のみ）
-- **影響**: 複雑なスケジュール設定ができない
-- **修正方針**: `croniter`ライブラリを使用してcron形式をサポート
-- **対象ファイル**: `src/scheduler/scheduler.py:54-105`
-
-#### 6. FR-024: CLI未実装
-- **問題**: 要件定義では「開発・デバッグ用」としてCLIが定義されているが未実装
-- **影響**: 開発・デバッグ時にGUIを起動する必要がある
-- **修正方針**: `argparse`または`click`を使用してCLIを実装
-- **対象ファイル**: 新規作成 `src/cli/main.py` または `src/main.py`を拡張
-
-### P2（将来実装・低優先度）
-
-#### 7. FR-020: 設定プロファイル管理
-- **問題**: 複数の設定プロファイルを管理する機能が未実装
-- **影響**: 異なる設定で実行する場合、設定ファイルを手動で切り替える必要がある
-- **修正方針**: 設定ファイルのパスを指定できる機能を追加
-- **対象ファイル**: `src/config/config_manager.py`
-
-#### 8. FR-SET-008/009/010: 設定ダイアログの高度な機能
-- **問題**: 設定プロファイル管理、インポート/エクスポート、プレビュー機能が未実装
-- **影響**: 設定の管理が煩雑
-- **修正方針**: 要件定義に従って段階的に実装
-- **対象ファイル**: `src/gui/settings_dialog.py`
-
-## バグ修正優先度
-
-### 最優先（P0）
-
-1. ✅ **入札調書ダウンロード不具合**: 早期リターンの廃止と`UserEntry_Download.aspx`の必ず探索 - **完了**
-2. ⚠️ **`javascript:__doPostBack(...)`形式のリンク未対応**: PostBack処理の実装 - **未実装**
-3. ✅ **FR-011: 重複回避の順序問題**: `ensure_unique()`を先に実行 - **完了**
-4. ⚠️ **FR-009/010: 命名規則テンプレート未使用**: テンプレート文字列の展開実装 - **未実装**
-
-## 実装状況サマリー
-
-- **実装済み**: 26項目（FR-011修正済み、FR-002 PostBack対応完了、UserEntry_Download.aspx ID抽出堅牢化完了）
-- **部分実装**: 5項目
-- **未実装**: 4項目
-
-## 修正実施状況
-
-### ✅ 完了した修正（2025-01-XX）
-
-#### 1. 入札調書ダウンロード不具合の修正（P0）
-- **修正内容**: `_extract_files_from_detail_page_via_postback()`の早期リターンを廃止
-- **変更ファイル**: `src/core/scraper.py:1487-1665`
-- **変更点**:
-  - 詳細ページでファイルが見つかっても、`UserEntry_Download.aspx`を必ず探索するように変更
-  - 詳細ページのファイルと`UserEntry_Download.aspx`のファイルをマージ（重複除去）
-  - 重複判定: URL同一、または（文書名 + ファイルタイプ）同一
-
-#### 2. 重複回避の順序修正（P0）- ✅ 完了
-- **修正内容**: `ensure_unique()`を先に実行し、ユニーク化されたパスで`check_duplicate()`を実行
-- **変更ファイル**: `src/core/downloader.py:109-122`
-- **変更点**: `check_duplicate()`の前に`ensure_unique()`を実行するように順序を変更
-- **注意**: FR-008のURL同一判定・ファイル名+サイズ判定は未実装（別タスク）
-
-#### 3. デバッグログの追加
-- **修正内容**: 抽出時・ダウンロード時の詳細情報をログ出力
-- **変更ファイル**: 
-  - `src/core/scraper.py:620-673` (`_extract_files_from_tables()`)
-  - `src/core/scraper.py:1487-1665` (`_extract_files_from_detail_page_via_postback()`)
-  - `src/utils/http_client.py:219-340` (`download_file()`)
-- **追加ログ**:
-  - 抽出時: 採用/不採用理由、PostBackリンク検出、ファイル抽出結果
-  - ダウンロード時: URL、保存先、HTTP status、Content-Type、Content-Disposition、ファイルサイズ
-
-#### 4. デバッグスクリプトの追加
-- **作成ファイル**: `scripts/debug_extract_files.py`
-- **機能**: 詳細ページURLを指定してファイル抽出をテストし、結果をJSON形式で出力
-
-#### 5. 動作確認メモの作成
-- **作成ファイル**: `docs/verification.md`
-- **内容**: 動作確認手順、期待されるログ出力例、トラブルシューティング
-
-#### 6. PostBackリンク対応の実装（P0）
-- **修正内容**: `javascript:__doPostBack(...)`形式のリンクを処理できるように実装
-- **変更ファイル**: 
-  - `src/core/scraper.py:628-673` (`_extract_files_from_tables()`) - PostBackリンクを検出してFileInfoを作成
-  - `src/core/downloader.py:59-133` (`_download_postback_file()`) - PostBackダウンロードを実装
-- **変更点**:
-  - PostBackリンクを検出した場合、`FileInfo.metadata`にpostback情報を保持
-  - `Downloader.download_file()`でPostBack情報を検出し、`_download_postback_file()`を呼び出し
-  - PostBackを実行してファイルを取得し、Content-Dispositionからファイル名を取得
-
-#### 7. UserEntry_Download.aspx 遷移に必要なID抽出の堅牢化（P0）
-- **修正内容**: `AnkenkanriNo`と`HachushaId`の抽出を堅牢化
-- **変更ファイル**: `src/core/scraper.py:1637-1680`
-- **変更点**:
-  - 3段階の抽出方法を実装（`script.string` → `script.get_text()` → `soup.get_text()`）
-  - 抽出失敗時はWARNINGログで原因を出力
-
-### ⚠️ 未修正（今後の対応が必要）
-
-#### 1. FR-009/010: 命名規則テンプレート未使用問題（P0）
-- **現状**: `AppConfig.naming_rule`が設定されているが、`Naming.generate_filename()`で使用されていない
-- **対応**: テンプレート文字列を展開する実装が必要
-- **対象ファイル**: `src/core/naming.py:29-79`
-
-#### 2. `javascript:__doPostBack(...)`形式のリンク対応 - ✅ 完了（P0）
-- **現状**: `_extract_files_from_tables()`でPostBackリンクを検出しているが、処理していない
-- **対応**: PostBackを実行してファイルURLを解決する実装が必要
-- **対象ファイル**: 
-  - `src/core/scraper.py:628-673` - PostBackリンクを検出してFileInfoを作成
-  - `src/core/downloader.py:56-133` - PostBackダウンロードを実装
-- **修正済み**: PostBackリンクを検出してFileInfoを作成し、ダウンロード時にPostBackを実行してファイルを取得
-
-#### 3. FR-016: カスタムcron形式未サポート（P1）
-- **現状**: `interval="custom"`かつ`cron`形式が未サポート（警告のみ）
-- **対応**: `croniter`ライブラリを使用してcron形式をサポート
-- **対象ファイル**: `src/scheduler/scheduler.py:54-105`
-
-#### 4. FR-024: CLI未実装（P1）
-- **現状**: GUIのみ実装、CLIが未実装
-- **対応**: `argparse`または`click`を使用してCLIを実装
-- **対象ファイル**: 新規作成 `src/cli/main.py` または `src/main.py`を拡張
-
-## 次のステップ
-
-### ✅ 完了したタスク
-
-1. ✅ P0のバグ修正を実施（入札調書ダウンロード不具合、重複回避順序） - **完了**
-2. ✅ デバッグログの追加（抽出時の採用/不採用理由、ダウンロード時の詳細情報） - **完了**
-3. ✅ デバッグスクリプトの追加（`scripts/debug_extract_files.py`） - **完了**
-4. ✅ 動作確認メモの作成（`docs/verification.md`） - **完了**
-5. ✅ PostBackリンク処理の実装 - **完了**
-6. ✅ UserEntry_Download.aspx 遷移に必要なID抽出の堅牢化 - **完了**
-
-### ⚠️ 残りのタスク
-
-7. ⚠️ 命名規則テンプレートの実装（FR-009/010） - **P0**
-8. ⚠️ カスタムcron形式のサポート（FR-016） - **P1**
-9. ⚠️ CLIの実装（FR-024） - **P1**
-10. ⚠️ FR-008: 重複回避の実装（URL同一判定、ファイル名+サイズ判定） - **P1**
-11. ⚠️ FR-006-1: .partファイル処理の実装 - **P1**
+**作成日**: 2026年2月  
+**参照**: docs/requirements.md, docs/REQUIREMENTS_TRACEABILITY.md

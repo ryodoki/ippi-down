@@ -124,11 +124,19 @@ class ConfigManager:
         # デフォルトのダウンロードパスはexeの場所を基準にする
         default_downloads = str(get_downloads_path())
         save_paths_dict = config_dict.get("save_paths", {})
+        sp = save_paths_dict
         save_paths = SavePaths(
-            local=save_paths_dict.get("local", default_downloads),
-            use_subfolders=save_paths_dict.get("use_subfolders", True),  # デフォルトTrueで既存挙動を維持
-            enable_hash_check=save_paths_dict.get("enable_hash_check", False),
-            keep_part_on_cancel=save_paths_dict.get("keep_part_on_cancel", True),  # デフォルトTrue
+            local=sp.get("local", default_downloads),
+            use_subfolders=sp.get("use_subfolders", True),
+            run_subfolder_mode=sp.get("run_subfolder_mode", "none"),
+            enable_hash_check=sp.get("enable_hash_check", False),
+            keep_part_on_cancel=sp.get("keep_part_on_cancel", True),
+            enable_agency_root_folders=sp.get("enable_agency_root_folders", False),
+            agency_root_label=(sp.get("agency_root_label") or "発注機関").strip() or "発注機関",
+            agency_folder_levels=sp.get("agency_folder_levels") or ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"],
+            include_search_tab_folder=sp.get("include_search_tab_folder", True),
+            search_tab_labels=sp.get("search_tab_labels") or {"works": "工事_入札公告等", "services": "業務_入札公告等"},
+            date_partition=sp.get("date_partition") or "none",
         )
 
         schedule = ScheduleConfig(
@@ -252,8 +260,15 @@ class ConfigManager:
             "save_paths": {
                 "local": config.save_paths.local,
                 "use_subfolders": config.save_paths.use_subfolders,
+                "run_subfolder_mode": config.save_paths.run_subfolder_mode,
                 "enable_hash_check": config.save_paths.enable_hash_check,
                 "keep_part_on_cancel": config.save_paths.keep_part_on_cancel,
+                "enable_agency_root_folders": getattr(config.save_paths, "enable_agency_root_folders", False),
+                "agency_root_label": getattr(config.save_paths, "agency_root_label", "発注機関"),
+                "agency_folder_levels": getattr(config.save_paths, "agency_folder_levels", ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]),
+                "include_search_tab_folder": getattr(config.save_paths, "include_search_tab_folder", True),
+                "search_tab_labels": getattr(config.save_paths, "search_tab_labels", {"works": "工事_入札公告等", "services": "業務_入札公告等"}),
+                "date_partition": getattr(config.save_paths, "date_partition", "none"),
             },
             "naming_rule": config.naming_rule,
             "schedule": {

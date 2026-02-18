@@ -1342,9 +1342,54 @@ class Scraper:
         
         # 工事件数を属性として保存（service.pyから参照可能）
         self.last_search_total_koji_count = total_koji_count
+
+        # 発注機関階層・検索種別を全 FileInfo の metadata に補完（フォルダ構造で使用）
+        for f in all_file_links:
+            self._ensure_agency_metadata(f, search_conditions, base_url)
         
         self.logger.info(f"検索結果から合計{len(all_file_links)}個のファイルリンクを抽出しました（工事件数: {total_koji_count}件）")
         return all_file_links
+
+    def _infer_search_tab_from_url(self, url: str) -> str:
+        """URL の tab パラメータから検索種別を推定。works=工事, services=業務。"""
+        if not url:
+            return "unknown"
+        try:
+            parsed = urlparse(url)
+            qs = parse_qs(parsed.query)
+            tab = (qs.get("tab") or [None])[0]
+            if tab == "4":
+                return "works"
+            if tab == "6":
+                return "services"
+            return tab or "unknown"
+        except Exception:
+            return "unknown"
+
+    def _ensure_agency_metadata(
+        self, file_info: FileInfo, search_conditions: Optional[SearchConditions], base_url: str
+    ) -> None:
+        """FileInfo.metadata に発注機関階層と search_tab を欠損時は unknown で補完する。"""
+        if not file_info.metadata:
+            file_info.metadata = {}
+        fallback = "unknown"
+        if search_conditions:
+            sc = search_conditions
+            if "daibunrui" not in file_info.metadata or not file_info.metadata.get("daibunrui"):
+                file_info.metadata["daibunrui"] = (sc.hachu_daibunrui or "").strip() or fallback
+            if "chubunrui" not in file_info.metadata or not file_info.metadata.get("chubunrui"):
+                file_info.metadata["chubunrui"] = (sc.hachu_chubunrui or "").strip() or fallback
+            if "shoubunrui" not in file_info.metadata or not file_info.metadata.get("shoubunrui"):
+                file_info.metadata["shoubunrui"] = (sc.hachu_shoubunrui or "").strip() or fallback
+            if "saibunrui" not in file_info.metadata or not file_info.metadata.get("saibunrui"):
+                file_info.metadata["saibunrui"] = (sc.hachu_saibunrui or "").strip() or fallback
+        else:
+            file_info.metadata.setdefault("daibunrui", fallback)
+            file_info.metadata.setdefault("chubunrui", fallback)
+            file_info.metadata.setdefault("shoubunrui", fallback)
+            file_info.metadata.setdefault("saibunrui", fallback)
+        if "search_tab" not in file_info.metadata or not file_info.metadata.get("search_tab"):
+            file_info.metadata["search_tab"] = self._infer_search_tab_from_url(base_url)
     
     def _count_koji_in_page(self, soup: BeautifulSoup, search_conditions: SearchConditions = None) -> int:
         """現在のページの工事件数をカウント"""
@@ -1589,9 +1634,10 @@ class Scraper:
             if not detail_soup:
                 return []
             
-            # デバッグ: 詳細ページのHTMLを保存（最初の1件のみ）
+            # デバッグ: 詳細ページのHTMLを保存（最初の1件のみ。生成物は artifacts/ に出力）
             if not hasattr(self, '_detail_page_saved'):
-                output_file = Path("test_detail_page.html")
+                output_file = Path("artifacts/test_detail_page.html")
+                output_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(output_file, "w", encoding="utf-8") as f:
                     f.write(str(detail_soup))
                 self.logger.debug(f"詳細ページHTMLを保存: {output_file}")

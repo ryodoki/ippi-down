@@ -2,7 +2,7 @@
 
 """ファイルダウンロードを行うクラス"""
 
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Tuple
 from pathlib import Path
 import json
 from ..models.file_info import FileInfo
@@ -263,6 +263,7 @@ class Downloader:
         use_subfolders: bool = True,
         enable_hash_check: bool = False,
         keep_part_on_cancel: bool = True,
+        build_save_dir_fn: Optional[Callable] = None,
     ) -> DownloadResult:
         """複数のファイルをダウンロード
         
@@ -275,9 +276,13 @@ class Downloader:
         """
         result = DownloadResult(total=len(file_list))
         save_dir_path = Path(save_dir)
-        
-        # ベースディレクトリを作成
-        save_dir_path.mkdir(parents=True, exist_ok=True)
+        # FR-012/FR-013: 保存先ベース = save_dir。folder_name 指定時はその下にサブフォルダを作成
+        base_dir = save_dir_path
+        if folder_name and str(folder_name).strip():
+            safe_folder_name = self.file_utils.sanitize_filename(str(folder_name).strip())
+            if safe_folder_name:
+                base_dir = save_dir_path / safe_folder_name
+        base_dir.mkdir(parents=True, exist_ok=True)
 
         for index, file_info in enumerate(file_list):
             # キャンセルチェック（progress_callbackがFalseを返した場合）
@@ -297,25 +302,33 @@ class Downloader:
                 # ファイル名を生成（元の意図したファイル名、FR-008）
                 filename = naming.generate_filename(file_info, file_info.metadata, index)
                 
-                # サブフォルダの生成（FR-013: 設定でON/OFF）
-                if use_subfolders:
+                # 保存ディレクトリ: 発注機関フォルダON時は path_builder、それ以外は従来の use_subfolders/generate_folder_name
+                if build_save_dir_fn:
+                    file_save_dir = Path(build_save_dir_fn(Path(base_dir), file_info))
+                elif use_subfolders:
                     file_folder_name = naming.generate_folder_name(file_info)
-                    file_save_dir = save_dir_path / file_folder_name
+                    file_save_dir = base_dir / file_folder_name
                 else:
-                    file_save_dir = save_dir_path
+                    file_save_dir = base_dir
                 file_save_dir.mkdir(parents=True, exist_ok=True)
                 
                 # 元の意図した保存パス（重複チェック用、FR-008）
                 intended_save_path = str(file_save_dir / filename)
+                self.logger.info(f"保存先: {intended_save_path}")
                 
                 # 重複チェック（元の意図したパスで実行、FR-008）
-                if self.check_duplicate(file_info, intended_save_path, naming, enable_hash_check):
-                    self.logger.info(f"スキップ（重複）: {intended_save_path}")
+                is_duplicate, skip_reason = self.check_duplicate(
+                    file_info, intended_save_path, naming, enable_hash_check
+                )
+                if is_duplicate:
+                    reason = skip_reason or "duplicate"
+                    self.logger.info(f"スキップ（重複: {reason}）: {intended_save_path}")
                     task = DownloadTask(
                         file_info=file_info,
                         local_path=intended_save_path,
                         status="skipped",
                         url=file_info.url,
+                        error_message=reason,
                     )
                     result.add_task(task)
                     result.update_status(task)
@@ -482,7 +495,7 @@ class Downloader:
 
     def check_duplicate(
         self, file_info: FileInfo, intended_save_path: str, naming, enable_hash_check: bool = False
-    ) -> bool:
+    ) -> Tuple[bool, Optional[str]]:
         """重複チェック（FR-008）
         
         優先順位:
@@ -497,14 +510,14 @@ class Downloader:
             enable_hash_check: ハッシュ判定を有効化するか
         
         Returns:
-            重複している場合True、重複していない場合False
+            (重複している場合True, スキップ理由: "url"|"filename_size"|"hash"|"file_exists"|None)
         """
         # 1. URL同一判定（FR-008）
         if file_info.url:
             history_record = self.history.find_by_url(file_info.url)
             if history_record:
                 self.logger.debug(f"スキップ（URL同一）: {file_info.url}")
-                return True
+                return (True, "url")
         
         # 2. ファイル名+サイズ判定（FR-008）
         path = Path(intended_save_path)
@@ -516,7 +529,7 @@ class Downloader:
                     path.unlink()  # 空ファイルを削除
                 except Exception as e:
                     self.logger.warning(f"ファイル削除エラー: {intended_save_path} - {str(e)}")
-                return False
+                return (False, None)
             
             # ファイルの先頭バイトをチェック（HTMLかどうか）
             try:
@@ -530,10 +543,10 @@ class Downloader:
                         path.unlink()  # HTMLファイルを削除
                     except Exception as e:
                         self.logger.warning(f"HTMLファイル削除エラー: {intended_save_path} - {str(e)}")
-                    return False
+                    return (False, None)
             except Exception as e:
                 self.logger.warning(f"ファイルチェックエラー: {intended_save_path} - {str(e)}")
-                return False
+                return (False, None)
             
             # ファイル名+サイズで履歴を検索
             filename = path.name
@@ -541,7 +554,7 @@ class Downloader:
             history_record = self.history.find_by_filename_and_size(filename, file_size)
             if history_record:
                 self.logger.debug(f"スキップ（ファイル名+サイズ同一）: {filename} ({file_size} bytes)")
-                return True
+                return (True, "filename_size")
             
             # 3. ハッシュ判定（オプション、FR-008）
             if enable_hash_check:
@@ -559,12 +572,12 @@ class Downloader:
                                     if (record.get("file_hash") == file_hash and
                                         record.get("status") == "completed"):
                                         self.logger.debug(f"スキップ（ハッシュ同一）: {filename} (hash={file_hash[:8]}...)")
-                                        return True
+                                        return (True, "hash")
                         except Exception as e:
                             self.logger.warning(f"ハッシュ履歴の読み込みに失敗: {str(e)}")
             
-            # 有効なファイルとして存在（ファイル名+サイズ判定で一致）
-            return True
+            # 有効なファイルとして存在（同一パスに既存ファイルあり）
+            return (True, "file_exists")
         
-        return False
+        return (False, None)
 

@@ -10,7 +10,7 @@ import sys
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.core.naming import Naming  # pyright: ignore[reportMissingImports]
+from src.core.naming import Naming, DEFAULT_PLACEHOLDER  # pyright: ignore[reportMissingImports]
 from src.models.file_info import FileInfo  # pyright: ignore[reportMissingImports]
 from src.models.config_model import SearchConditions  # pyright: ignore[reportMissingImports]
 from src.utils.logger import Logger, LoggingConfig  # pyright: ignore[reportMissingImports]
@@ -43,7 +43,7 @@ class TestNaming:
         assert "公告" in filename or "入札調書" in filename
 
     def test_generate_filename_with_missing_key(self):
-        """テンプレートに欠けているキーがあっても例外にならない"""
+        """テンプレートに欠けているキーがあっても例外にならず、既定値 unknown が使われる（FR-009）"""
         logger = Logger(LoggingConfig(level="WARNING"))
         naming = Naming(
             naming_rule="{category}_{title}_{date}_{index}_{missing_key}",
@@ -58,9 +58,10 @@ class TestNaming:
             metadata={"category": "公告", "title": "入札調書"}
         )
         
-        # 例外が発生しないことを確認
         filename = naming.generate_filename(file_info, index=1)
         assert filename.endswith(".pdf")
+        # 欠損キーは安全な既定値になる
+        assert DEFAULT_PLACEHOLDER in filename
 
     def test_generate_filename_without_template(self):
         """テンプレートが設定されていない場合は従来ロジックを使用"""
@@ -129,3 +130,57 @@ class TestNaming:
         invalid_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
         for char in invalid_chars:
             assert char not in filename
+
+    def test_generate_filename_ext_placeholder(self):
+        """プレースホルダ {ext} はドット付き（.pdf）。{filename}{ext} で doc.xlsx になる（FR-010）"""
+        logger = Logger(LoggingConfig(level="WARNING"))
+        naming = Naming(
+            naming_rule="{filename}{ext}",
+            logger=logger,
+            search_conditions=None
+        )
+        file_info = FileInfo(
+            url="https://example.com/doc.xlsx",
+            filename="doc.xlsx",
+            file_type=".xlsx",
+            metadata={},
+        )
+        filename = naming.generate_filename(file_info, index=0)
+        assert filename.endswith(".xlsx")
+        assert "doc" in filename
+
+    def test_generate_filename_index_ext_produces_0_pdf(self):
+        """naming_rule={index}{ext} のとき 0.pdf になる（ext はドット付き）"""
+        logger = Logger(LoggingConfig(level="WARNING"))
+        naming = Naming(
+            naming_rule="{index}{ext}",
+            logger=logger,
+            search_conditions=None
+        )
+        file_info = FileInfo(
+            url="https://example.com/a.pdf",
+            filename="a.pdf",
+            file_type=".pdf",
+            metadata={},
+        )
+        filename = naming.generate_filename(file_info, index=0)
+        assert filename == "0.pdf"
+
+    def test_generate_filename_empty_metadata_uses_unknown(self):
+        """メタデータが空の場合、category/title/koji_name 等が unknown になること（FR-009）"""
+        logger = Logger(LoggingConfig(level="WARNING"))
+        naming = Naming(
+            naming_rule="{category}_{title}_{koji_name}_{index}",
+            logger=logger,
+            search_conditions=None
+        )
+        file_info = FileInfo(
+            url="https://example.com/a.pdf",
+            filename="a.pdf",
+            file_type=".pdf",
+            metadata={},
+        )
+        filename = naming.generate_filename(file_info, index=0)
+        assert filename.endswith(".pdf")
+        # 空のメタデータは unknown に置換される
+        assert DEFAULT_PLACEHOLDER in filename

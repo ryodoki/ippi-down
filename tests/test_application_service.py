@@ -228,3 +228,62 @@ def test_application_service_cleanup():
     # HTTPClientが閉じられていることを確認（実際の実装に依存）
     # ここでは例外が発生しないことを確認
     assert True
+
+
+@patch('src.app.service.resolve_save_path')
+@patch('src.app.service.HTTPClient')
+@patch('src.app.service.Scraper')
+@patch('src.app.service.Filter')
+@patch('src.app.service.Naming')
+@patch('src.app.service.Downloader')
+def test_run_subfolder_mode_datetime_creates_folder(
+    mock_downloader, mock_naming, mock_filter, mock_scraper, mock_http_client, mock_resolve_save_path, tmp_path
+):
+    """run_subfolder_mode=datetime のとき save_dir/YYYYMMDD_HHMMSS が download_files に渡される"""
+    import re
+    from src.app.service import ApplicationService
+    from src.models.config_model import (
+        AppConfig, SearchConditions, DownloadConditions, SavePaths,
+        ScheduleConfig, LoggingConfig,
+    )
+    from src.models.file_info import FileInfo
+    from src.models.download_result import DownloadResult
+    from src.utils.logger import Logger
+
+    mock_resolve_save_path.return_value = tmp_path
+
+    mock_scraper_instance = MagicMock()
+    mock_scraper_instance.fetch_page.return_value = MagicMock()
+    mock_scraper_instance.extract_file_links.return_value = [
+        FileInfo(url="https://example.com/f.pdf", filename="f.pdf", file_type=".pdf")
+    ]
+    mock_scraper.return_value = mock_scraper_instance
+
+    mock_filter_instance = MagicMock()
+    mock_filter_instance.filter_files.return_value = [
+        FileInfo(url="https://example.com/f.pdf", filename="f.pdf", file_type=".pdf")
+    ]
+    mock_filter.return_value = mock_filter_instance
+
+    mock_downloader_instance = MagicMock()
+    mock_downloader_instance.download_files.return_value = DownloadResult(total=1, success=1, failed=0, skipped=0)
+    mock_downloader.return_value = mock_downloader_instance
+
+    config = AppConfig(
+        target_urls=["https://example.com"],
+        download_conditions=DownloadConditions(),
+        search_conditions=SearchConditions(),
+        save_paths=SavePaths(local="./downloads", run_subfolder_mode="datetime"),
+        schedule=ScheduleConfig(),
+        logging=LoggingConfig(),
+    )
+
+    logger = Logger()
+    service = ApplicationService(logger)
+    run_result = service.run(config)
+
+    assert run_result.success
+    call_kwargs = mock_downloader_instance.download_files.call_args[1]
+    folder_name = call_kwargs.get("folder_name")
+    assert folder_name is not None
+    assert re.match(r"^\d{8}_\d{6}$", folder_name), f"folder_name は YYYYMMDD_HHMMSS 形式: {folder_name}"

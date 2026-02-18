@@ -171,6 +171,53 @@ class SettingsDialog:
         save_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
         ttk.Button(save_frame, text="参照", command=self.on_browse_path).pack(side=tk.LEFT)
 
+        run_folder_frame = ttk.Frame(save_frame)
+        run_folder_frame.pack(fill=tk.X, pady=(5, 0))
+        ttk.Label(run_folder_frame, text="実行単位のルートフォルダ:").pack(side=tk.LEFT, padx=(0, 5))
+        self.run_subfolder_mode_var = tk.StringVar(value="none")
+        run_combo = ttk.Combobox(
+            run_folder_frame,
+            textvariable=self.run_subfolder_mode_var,
+            values=("none", "datetime", "search"),
+            state="readonly",
+            width=12,
+        )
+        run_combo.pack(side=tk.LEFT)
+        ttk.Label(
+            run_folder_frame,
+            text="(none=作成しない / datetime=日時 / search=検索条件)",
+            font=("", 8),
+        ).pack(side=tk.LEFT, padx=(5, 0))
+
+        # 発注機関ごとのルートフォルダ
+        agency_frame = ttk.LabelFrame(scrollable_frame, text="発注機関フォルダ構造", padding="5")
+        agency_frame.pack(fill=tk.X, pady=(0, 10))
+        self.enable_agency_root_folders_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            agency_frame,
+            text="発注機関ごとにルートフォルダを作成（大分類/中分類/小分類/細分類で枝分かれ）",
+            variable=self.enable_agency_root_folders_var,
+        ).pack(anchor=tk.W, pady=(0, 3))
+        self.include_search_tab_folder_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            agency_frame,
+            text="工事/業務でフォルダを分ける",
+            variable=self.include_search_tab_folder_var,
+        ).pack(anchor=tk.W, pady=(0, 3))
+        date_partition_frame = ttk.Frame(agency_frame)
+        date_partition_frame.pack(fill=tk.X, pady=(0, 3))
+        ttk.Label(date_partition_frame, text="日付フォルダ分割:").pack(side=tk.LEFT, padx=(0, 5))
+        self.date_partition_var = tk.StringVar(value="none")
+        date_partition_combo = ttk.Combobox(
+            date_partition_frame,
+            textvariable=self.date_partition_var,
+            values=("none", "yyyy", "yyyy_mm", "yyyy_mm_dd"),
+            state="readonly",
+            width=14,
+        )
+        date_partition_combo.pack(side=tk.LEFT)
+        ttk.Label(date_partition_frame, text="(なし/年/年_月/年_月_日)", font=("", 8)).pack(side=tk.LEFT, padx=(5, 0))
+
         # ファイル命名規則
         naming_frame = ttk.LabelFrame(scrollable_frame, text="ファイル命名規則", padding="5")
         naming_frame.pack(fill=tk.X, pady=(0, 10))
@@ -181,7 +228,7 @@ class SettingsDialog:
         )
         ttk.Label(
             naming_frame,
-            text="使用可能変数: {category}, {title}, {date}, {index}, {filename}, {file_type}",
+            text="使用可能変数: {category}, {title}, {date}, {index}, {filename}, {file_type}, {ext}, {koji_name}, {daibunrui}, {chubunrui}, {shoubunrui}, {saibunrui}",
             font=("", 8),
         ).pack(anchor=tk.W)
 
@@ -692,6 +739,14 @@ class SettingsDialog:
 
         # 保存先
         self.save_path_var.set(config.save_paths.local)
+        if hasattr(self, "run_subfolder_mode_var"):
+            self.run_subfolder_mode_var.set(getattr(config.save_paths, "run_subfolder_mode", "none"))
+        if hasattr(self, "enable_agency_root_folders_var"):
+            self.enable_agency_root_folders_var.set(getattr(config.save_paths, "enable_agency_root_folders", False))
+        if hasattr(self, "include_search_tab_folder_var"):
+            self.include_search_tab_folder_var.set(getattr(config.save_paths, "include_search_tab_folder", True))
+        if hasattr(self, "date_partition_var"):
+            self.date_partition_var.set(getattr(config.save_paths, "date_partition", "none"))
 
         # ファイル命名規則
         self.naming_rule_var.set(config.naming_rule)
@@ -787,8 +842,21 @@ class SettingsDialog:
         )
 
         # 保存先
+        run_mode = getattr(self, "run_subfolder_mode_var", None)
+        run_mode_val = run_mode.get() if run_mode else getattr(self.config.save_paths, "run_subfolder_mode", "none")
+        sp = self.config.save_paths
         save_paths = SavePaths(
             local=self.save_path_var.get(),
+            use_subfolders=getattr(sp, "use_subfolders", True),
+            run_subfolder_mode=run_mode_val,
+            enable_hash_check=getattr(sp, "enable_hash_check", False),
+            keep_part_on_cancel=getattr(sp, "keep_part_on_cancel", True),
+            enable_agency_root_folders=self.enable_agency_root_folders_var.get() if getattr(self, "enable_agency_root_folders_var", None) else getattr(sp, "enable_agency_root_folders", False),
+            agency_root_label=getattr(sp, "agency_root_label", "発注機関"),
+            agency_folder_levels=getattr(sp, "agency_folder_levels", ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]),
+            include_search_tab_folder=self.include_search_tab_folder_var.get() if getattr(self, "include_search_tab_folder_var", None) else getattr(sp, "include_search_tab_folder", True),
+            search_tab_labels=getattr(sp, "search_tab_labels", {"works": "工事_入札公告等", "services": "業務_入札公告等"}),
+            date_partition=self.date_partition_var.get() if getattr(self, "date_partition_var", None) else getattr(sp, "date_partition", "none"),
         )
 
         # スケジュール設定

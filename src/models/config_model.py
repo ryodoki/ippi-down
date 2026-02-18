@@ -3,7 +3,7 @@
 """設定データモデル"""
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 
 @dataclass
@@ -99,9 +99,22 @@ class SavePaths:
     """保存先パス"""
 
     local: str = "./downloads"
-    use_subfolders: bool = True  # サブフォルダ自動生成（FR-013、デフォルトはTrueで既存挙動を維持）
-    enable_hash_check: bool = False  # ハッシュ判定を有効化（FR-008、オプション）
-    keep_part_on_cancel: bool = True  # キャンセル時に.partファイルを残す（FR-006-1、デフォルトはTrue）
+    use_subfolders: bool = True  # サブフォルダ自動生成（FR-013）
+    run_subfolder_mode: str = "none"  # 実行単位のルートフォルダ: "none" | "datetime" | "search"
+    enable_hash_check: bool = False
+    keep_part_on_cancel: bool = True
+
+    # 発注機関ごとのルートフォルダ（オプション、デフォルトOFFで現行互換）
+    enable_agency_root_folders: bool = False
+    agency_root_label: str = "発注機関"
+    agency_folder_levels: List[str] = field(
+        default_factory=lambda: ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]
+    )
+    include_search_tab_folder: bool = True  # 工事/業務で分ける
+    search_tab_labels: Dict[str, str] = field(
+        default_factory=lambda: {"works": "工事_入札公告等", "services": "業務_入札公告等"}
+    )
+    date_partition: str = "none"  # "none" | "yyyy" | "yyyy_mm" | "yyyy_mm_dd"
 
 
 @dataclass

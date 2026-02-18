@@ -13,6 +13,8 @@ from ..core.scraper import Scraper
 from ..core.filter import Filter
 from ..core.downloader import Downloader
 from ..core.naming import Naming
+from ..core.path_builder import build_save_dir as path_builder_build_save_dir
+from ..utils.path_utils import resolve_save_path
 from .run_result import RunResult
 from .events import ProgressEvent, EventType
 
@@ -37,8 +39,8 @@ class ApplicationService:
     ) -> RunResult:
         """ダウンロード処理を実行"""
         try:
-            # 保存先ディレクトリの作成
-            save_dir = Path(config.save_paths.local)
+            # 保存先を絶対パスに解決（相対の場合は exe/プロジェクトルート基準）
+            save_dir = resolve_save_path(config.save_paths.local)
             save_dir.mkdir(parents=True, exist_ok=True)
 
             # コンポーネントの初期化
@@ -82,12 +84,13 @@ class ApplicationService:
                     message="ダウンロード対象のファイルが見つかりませんでした"
                 )
 
-            # ダウンロード実行
+            # ダウンロード実行（save_dir は絶対パス解決済み）
             result = self._download_files(
                 filtered_files,
                 config,
                 progress_callback,
-                cancel_flag
+                cancel_flag,
+                save_dir=str(save_dir),
             )
 
             if cancel_flag and cancel_flag():
@@ -301,9 +304,10 @@ class ApplicationService:
         files,
         config: AppConfig,
         progress_callback: Optional[Callable[[ProgressEvent], None]],
-        cancel_flag: Optional[Callable[[], bool]]
+        cancel_flag: Optional[Callable[[], bool]],
+        save_dir: Optional[str] = None,
     ) -> DownloadResult:
-        """ファイルをダウンロード"""
+        """ファイルをダウンロード。save_dir は run() で絶対パス解決済みを渡す。"""
         def progress_wrapper(current: int, total: int, filename: str) -> bool:
             """Downloader用の進捗コールバック（boolを返す）"""
             if cancel_flag and cancel_flag():
@@ -319,17 +323,54 @@ class ApplicationService:
                 ))
             return True
 
+        base_save_dir = save_dir if save_dir else config.save_paths.local
+        folder_name = self._compute_run_folder_name(config) if getattr(
+            config.save_paths, "run_subfolder_mode", "none"
+        ) != "none" else None
+
+        build_save_dir_fn = None
+        if getattr(config.save_paths, "enable_agency_root_folders", False):
+            def _build_fn(base: Path, file_info: FileInfo):
+                return path_builder_build_save_dir(base, file_info, config, self.logger)
+            build_save_dir_fn = _build_fn
+
         return self._downloader.download_files(
             files,
-            config.save_paths.local,
+            base_save_dir,
             self._naming,
             progress_wrapper,
-            folder_name=None,
+            folder_name=folder_name,
             cancel_flag=cancel_flag,
             use_subfolders=config.save_paths.use_subfolders,
             enable_hash_check=config.save_paths.enable_hash_check,
             keep_part_on_cancel=config.save_paths.keep_part_on_cancel,
+            build_save_dir_fn=build_save_dir_fn,
         )
+
+    def _compute_run_folder_name(self, config: AppConfig) -> Optional[str]:
+        """実行単位のルートフォルダ名を生成（run_subfolder_mode に従う）"""
+        mode = getattr(config.save_paths, "run_subfolder_mode", "none")
+        if not mode or mode == "none":
+            return None
+        if mode == "datetime":
+            from datetime import datetime
+            return datetime.now().strftime("%Y%m%d_%H%M%S")
+        if mode == "search":
+            sc = config.search_conditions
+            parts = []
+            if sc.hachu_daibunrui:
+                parts.append(sc.hachu_daibunrui)
+            if sc.hachu_chubunrui:
+                parts.append(sc.hachu_chubunrui)
+            if sc.koji_name:
+                parts.append(sc.koji_name)
+            if not parts:
+                from datetime import datetime
+                return datetime.now().strftime("%Y%m%d_%H%M%S")
+            from ..utils.file_utils import FileUtils
+            raw = "_".join(parts).strip()
+            return FileUtils.sanitize_filename(raw) or "run"
+        return None
 
     def _cleanup(self):
         """リソースをクリーンアップ"""
