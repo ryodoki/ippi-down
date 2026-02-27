@@ -2,11 +2,17 @@
 
 """設定検証を行うクラス"""
 
+import re
+import difflib
 from typing import Tuple, List
 from urllib.parse import urlparse
 from ..models.config_model import AppConfig
 from ..utils.logger import Logger
 from ..core.naming import NAMING_TEMPLATE_VARIABLES
+
+
+# 候補提示に使う有効キーリスト（get_close_matches 用）
+_VALID_KEYS_LIST = list(NAMING_TEMPLATE_VARIABLES)
 
 
 class ConfigValidator:
@@ -70,21 +76,33 @@ class ConfigValidator:
         return len(errors) == 0, errors
 
     def validate_naming_rule(self, naming_rule: str) -> List[str]:
-        """命名規則テンプレートを検証する。未知キーがあればエラーメッセージを返す。"""
+        """命名規則テンプレートを検証する。未知キーがあればエラーメッセージ（候補付き）を返す。"""
         errors = []
-        # format_map 用のダミーコンテキスト（使用可能な変数のみ）
-        dummy = {k: "0" for k in NAMING_TEMPLATE_VARIABLES}
-        try:
-            naming_rule.format_map(dummy)
-        except KeyError as e:
-            key = str(e).strip("'")
-            valid = ", ".join("{" + k + "}" for k in NAMING_TEMPLATE_VARIABLES)
+        if not naming_rule or not naming_rule.strip():
+            return errors
+        # テンプレート中の全プレースホルダ {key} を抽出
+        placeholders = re.findall(r"\{(\w+)\}", naming_rule)
+        unknown_keys = [k for k in placeholders if k not in NAMING_TEMPLATE_VARIABLES]
+        # 重複を除きつつ順序を保持
+        seen = set()
+        for key in unknown_keys:
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates = difflib.get_close_matches(key, _VALID_KEYS_LIST, n=3, cutoff=0.4)
+            hint = ""
+            if candidates:
+                hint = f" 候補: " + ", ".join("{" + c + "}" for c in candidates)
             errors.append(
-                f"命名規則に未知の変数 '{key}' が含まれています。"
-                f"使用可能: {valid}"
+                f"命名規則に未知の変数 '{{{key}}}' が含まれています。{hint} "
+                f"使用可能: " + ", ".join("{" + k + "}" for k in NAMING_TEMPLATE_VARIABLES)
             )
-        except Exception as e:
-            errors.append(f"命名規則の形式が不正です: {e}")
+        if not errors:
+            try:
+                dummy = {k: "0" for k in NAMING_TEMPLATE_VARIABLES}
+                naming_rule.format_map(dummy)
+            except Exception as e:
+                errors.append(f"命名規則の形式が不正です: {e}")
         return errors
 
     def _is_valid_url(self, url: str) -> bool:

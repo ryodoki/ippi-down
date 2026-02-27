@@ -516,68 +516,87 @@ class Downloader:
         if file_info.url:
             history_record = self.history.find_by_url(file_info.url)
             if history_record:
-                self.logger.debug(f"スキップ（URL同一）: {file_info.url}")
-                return (True, "url")
+                # ファイルが意図した保存先に存在するか確認
+                intended_path = Path(intended_save_path)
+                if intended_path.exists() and intended_path.stat().st_size > 0:
+                    self.logger.debug(f"スキップ（URL同一、ファイル存在確認済み）: {file_info.url}")
+                    return (True, "url")
+                
+                # 履歴に記録された旧パスにファイルが存在するか確認
+                old_path_str = history_record.get("file_path", "")
+                old_path = Path(old_path_str) if old_path_str else None
+                if old_path and old_path.exists() and old_path.stat().st_size > 0:
+                    # 旧パスには存在するが新パスには無い → 再ダウンロードを許可
+                    self.logger.info(
+                        f"URL同一だが保存先が異なるため再ダウンロードします: "
+                        f"既存={old_path_str}"
+                    )
+                else:
+                    # どちらにもファイルが無い → 再ダウンロードを許可
+                    self.logger.info(
+                        f"URL同一だがファイルが見つからないため再ダウンロードします: "
+                        f"履歴パス={old_path_str}"
+                    )
         
         # 2. ファイル名+サイズ判定（FR-008）
         path = Path(intended_save_path)
-        if path.exists() and path.stat().st_size > 0:
-            # ファイルサイズが0の場合は再ダウンロード
-            if path.stat().st_size == 0:
-                self.logger.debug(f"空ファイルを検出、再ダウンロードします: {intended_save_path}")
-                try:
-                    path.unlink()  # 空ファイルを削除
-                except Exception as e:
-                    self.logger.warning(f"ファイル削除エラー: {intended_save_path} - {str(e)}")
-                return (False, None)
-            
-            # ファイルの先頭バイトをチェック（HTMLかどうか）
+        if not path.exists():
+            return (False, None)
+
+        try:
+            st = path.stat()
+            size = st.st_size
+        except OSError as e:
+            self.logger.warning(f"ファイル情報取得エラー: {intended_save_path} - {str(e)}")
+            return (False, None)
+
+        # ゼロバイトファイルは削除して再取得
+        if size == 0:
+            self.logger.debug(f"空ファイルを検出、再ダウンロードします: {intended_save_path}")
             try:
-                with open(intended_save_path, 'rb') as f:
-                    first_bytes = f.read(100)
-                
-                # HTMLファイルの場合は再ダウンロード
-                if first_bytes.startswith(b'<html') or first_bytes.startswith(b'<!DOCTYPE') or first_bytes.startswith(b'<HTML'):
-                    self.logger.debug(f"HTMLファイルを検出、再ダウンロードします: {intended_save_path}")
-                    try:
-                        path.unlink()  # HTMLファイルを削除
-                    except Exception as e:
-                        self.logger.warning(f"HTMLファイル削除エラー: {intended_save_path} - {str(e)}")
-                    return (False, None)
+                path.unlink()
             except Exception as e:
-                self.logger.warning(f"ファイルチェックエラー: {intended_save_path} - {str(e)}")
+                self.logger.warning(f"ファイル削除エラー: {intended_save_path} - {str(e)}")
+            return (False, None)
+
+        # ファイルの先頭バイトをチェック（HTML混入の場合は再取得）
+        try:
+            with open(intended_save_path, "rb") as f:
+                first_bytes = f.read(100)
+            if first_bytes.startswith(b"<html") or first_bytes.startswith(b"<!DOCTYPE") or first_bytes.startswith(b"<HTML"):
+                self.logger.debug(f"HTMLファイルを検出、再ダウンロードします: {intended_save_path}")
+                try:
+                    path.unlink()
+                except Exception as e:
+                    self.logger.warning(f"HTMLファイル削除エラー: {intended_save_path} - {str(e)}")
                 return (False, None)
-            
-            # ファイル名+サイズで履歴を検索
-            filename = path.name
-            file_size = path.stat().st_size
-            history_record = self.history.find_by_filename_and_size(filename, file_size)
-            if history_record:
-                self.logger.debug(f"スキップ（ファイル名+サイズ同一）: {filename} ({file_size} bytes)")
-                return (True, "filename_size")
-            
-            # 3. ハッシュ判定（オプション、FR-008）
-            if enable_hash_check:
-                file_hash = self.history.calculate_file_hash(intended_save_path)
-                if file_hash:
-                    # 履歴から同じハッシュのファイルを検索
-                    # （簡易実装: 履歴ファイル全体を検索）
-                    if self.history.history_file.exists():
-                        try:
-                            with open(self.history.history_file, "r", encoding="utf-8") as f:
-                                for line in reversed(list(f)):
-                                    if not line.strip():
-                                        continue
-                                    record = json.loads(line.strip())
-                                    if (record.get("file_hash") == file_hash and
-                                        record.get("status") == "completed"):
-                                        self.logger.debug(f"スキップ（ハッシュ同一）: {filename} (hash={file_hash[:8]}...)")
-                                        return (True, "hash")
-                        except Exception as e:
-                            self.logger.warning(f"ハッシュ履歴の読み込みに失敗: {str(e)}")
-            
-            # 有効なファイルとして存在（同一パスに既存ファイルあり）
-            return (True, "file_exists")
-        
-        return (False, None)
+        except Exception as e:
+            self.logger.warning(f"ファイルチェックエラー: {intended_save_path} - {str(e)}")
+            return (False, None)
+
+        filename = path.name
+        # ファイル名+サイズで履歴を検索（size は既に取得済み）
+        history_record = self.history.find_by_filename_and_size(filename, size)
+        if history_record:
+            self.logger.debug(f"スキップ（ファイル名+サイズ同一）: {filename} ({size} bytes)")
+            return (True, "filename_size")
+
+        # 3. ハッシュ判定（オプション、FR-008）
+        if enable_hash_check:
+            file_hash = self.history.calculate_file_hash(intended_save_path)
+            if file_hash and self.history.history_file.exists():
+                try:
+                    with open(self.history.history_file, "r", encoding="utf-8") as f:
+                        for line in reversed(list(f)):
+                            if not line.strip():
+                                continue
+                            record = json.loads(line.strip())
+                            if record.get("file_hash") == file_hash and record.get("status") == "completed":
+                                self.logger.debug(f"スキップ（ハッシュ同一）: {filename} (hash={file_hash[:8]}...)")
+                                return (True, "hash")
+                except Exception as e:
+                    self.logger.warning(f"ハッシュ履歴の読み込みに失敗: {str(e)}")
+
+        # 有効なファイルとして存在（同一パスに既存ファイルあり）
+        return (True, "file_exists")
 

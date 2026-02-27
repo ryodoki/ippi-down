@@ -30,6 +30,26 @@ class TestConfigValidatorNamingRule:
         assert "typo_key" in errors[0]
         assert "使用可能" in errors[0] or "category" in errors[0]
 
+    def test_typo_key_includes_candidates(self):
+        """typo の未知キーに対して候補（近い有効キー）がメッセージに含まれる"""
+        v = ConfigValidator()
+        errors = v.validate_naming_rule("{titl}_{index}")  # titl → title に近い
+        assert len(errors) == 1
+        assert "titl" in errors[0]
+        assert "候補" in errors[0]
+        # 候補に {title} が含まれること（difflib の結果に依存するが titl は title に近い）
+        assert "title" in errors[0]
+
+    def test_multiple_unknown_keys_all_listed(self):
+        """複数の未知キーがあるとき、それぞれエラーに列挙される"""
+        v = ConfigValidator()
+        errors = v.validate_naming_rule("{category}_{xxx}_{yyy}_{index}")
+        assert len(errors) >= 2
+        keys_in_errors = " ".join(errors)
+        assert "xxx" in keys_in_errors
+        assert "yyy" in keys_in_errors
+        assert "使用可能" in errors[0]
+
     def test_validate_config_includes_naming_error(self):
         """validate_config で naming_rule に未知キーがあるとエラーに含まれる"""
         v = ConfigValidator()

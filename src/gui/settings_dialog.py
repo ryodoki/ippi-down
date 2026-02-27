@@ -18,7 +18,10 @@ from ..models.config_model import (
 from ..config.config_manager import ConfigManager
 from ..config.config_validator import ConfigValidator
 from ..utils.logger import Logger
+from ..utils.http_client import HTTPClient
+from ..core.scraper import Scraper
 from ..core.ppi_dropdowns import get_labels, code_to_label, label_to_code
+from threading import Thread
 
 
 class SettingsDialog:
@@ -38,6 +41,13 @@ class SettingsDialog:
         self.logger = logger or Logger()
         self.validator = ConfigValidator(self.logger)
         self.result = None  # 保存された設定
+        self._http_client = None
+        self._scraper = None
+        self._search_url = (
+            config.target_urls[0]
+            if (getattr(config, "target_urls", None) and config.target_urls)
+            else "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"
+        )
 
         # ダイアログを作成
         self.dialog = tk.Toplevel(parent)
@@ -57,6 +67,8 @@ class SettingsDialog:
 
         self.setup_ui()
         self.load_config_to_ui()
+        # 発注機関・工事場所のオプションを動的ロード（遅延実行）
+        self.dialog.after(100, self._load_search_condition_options)
 
     def setup_font(self):
         """日本語フォントを設定（Windows専用）"""
@@ -192,7 +204,7 @@ class SettingsDialog:
         # 発注機関ごとのルートフォルダ
         agency_frame = ttk.LabelFrame(scrollable_frame, text="発注機関フォルダ構造", padding="5")
         agency_frame.pack(fill=tk.X, pady=(0, 10))
-        self.enable_agency_root_folders_var = tk.BooleanVar(value=False)
+        self.enable_agency_root_folders_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             agency_frame,
             text="発注機関ごとにルートフォルダを作成（大分類/中分類/小分類/細分類で枝分かれ）",
@@ -291,19 +303,22 @@ class SettingsDialog:
 
         ttk.Label(hachu_input_frame, text="大分類:").pack(side=tk.LEFT, padx=(0, 5))
         self.hachu_daibunrui_var = tk.StringVar()
-        ttk.Combobox(
+        self.hachu_daibunrui_combo = ttk.Combobox(
             hachu_input_frame,
             textvariable=self.hachu_daibunrui_var,
             values=["", "国の機関", "地方公共団体（都道府県）", "地方公共団体（市区町村）", "テスト機関"],
             state="readonly",
             width=25,
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        )
+        self.hachu_daibunrui_combo.pack(side=tk.LEFT, padx=(0, 10))
+        self.hachu_daibunrui_combo.bind("<<ComboboxSelected>>", self._on_hachu_daibunrui_changed)
 
         ttk.Label(hachu_input_frame, text="中分類:").pack(side=tk.LEFT, padx=(0, 5))
         self.hachu_chubunrui_var = tk.StringVar()
-        ttk.Combobox(
-            hachu_input_frame, textvariable=self.hachu_chubunrui_var, values=[], state="readonly", width=25
-        ).pack(side=tk.LEFT)
+        self.hachu_chubunrui_combo = ttk.Combobox(
+            hachu_input_frame, textvariable=self.hachu_chubunrui_var, values=[""], state="readonly", width=25
+        )
+        self.hachu_chubunrui_combo.pack(side=tk.LEFT)
 
         # 発注機関（複数選択検索）
         hachu_multi_frame = ttk.LabelFrame(
@@ -350,7 +365,7 @@ class SettingsDialog:
 
         ttk.Label(place_list_input_frame, text="地方:").pack(side=tk.LEFT, padx=(0, 5))
         self.place_chihou_var = tk.StringVar()
-        ttk.Combobox(
+        self.place_chihou_combobox = ttk.Combobox(
             place_list_input_frame,
             textvariable=self.place_chihou_var,
             values=[
@@ -367,19 +382,24 @@ class SettingsDialog:
             ],
             state="readonly",
             width=12,
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        )
+        self.place_chihou_combobox.pack(side=tk.LEFT, padx=(0, 10))
+        self.place_chihou_combobox.bind("<<ComboboxSelected>>", self._on_place_chihou_changed)
 
         ttk.Label(place_list_input_frame, text="都道府県:").pack(side=tk.LEFT, padx=(0, 5))
         self.place_todofuken_var = tk.StringVar()
-        ttk.Combobox(
-            place_list_input_frame, textvariable=self.place_todofuken_var, values=[], state="readonly", width=15
-        ).pack(side=tk.LEFT, padx=(0, 10))
+        self.place_todofuken_combobox = ttk.Combobox(
+            place_list_input_frame, textvariable=self.place_todofuken_var, values=[""], state="readonly", width=15
+        )
+        self.place_todofuken_combobox.pack(side=tk.LEFT, padx=(0, 10))
+        self.place_todofuken_combobox.bind("<<ComboboxSelected>>", self._on_place_todofuken_changed)
 
         ttk.Label(place_list_input_frame, text="市町村:").pack(side=tk.LEFT, padx=(0, 5))
         self.place_shichouson_var = tk.StringVar()
-        ttk.Combobox(
-            place_list_input_frame, textvariable=self.place_shichouson_var, values=[], state="readonly", width=15
-        ).pack(side=tk.LEFT)
+        self.place_shichouson_combobox = ttk.Combobox(
+            place_list_input_frame, textvariable=self.place_shichouson_var, values=[""], state="readonly", width=15
+        )
+        self.place_shichouson_combobox.pack(side=tk.LEFT)
 
         # 工事場所（文字列検索）
         koji_place_text_frame = ttk.LabelFrame(
@@ -742,7 +762,7 @@ class SettingsDialog:
         if hasattr(self, "run_subfolder_mode_var"):
             self.run_subfolder_mode_var.set(getattr(config.save_paths, "run_subfolder_mode", "none"))
         if hasattr(self, "enable_agency_root_folders_var"):
-            self.enable_agency_root_folders_var.set(getattr(config.save_paths, "enable_agency_root_folders", False))
+            self.enable_agency_root_folders_var.set(getattr(config.save_paths, "enable_agency_root_folders", True))
         if hasattr(self, "include_search_tab_folder_var"):
             self.include_search_tab_folder_var.set(getattr(config.save_paths, "include_search_tab_folder", True))
         if hasattr(self, "date_partition_var"):
@@ -829,6 +849,145 @@ class SettingsDialog:
             # 表示件数
             self.display_count_var.set(str(sc.display_count or 20))
 
+    def _get_scraper(self) -> Scraper:
+        if self._scraper is None:
+            if self._http_client is None:
+                self._http_client = HTTPClient(self.logger)
+            self._scraper = Scraper(self._http_client, self.logger)
+        return self._scraper
+
+    def _load_search_condition_options(self):
+        """発注機関大分類・中分類と工事場所のオプションをロードし、保存値で復元する"""
+        def load():
+            try:
+                scraper = self._get_scraper()
+                daibunrui_opts = scraper.get_hachu_daibunrui_options(self._search_url)
+                self.dialog.after(0, lambda: self._apply_daibunrui_and_restore(daibunrui_opts))
+            except Exception as e:
+                self.logger.warning(f"設定ダイアログ 発注機関オプション読み込みエラー: {e}")
+                self.dialog.after(0, lambda: self._apply_daibunrui_and_restore([]))
+        Thread(target=load, daemon=True).start()
+
+    def _apply_daibunrui_and_restore(self, daibunrui_options: list):
+        """大分類オプションを反映し、現在値に基づいて中分類・工事場所を復元"""
+        if daibunrui_options:
+            self.hachu_daibunrui_combo["values"] = [""] + daibunrui_options
+        d = (self.hachu_daibunrui_var.get() or "").strip()
+        if d:
+            def load_chubunrui():
+                try:
+                    scraper = self._get_scraper()
+                    opts = scraper.get_hachu_chubunrui_options(self._search_url, d)
+                    self.dialog.after(0, lambda: self._update_hachu_chubunrui_options(opts))
+                except Exception as e:
+                    self.logger.warning(f"中分類オプション読み込みエラー: {e}")
+                    self.dialog.after(0, lambda: self._update_hachu_chubunrui_options([]))
+            Thread(target=load_chubunrui, daemon=True).start()
+        else:
+            self.hachu_chubunrui_combo["values"] = [""]
+        chihou = (self.place_chihou_var.get() or "").strip()
+        if chihou:
+            def load_place():
+                try:
+                    scraper = self._get_scraper()
+                    pref = scraper.get_koji_prefecture_options(self._search_url, chihou)
+                    self.dialog.after(0, lambda: self._apply_restored_place_todofuken(pref))
+                except Exception as e:
+                    self.logger.warning(f"都道府県オプション読み込みエラー: {e}")
+                    self.dialog.after(0, lambda: self._apply_restored_place_todofuken([]))
+            Thread(target=load_place, daemon=True).start()
+        else:
+            self.place_todofuken_combobox["values"] = [""]
+            self.place_shichouson_combobox["values"] = [""]
+
+    def _update_hachu_chubunrui_options(self, options: list):
+        if options is None:
+            options = []
+        self.hachu_chubunrui_combo["values"] = [""] + options
+        c = (self.hachu_chubunrui_var.get() or "").strip()
+        if c and options and c in options:
+            self.hachu_chubunrui_combo.current(options.index(c) + 1)
+
+    def _apply_restored_place_todofuken(self, options: list):
+        if options is None:
+            options = []
+        self.place_todofuken_combobox["values"] = [""] + options
+        todofuken = (self.place_todofuken_var.get() or "").strip()
+        if todofuken and options and todofuken in options:
+            self.place_todofuken_combobox.current(options.index(todofuken) + 1)
+            chihou = (self.place_chihou_var.get() or "").strip()
+            if chihou:
+                def load_city():
+                    try:
+                        scraper = self._get_scraper()
+                        city_opts = scraper.get_koji_city_options(self._search_url, chihou, todofuken)
+                        self.dialog.after(0, lambda: self._update_place_shichouson_options(city_opts))
+                    except Exception as e:
+                        self.logger.warning(f"市町村オプション読み込みエラー: {e}")
+                        self.dialog.after(0, lambda: self._update_place_shichouson_options([]))
+                Thread(target=load_city, daemon=True).start()
+        else:
+            self.place_shichouson_combobox["values"] = [""]
+
+    def _update_place_shichouson_options(self, options: list):
+        if options is None:
+            options = []
+        self.place_shichouson_combobox["values"] = [""] + options
+        shichouson = (self.place_shichouson_var.get() or "").strip()
+        if shichouson and options and shichouson in options:
+            self.place_shichouson_combobox.current(options.index(shichouson) + 1)
+
+    def _on_hachu_daibunrui_changed(self, event=None):
+        d = (self.hachu_daibunrui_var.get() or "").strip()
+        self.hachu_chubunrui_var.set("")
+        self.hachu_chubunrui_combo["values"] = [""]
+        if not d:
+            return
+        def load():
+            try:
+                scraper = self._get_scraper()
+                opts = scraper.get_hachu_chubunrui_options(self._search_url, d)
+                self.dialog.after(0, lambda: self._update_hachu_chubunrui_options(opts))
+            except Exception as e:
+                self.logger.warning(f"中分類オプション読み込みエラー: {e}")
+                self.dialog.after(0, lambda: self._update_hachu_chubunrui_options([]))
+        Thread(target=load, daemon=True).start()
+
+    def _on_place_chihou_changed(self, event=None):
+        chihou = (self.place_chihou_var.get() or "").strip()
+        self.place_todofuken_var.set("")
+        self.place_shichouson_var.set("")
+        self.place_todofuken_combobox["values"] = [""]
+        self.place_shichouson_combobox["values"] = [""]
+        if not chihou:
+            return
+        def load():
+            try:
+                scraper = self._get_scraper()
+                opts = scraper.get_koji_prefecture_options(self._search_url, chihou)
+                self.dialog.after(0, lambda: self._apply_restored_place_todofuken(opts))
+            except Exception as e:
+                self.logger.warning(f"都道府県オプション読み込みエラー: {e}")
+                self.dialog.after(0, lambda: self._apply_restored_place_todofuken([]))
+        Thread(target=load, daemon=True).start()
+
+    def _on_place_todofuken_changed(self, event=None):
+        chihou = (self.place_chihou_var.get() or "").strip()
+        todofuken = (self.place_todofuken_var.get() or "").strip()
+        self.place_shichouson_var.set("")
+        self.place_shichouson_combobox["values"] = [""]
+        if not chihou or not todofuken:
+            return
+        def load():
+            try:
+                scraper = self._get_scraper()
+                opts = scraper.get_koji_city_options(self._search_url, chihou, todofuken)
+                self.dialog.after(0, lambda: self._update_place_shichouson_options(opts))
+            except Exception as e:
+                self.logger.warning(f"市町村オプション読み込みエラー: {e}")
+                self.dialog.after(0, lambda: self._update_place_shichouson_options([]))
+        Thread(target=load, daemon=True).start()
+
     def get_config_from_ui(self) -> AppConfig:
         """UIから設定を取得"""
         # 対象URL
@@ -851,7 +1010,7 @@ class SettingsDialog:
             run_subfolder_mode=run_mode_val,
             enable_hash_check=getattr(sp, "enable_hash_check", False),
             keep_part_on_cancel=getattr(sp, "keep_part_on_cancel", True),
-            enable_agency_root_folders=self.enable_agency_root_folders_var.get() if getattr(self, "enable_agency_root_folders_var", None) else getattr(sp, "enable_agency_root_folders", False),
+            enable_agency_root_folders=self.enable_agency_root_folders_var.get() if getattr(self, "enable_agency_root_folders_var", None) else getattr(sp, "enable_agency_root_folders", True),
             agency_root_label=getattr(sp, "agency_root_label", "発注機関"),
             agency_folder_levels=getattr(sp, "agency_folder_levels", ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]),
             include_search_tab_folder=self.include_search_tab_folder_var.get() if getattr(self, "include_search_tab_folder_var", None) else getattr(sp, "include_search_tab_folder", True),
@@ -922,9 +1081,18 @@ class SettingsDialog:
             except ValueError:
                 return None
 
+        # 設定画面にUIの無い項目は現在configの値を引き継ぐ（保存時に消さない）
+        sc = getattr(self, "config", None) and getattr(self.config, "search_conditions", None)
+        hachu_shoubunrui = (sc.hachu_shoubunrui or "") if sc else ""
+        hachu_saibunrui = (sc.hachu_saibunrui or "") if sc else ""
+        hachu_multi = (sc.hachu_multi or []) if sc else []
+
         return SearchConditions(
             hachu_daibunrui=self.hachu_daibunrui_var.get(),
             hachu_chubunrui=self.hachu_chubunrui_var.get(),
+            hachu_shoubunrui=hachu_shoubunrui,
+            hachu_saibunrui=hachu_saibunrui,
+            hachu_multi=hachu_multi,
             koji_name=self.koji_name_var.get(),
             place_search_type=self.place_list_radio_var.get(),
             place_chihou=self.place_chihou_var.get(),

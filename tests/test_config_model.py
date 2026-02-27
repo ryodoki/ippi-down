@@ -69,3 +69,12 @@ class TestAppConfig:
         assert config.schedule is not None
         assert config.logging is not None
 
+
+class TestSearchConditions:
+    """SearchConditions のデフォルト（起動時に検索条件が勝手に入らない）"""
+
+    def test_contract_types_default_empty(self):
+        """contract_types のデフォルトは空リスト（全選択にしない）"""
+        sc = SearchConditions()
+        assert sc.contract_types == []
+

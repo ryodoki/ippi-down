@@ -131,7 +131,7 @@ class ConfigManager:
             run_subfolder_mode=sp.get("run_subfolder_mode", "none"),
             enable_hash_check=sp.get("enable_hash_check", False),
             keep_part_on_cancel=sp.get("keep_part_on_cancel", True),
-            enable_agency_root_folders=sp.get("enable_agency_root_folders", False),
+            enable_agency_root_folders=sp.get("enable_agency_root_folders", True),
             agency_root_label=(sp.get("agency_root_label") or "発注機関").strip() or "発注機関",
             agency_folder_levels=sp.get("agency_folder_levels") or ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"],
             include_search_tab_folder=sp.get("include_search_tab_folder", True),
@@ -169,16 +169,7 @@ class ConfigManager:
             place_todofuken=search_dict.get("place_todofuken", ""),
             place_shichouson=search_dict.get("place_shichouson", ""),
             place_text=search_dict.get("place_text", ""),
-            contract_types=search_dict.get(
-                "contract_types",
-                [
-                    "一般競争入札",
-                    "公募型指名競争入札",
-                    "指名競争入札",
-                    "随意契約",
-                    "その他方式",
-                ],
-            ),
+            contract_types=search_dict.get("contract_types", []),
             update_date_type=search_dict.get("update_date_type", "none"),
             update_date_days=search_dict.get("update_date_days"),
             koukoku_date_type=search_dict.get("koukoku_date_type", "none"),
@@ -202,8 +193,14 @@ class ConfigManager:
             display_count=search_dict.get("display_count", 20),
         )
 
+        # target_urls が欠落または空リストのときは既定URLでフォールバック（起動不能にしない）
+        raw_urls = config_dict.get("target_urls")
+        if not raw_urls or (isinstance(raw_urls, list) and len(raw_urls) == 0):
+            target_urls = list(AppConfig().target_urls)
+        else:
+            target_urls = raw_urls
         return AppConfig(
-            target_urls=config_dict.get("target_urls", []),
+            target_urls=target_urls,
             download_conditions=download_conditions,
             search_conditions=search_conditions,
             save_paths=save_paths,

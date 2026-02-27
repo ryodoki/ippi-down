@@ -20,9 +20,10 @@ src/main.py::main() (--background または PPI_BACKGROUND_MODE=true)
   → ApplicationService.run()
 ```
 
-### CLI（未実装）
-- 要件定義では「開発・デバッグ用」として定義されているが、未実装
-- `src/main.py` は GUI/バックグラウンドモードのみ
+### CLI（実装済み）
+- 要件定義では「開発・デバッグ用」として定義されている
+- `src/cli/main.py` が CLI のエントリーポイント（`--config`, `--once`, `--dry-run` 等をサポート）
+- `src/main.py` は GUI/バックグラウンドモード用
 
 ## 2. 設定読み込み経路
 

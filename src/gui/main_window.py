@@ -34,8 +34,9 @@ class MainWindow:
         # 階層ドロップダウン用のHTTPClientとScraper（遅延初期化）
         self._http_client = None
         self._scraper = None
-        # tabパラメータなしのSearch.aspxを使用
-        self._search_url = "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx"
+        # 検索URL: config の target_urls[0] を優先し、無ければ tab=4(工事) をデフォルトに
+        default_search_url = "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"
+        self._search_url = (config.target_urls[0] if (config.target_urls and config.target_urls[0]) else default_search_url)
 
         # 日本語フォントの設定
         self.setup_font()
@@ -49,6 +50,8 @@ class MainWindow:
         # 初期化時に大分類のオプションを取得（遅延実行：root.afterでGUI表示後に実行）
         # import時にHTTPリクエストが送られないようにするため
         self.root.after(100, self.load_hachu_daibunrui_options)
+        # 工事場所の階層（地方→都道府県→市町村）も config に値があれば復元
+        self.root.after(400, self._restore_place_hierarchy_from_values)
 
     def setup_font(self):
         """日本語フォントを設定（Windows専用）"""
@@ -105,7 +108,11 @@ class MainWindow:
         self.btn_cancel.pack(side=tk.LEFT, padx=(0, 5))
 
         self.btn_clear = ttk.Button(toolbar, text="クリア", command=self.on_clear_log)
-        self.btn_clear.pack(side=tk.LEFT)
+        self.btn_clear.pack(side=tk.LEFT, padx=(0, 5))
+        self.btn_clear_search = ttk.Button(
+            toolbar, text="検索条件クリア", command=self.on_clear_search_conditions
+        )
+        self.btn_clear_search.pack(side=tk.LEFT)
 
         # 検索条件フレーム（スクロール可能にする）
         search_frame = ttk.LabelFrame(main_frame, text="検索条件", padding="5")
@@ -212,6 +219,7 @@ class MainWindow:
         )
         self.hachu_chubunrui_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=5, pady=2)
         self.hachu_chubunrui_combo.bind("<<ComboboxSelected>>", self.on_hachu_chubunrui_changed)
+        self.hachu_chubunrui_combo.bind("<FocusIn>", self._on_hachu_chubunrui_focusin)
 
         ttk.Label(hachu_frame, text="小分類:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
         self.hachu_shoubunrui_var = tk.StringVar(value=search_conditions.hachu_shoubunrui)
@@ -224,6 +232,7 @@ class MainWindow:
         )
         self.hachu_shoubunrui_combo.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=5, pady=2)
         self.hachu_shoubunrui_combo.bind("<<ComboboxSelected>>", self.on_hachu_shoubunrui_changed)
+        self.hachu_shoubunrui_combo.bind("<FocusIn>", self._on_hachu_shoubunrui_focusin)
 
         ttk.Label(hachu_frame, text="細分類:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=2)
         self.hachu_saibunrui_var = tk.StringVar(value=search_conditions.hachu_saibunrui)
@@ -235,6 +244,8 @@ class MainWindow:
             width=30,
         )
         self.hachu_saibunrui_combo.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=5, pady=2)
+        self.hachu_saibunrui_combo.bind("<<ComboboxSelected>>", self.on_hachu_saibunrui_changed)
+        self.hachu_saibunrui_combo.bind("<FocusIn>", self._on_hachu_saibunrui_focusin)
 
         # 発注機関（複数選択検索）
         hachu_multi_frame = ttk.LabelFrame(parent, text="発注機関（複数選択検索）", padding="5")
@@ -292,6 +303,7 @@ class MainWindow:
             width=30,
         )
         self.place_chihou_combobox.grid(row=0, column=1, sticky=tk.W, padx=5, pady=2)
+        self.place_chihou_combobox.bind("<<ComboboxSelected>>", self.on_place_chihou_changed)
         # readonlyのComboboxで空文字列を選択するには、current(0)を使用する必要がある
         if not initial_place_chihou:
             self.place_chihou_combobox.current(0)  # 最初の要素（空文字列）を選択
@@ -306,23 +318,26 @@ class MainWindow:
 
         ttk.Label(place_frame, text="都道府県:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
         self.place_todofuken_var = tk.StringVar(value=search_conditions.place_todofuken)
-        ttk.Combobox(
+        self.place_todofuken_combobox = ttk.Combobox(
             place_frame,
             textvariable=self.place_todofuken_var,
-            values=[],  # 動的読み込み対応のため空
+            values=[""],  # 動的読み込み（地方選択で更新）。空配列だと固まるため最低 [""]
             state="readonly",
             width=30,
-        ).grid(row=1, column=1, sticky=tk.W, padx=5, pady=2)
+        )
+        self.place_todofuken_combobox.grid(row=1, column=1, sticky=tk.W, padx=5, pady=2)
+        self.place_todofuken_combobox.bind("<<ComboboxSelected>>", self.on_place_todofuken_changed)
 
         ttk.Label(place_frame, text="市町村:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
         self.place_shichouson_var = tk.StringVar(value=search_conditions.place_shichouson)
-        ttk.Combobox(
+        self.place_shichouson_combobox = ttk.Combobox(
             place_frame,
             textvariable=self.place_shichouson_var,
-            values=[],  # 動的読み込み対応のため空
+            values=[""],  # 動的読み込み（都道府県選択で更新）
             state="readonly",
             width=30,
-        ).grid(row=2, column=1, sticky=tk.W, padx=5, pady=2)
+        )
+        self.place_shichouson_combobox.grid(row=2, column=1, sticky=tk.W, padx=5, pady=2)
 
         # 工事場所（文字列検索）
         place_text_frame = ttk.LabelFrame(parent, text="工事場所（文字列検索）", padding="5")
@@ -372,7 +387,7 @@ class MainWindow:
             side=tk.LEFT, padx=5
         )
         self.update_date_days_var = tk.StringVar(
-            value=str(search_conditions.update_date_days) if search_conditions.update_date_days else "30"
+            value=str(search_conditions.update_date_days) if search_conditions.update_date_days else ""
         )
         ttk.Entry(update_date_frame, textvariable=self.update_date_days_var, width=5).pack(side=tk.LEFT, padx=5)
         ttk.Label(update_date_frame, text="日以内").pack(side=tk.LEFT)
@@ -600,17 +615,86 @@ class MainWindow:
         else:
             # フォールバック: 固定のオプション
             self.hachu_daibunrui_combo['values'] = ["", "国の機関", "地方公共団体（都道府県）", "地方公共団体（市区町村）", "テスト機関"]
+        # 起動時/設定戻り時に現在値に基づいて中分類以下を復元（中分類以下が空で選べない問題を解消）
+        self._restore_hachu_hierarchy_from_values()
+
+    def _restore_hachu_hierarchy_from_values(self):
+        """現在の大分類〜細分類の値に基づいて階層オプションをロードし、Combobox を選択可能にする。
+        起動時・設定ダイアログから戻った後に呼ぶ。ユーザー操作の on_*_changed は使わず専用経路でクリアせずロードする。
+        """
+        d = (self.hachu_daibunrui_var.get() or "").strip()
+        c = (self.hachu_chubunrui_var.get() or "").strip()
+        s = (self.hachu_shoubunrui_var.get() or "").strip()
+        a = (self.hachu_saibunrui_var.get() or "").strip()
+        if not d:
+            return
+
+        def load_in_thread():
+            results = {}
+            try:
+                scraper = self._get_scraper()
+                results["chubunrui"] = scraper.get_hachu_chubunrui_options(self._search_url, d)
+                if c:
+                    results["shoubunrui"] = scraper.get_hachu_shoubunrui_options(self._search_url, d, c)
+                if c and s:
+                    results["saibunrui"] = scraper.get_hachu_saibunrui_options(self._search_url, d, c, s)
+            except Exception as e:
+                self.logger.error(f"発注機関階層復元エラー: {str(e)}")
+            self.root.after(0, lambda: self._apply_restored_hachu_options(results, d, c, s, a))
+
+        Thread(target=load_in_thread, daemon=True).start()
+
+    def _apply_restored_hachu_options(
+        self, results: dict, daibunrui_val: str, chubunrui_val: str, shoubunrui_val: str, saibunrui_val: str
+    ):
+        """スレッド取得したオプションを GUI に反映し、保存されていた値を current で選択する。空でも [""] で死なせない。"""
+        try:
+            if "chubunrui" in results:
+                raw = results["chubunrui"] or []
+                opts = [""] + raw
+                self.hachu_chubunrui_combo["values"] = opts
+                if not raw:
+                    self.logger.warning("中分類オプション取得が空でした。大分類を再選択するかクリックで再読み込みできます。")
+                elif chubunrui_val and chubunrui_val in raw:
+                    idx = raw.index(chubunrui_val) + 1
+                    self.hachu_chubunrui_combo.current(idx)
+                elif chubunrui_val:
+                    self.hachu_chubunrui_var.set("")
+            if "shoubunrui" in results:
+                raw = results["shoubunrui"] or []
+                opts = [""] + raw
+                self.hachu_shoubunrui_combo["values"] = opts
+                if not raw:
+                    self.logger.warning("小分類オプション取得が空でした。中分類を再選択するかクリックで再読み込みできます。")
+                elif shoubunrui_val and shoubunrui_val in raw:
+                    idx = raw.index(shoubunrui_val) + 1
+                    self.hachu_shoubunrui_combo.current(idx)
+                elif shoubunrui_val:
+                    self.hachu_shoubunrui_var.set("")
+            if "saibunrui" in results:
+                raw = results["saibunrui"] or []
+                opts = [""] + raw
+                self.hachu_saibunrui_combo["values"] = opts
+                if not raw:
+                    self.logger.warning("細分類オプション取得が空でした。小分類を再選択するかクリックで再読み込みできます。")
+                elif saibunrui_val and saibunrui_val in raw:
+                    idx = raw.index(saibunrui_val) + 1
+                    self.hachu_saibunrui_combo.current(idx)
+                elif saibunrui_val:
+                    self.hachu_saibunrui_var.set("")
+        except Exception as e:
+            self.logger.warning(f"発注機関階層反映エラー: {str(e)}")
 
     def on_hachu_daibunrui_changed(self, event=None):
         """大分類が変更されたときの処理"""
         daibunrui_value = self.hachu_daibunrui_var.get()
         if not daibunrui_value:
-            # 大分類がクリアされた場合は、中分類以下もクリア
-            self.hachu_chubunrui_combo['values'] = []
+            # 大分類がクリアされた場合は、中分類以下もクリア（values は [""] で残して操作可能に）
+            self.hachu_chubunrui_combo['values'] = [""]
             self.hachu_chubunrui_var.set("")
-            self.hachu_shoubunrui_combo['values'] = []
+            self.hachu_shoubunrui_combo['values'] = [""]
             self.hachu_shoubunrui_var.set("")
-            self.hachu_saibunrui_combo['values'] = []
+            self.hachu_saibunrui_combo['values'] = [""]
             self.hachu_saibunrui_var.set("")
             return
         
@@ -624,18 +708,22 @@ class MainWindow:
                 self.logger.error(f"中分類オプション読み込みエラー: {str(e)}")
                 self.root.after(0, lambda: self.show_message(f"中分類オプションの読み込みに失敗しました: {str(e)}", "error"))
         
-        # 中分類以下をクリア
+        # 中分類以下をクリア（values は [""] で残す）
         self.hachu_chubunrui_var.set("")
         self.hachu_shoubunrui_var.set("")
         self.hachu_saibunrui_var.set("")
-        self.hachu_shoubunrui_combo['values'] = []
-        self.hachu_saibunrui_combo['values'] = []
+        self.hachu_shoubunrui_combo['values'] = [""]
+        self.hachu_saibunrui_combo['values'] = [""]
         
         Thread(target=load_in_thread, daemon=True).start()
 
     def _update_hachu_chubunrui_options(self, options: list):
-        """中分類のオプションを更新"""
-        self.hachu_chubunrui_combo['values'] = [""] + options
+        """中分類のオプションを更新（空でも [""] にしてUIを死なせない）"""
+        if options is None:
+            options = []
+        self.hachu_chubunrui_combo['values'] = [""] + options if options else [""]
+        if not options:
+            self.logger.warning("中分類オプションが空です。大分類を再選択するか、クリックで再読み込みできます。")
 
     def on_hachu_chubunrui_changed(self, event=None):
         """中分類が変更されたときの処理"""
@@ -643,9 +731,9 @@ class MainWindow:
         chubunrui_value = self.hachu_chubunrui_var.get()
         if not chubunrui_value or not daibunrui_value:
             # 小分類以下をクリア
-            self.hachu_shoubunrui_combo['values'] = []
+            self.hachu_shoubunrui_combo['values'] = [""]
             self.hachu_shoubunrui_var.set("")
-            self.hachu_saibunrui_combo['values'] = []
+            self.hachu_saibunrui_combo['values'] = [""]
             self.hachu_saibunrui_var.set("")
             return
         
@@ -661,15 +749,19 @@ class MainWindow:
         
         # 小分類・細分類をクリア
         self.hachu_shoubunrui_var.set("")
-        self.hachu_shoubunrui_combo['values'] = []
+        self.hachu_shoubunrui_combo['values'] = [""]
         self.hachu_saibunrui_var.set("")
-        self.hachu_saibunrui_combo['values'] = []
+        self.hachu_saibunrui_combo['values'] = [""]
         
         Thread(target=load_in_thread, daemon=True).start()
 
     def _update_hachu_shoubunrui_options(self, options: list):
-        """小分類のオプションを更新"""
-        self.hachu_shoubunrui_combo['values'] = [""] + options
+        """小分類のオプションを更新（空でも [""] にしてUIを死なせない）"""
+        if options is None:
+            options = []
+        self.hachu_shoubunrui_combo['values'] = [""] + options if options else [""]
+        if not options:
+            self.logger.warning("小分類オプションが空です。中分類を再選択するか、クリックで再読み込みできます。")
 
     def on_hachu_shoubunrui_changed(self, event=None):
         """小分類が変更されたときの処理"""
@@ -678,7 +770,7 @@ class MainWindow:
         shoubunrui_value = self.hachu_shoubunrui_var.get()
         if not shoubunrui_value or not chubunrui_value or not daibunrui_value:
             # 細分類をクリア
-            self.hachu_saibunrui_combo['values'] = []
+            self.hachu_saibunrui_combo['values'] = [""]
             self.hachu_saibunrui_var.set("")
             return
         
@@ -695,8 +787,75 @@ class MainWindow:
         Thread(target=load_in_thread, daemon=True).start()
 
     def _update_hachu_saibunrui_options(self, options: list):
-        """細分類のオプションを更新"""
-        self.hachu_saibunrui_combo['values'] = [""] + options
+        """細分類のオプションを更新（空でも [""] にしてUIを死なせない）"""
+        if options is None:
+            options = []
+        self.hachu_saibunrui_combo['values'] = [""] + options if options else [""]
+        if not options:
+            self.logger.warning("細分類オプションが空です。小分類を再選択するか、クリックで再読み込みできます。")
+
+    def on_hachu_saibunrui_changed(self, event=None):
+        """細分類が変更されたとき（下位階層は無いため処理なし）"""
+        pass
+
+    def _is_values_effectively_empty(self, combo: ttk.Combobox) -> bool:
+        """Combobox の values が実質空（選択肢がない）か"""
+        try:
+            v = list(combo["values"]) if combo["values"] else []
+        except (tk.TclError, TypeError):
+            v = []
+        return len(v) == 0 or (len(v) == 1 and (v[0] == "" or v[0] is None))
+
+    def _on_hachu_chubunrui_focusin(self, event=None):
+        """中分類にフォーカスしたとき、オプションが空なら大分類に基づき再ロード"""
+        if not self._is_values_effectively_empty(self.hachu_chubunrui_combo):
+            return
+        d = (self.hachu_daibunrui_var.get() or "").strip()
+        if not d:
+            return
+        def load():
+            try:
+                scraper = self._get_scraper()
+                options = scraper.get_hachu_chubunrui_options(self._search_url, d)
+                self.root.after(0, lambda: self._update_hachu_chubunrui_options(options))
+            except Exception as e:
+                self.logger.warning(f"中分類再読み込みエラー: {e}")
+        Thread(target=load, daemon=True).start()
+
+    def _on_hachu_shoubunrui_focusin(self, event=None):
+        """小分類にフォーカスしたとき、オプションが空なら中分類に基づき再ロード"""
+        if not self._is_values_effectively_empty(self.hachu_shoubunrui_combo):
+            return
+        d = (self.hachu_daibunrui_var.get() or "").strip()
+        c = (self.hachu_chubunrui_var.get() or "").strip()
+        if not d or not c:
+            return
+        def load():
+            try:
+                scraper = self._get_scraper()
+                options = scraper.get_hachu_shoubunrui_options(self._search_url, d, c)
+                self.root.after(0, lambda: self._update_hachu_shoubunrui_options(options))
+            except Exception as e:
+                self.logger.warning(f"小分類再読み込みエラー: {e}")
+        Thread(target=load, daemon=True).start()
+
+    def _on_hachu_saibunrui_focusin(self, event=None):
+        """細分類にフォーカスしたとき、オプションが空なら小分類に基づき再ロード"""
+        if not self._is_values_effectively_empty(self.hachu_saibunrui_combo):
+            return
+        d = (self.hachu_daibunrui_var.get() or "").strip()
+        c = (self.hachu_chubunrui_var.get() or "").strip()
+        s = (self.hachu_shoubunrui_var.get() or "").strip()
+        if not d or not c or not s:
+            return
+        def load():
+            try:
+                scraper = self._get_scraper()
+                options = scraper.get_hachu_saibunrui_options(self._search_url, d, c, s)
+                self.root.after(0, lambda: self._update_hachu_saibunrui_options(options))
+            except Exception as e:
+                self.logger.warning(f"細分類再読み込みエラー: {e}")
+        Thread(target=load, daemon=True).start()
 
     def set_download_callback(self, callback: Callable):
         """ダウンロードコールバックを設定"""
@@ -771,6 +930,17 @@ class MainWindow:
         self.log_text.delete(1.0, tk.END)
         self.show_message("ログをクリアしました", "info")
 
+    def on_clear_search_conditions(self):
+        """検索条件を既定値に戻し、UIとconfigを同期する"""
+        from ..models.config_model import SearchConditions
+        self.config.search_conditions = SearchConditions()
+        self.load_config_to_ui()
+        if self.config_manager.save_config(self.config):
+            self.logger.info("検索条件をクリアし、設定を保存しました")
+            self.show_message("検索条件をクリアしました", "info")
+        else:
+            self.show_message("検索条件をクリアしました（設定ファイルの保存に失敗しました）", "warning")
+
     def on_settings_open(self):
         """設定画面を開く"""
         from ..gui.settings_dialog import SettingsDialog
@@ -781,18 +951,22 @@ class MainWindow:
         if result:
             # 設定が保存された場合、メインウィンドウの設定を更新
             self.config = result
+            default_search_url = "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"
+            self._search_url = (result.target_urls[0] if (result.target_urls and result.target_urls[0]) else default_search_url)
             self.load_config_to_ui()
+            # 発注機関オプションを再ロード（設定でURLが変わった場合に備える）
+            self.root.after(100, self.load_hachu_daibunrui_options)
 
     def load_config_to_ui(self):
         """設定をUIに反映"""
         # 検索条件をUIに反映
         search_conditions = self.config.search_conditions
         
-        # 発注機関（リスト検索）
-        self.hachu_daibunrui_var.set(search_conditions.hachu_daibunrui)
-        self.hachu_chubunrui_var.set(search_conditions.hachu_chubunrui)
-        self.hachu_shoubunrui_var.set(search_conditions.hachu_shoubunrui)
-        self.hachu_saibunrui_var.set(search_conditions.hachu_saibunrui)
+        # 発注機関（リスト検索）（値がない場合は必ずクリア）
+        self.hachu_daibunrui_var.set(search_conditions.hachu_daibunrui or "")
+        self.hachu_chubunrui_var.set(search_conditions.hachu_chubunrui or "")
+        self.hachu_shoubunrui_var.set(search_conditions.hachu_shoubunrui or "")
+        self.hachu_saibunrui_var.set(search_conditions.hachu_saibunrui or "")
 
         # 発注機関（複数選択検索）
         if search_conditions.hachu_multi:
@@ -800,8 +974,8 @@ class MainWindow:
         else:
             self.hachu_multi_var.set("")
 
-        # 工事名
-        self.koji_name_var.set(search_conditions.koji_name)
+        # 工事名（空のときはクリア）
+        self.koji_name_var.set(search_conditions.koji_name or "")
 
         # 工事場所（空文字列の場合は明示的に空文字列を設定）
         place_chihou_value = search_conditions.place_chihou if search_conditions.place_chihou else ""
@@ -823,52 +997,158 @@ class MainWindow:
                 # 値が見つからない場合は空文字列を選択
                 if hasattr(self, 'place_chihou_combobox'):
                     self.place_chihou_combobox.current(0)
-        self.place_todofuken_var.set(search_conditions.place_todofuken)
-        self.place_shichouson_var.set(search_conditions.place_shichouson)
-        self.place_text_var.set(search_conditions.place_text)
+        self.place_todofuken_var.set(search_conditions.place_todofuken or "")
+        self.place_shichouson_var.set(search_conditions.place_shichouson or "")
+        self.place_text_var.set(search_conditions.place_text or "")
 
         # 入札契約方式
         for contract_type, var in self.contract_type_vars.items():
             var.set(contract_type in search_conditions.contract_types)
 
-        # 最終更新日
-        self.update_date_type_var.set(search_conditions.update_date_type)
-        if search_conditions.update_date_days:
+        # 最終更新日（値がない場合は必ずクリア）
+        self.update_date_type_var.set(search_conditions.update_date_type or "none")
+        if search_conditions.update_date_days is not None:
             self.update_date_days_var.set(str(search_conditions.update_date_days))
+        else:
+            self.update_date_days_var.set("")
 
-        # 公告日、開札日、契約日
-        self.koukoku_date_type_var.set(search_conditions.koukoku_date_type)
+        # 公告日、開札日、契約日（値がない場合は必ずクリア）
+        self.koukoku_date_type_var.set(search_conditions.koukoku_date_type or "none")
         self.koukoku_date_start_var.set(search_conditions.koukoku_date_start or "")
         
-        self.kaisatsu_date_type_var.set(search_conditions.kaisatsu_date_type)
+        self.kaisatsu_date_type_var.set(search_conditions.kaisatsu_date_type or "none")
         self.kaisatsu_date_start_var.set(search_conditions.kaisatsu_date_start or "")
         
-        self.keiyaku_date_type_var.set(search_conditions.keiyaku_date_type)
+        self.keiyaku_date_type_var.set(search_conditions.keiyaku_date_type or "none")
         self.keiyaku_date_start_var.set(search_conditions.keiyaku_date_start or "")
 
         # 工事種別、工事の業種（コードまたはラベルをラベルに変換して表示）
         self.koji_shubetsu_var.set(code_to_label("koji_shubetsu", search_conditions.koji_shubetsu, self.logger))
         self.koji_gyoushu_var.set(code_to_label("koji_gyoushu", search_conditions.koji_gyoushu, self.logger))
 
-        # 価格
-        if search_conditions.yotei_price_min:
+        # 価格（値がない場合は必ずクリア）
+        if search_conditions.yotei_price_min is not None:
             self.yotei_price_min_var.set(str(search_conditions.yotei_price_min))
-        if search_conditions.yotei_price_max:
+        else:
+            self.yotei_price_min_var.set("")
+        if search_conditions.yotei_price_max is not None:
             self.yotei_price_max_var.set(str(search_conditions.yotei_price_max))
-        if search_conditions.rakusatsu_price_min:
+        else:
+            self.yotei_price_max_var.set("")
+        if search_conditions.rakusatsu_price_min is not None:
             self.rakusatsu_price_min_var.set(str(search_conditions.rakusatsu_price_min))
-        if search_conditions.rakusatsu_price_max:
+        else:
+            self.rakusatsu_price_min_var.set("")
+        if search_conditions.rakusatsu_price_max is not None:
             self.rakusatsu_price_max_var.set(str(search_conditions.rakusatsu_price_max))
+        else:
+            self.rakusatsu_price_max_var.set("")
 
-        # 落札者名
-        self.rakusatsu_name_var.set(search_conditions.rakusatsu_name)
+        # 落札者名（空のときはクリア）
+        self.rakusatsu_name_var.set(search_conditions.rakusatsu_name or "")
 
         # オプション
         self.denshi_var.set(search_conditions.denshi)
         self.koukai_var.set(search_conditions.koukai)
 
-        # 表示件数
-        self.display_count_var.set(str(search_conditions.display_count))
+        # 表示件数（値がない場合は既定値 20）
+        self.display_count_var.set(
+            str(search_conditions.display_count) if search_conditions.display_count is not None else "20"
+        )
+        # 設定ダイアログから戻った後、発注機関の階層オプションを現在値に基づいて復元する
+        self.root.after(0, self._restore_hachu_hierarchy_from_values)
+        # 工事場所（地方→都道府県→市町村）の階層オプションも復元
+        self.root.after(200, self._restore_place_hierarchy_from_values)
+
+    def on_place_chihou_changed(self, event=None):
+        """地方が変更されたとき：都道府県オプションをロードし、都道府県・市町村をクリア"""
+        chihou = (self.place_chihou_var.get() or "").strip()
+        self.place_todofuken_var.set("")
+        self.place_shichouson_var.set("")
+        self.place_todofuken_combobox["values"] = [""]
+        self.place_shichouson_combobox["values"] = [""]
+        if not chihou:
+            return
+        def load():
+            try:
+                scraper = self._get_scraper()
+                options = scraper.get_koji_prefecture_options(self._search_url, chihou)
+                self.root.after(0, lambda: self._update_place_todofuken_options(options))
+            except Exception as e:
+                self.logger.warning(f"都道府県オプション読み込みエラー: {e}")
+                self.root.after(0, lambda: self._update_place_todofuken_options([]))
+        Thread(target=load, daemon=True).start()
+
+    def _update_place_todofuken_options(self, options: list):
+        """都道府県のオプションを更新"""
+        if options is None:
+            options = []
+        self.place_todofuken_combobox["values"] = [""] + options if options else [""]
+        if not options:
+            self.logger.warning("都道府県オプションが空です。")
+
+    def on_place_todofuken_changed(self, event=None):
+        """都道府県が変更されたとき：市町村オプションをロード"""
+        chihou = (self.place_chihou_var.get() or "").strip()
+        todofuken = (self.place_todofuken_var.get() or "").strip()
+        self.place_shichouson_var.set("")
+        self.place_shichouson_combobox["values"] = [""]
+        if not chihou or not todofuken:
+            return
+        def load():
+            try:
+                scraper = self._get_scraper()
+                options = scraper.get_koji_city_options(self._search_url, chihou, todofuken)
+                self.root.after(0, lambda: self._update_place_shichouson_options(options))
+            except Exception as e:
+                self.logger.warning(f"市町村オプション読み込みエラー: {e}")
+                self.root.after(0, lambda: self._update_place_shichouson_options([]))
+        Thread(target=load, daemon=True).start()
+
+    def _update_place_shichouson_options(self, options: list):
+        """市町村のオプションを更新"""
+        if options is None:
+            options = []
+        self.place_shichouson_combobox["values"] = [""] + options if options else [""]
+        if not options:
+            self.logger.warning("市町村オプションが空です。")
+
+    def _restore_place_hierarchy_from_values(self):
+        """現在の地方・都道府県・市町村に基づいて階層オプションをロードし、選択可能にする"""
+        chihou = (self.place_chihou_var.get() or "").strip()
+        todofuken = (self.place_todofuken_var.get() or "").strip()
+        shichouson = (self.place_shichouson_var.get() or "").strip()
+        if not chihou:
+            return
+        def load():
+            results = {}
+            try:
+                scraper = self._get_scraper()
+                results["todofuken"] = scraper.get_koji_prefecture_options(self._search_url, chihou)
+                if todofuken:
+                    results["shichouson"] = scraper.get_koji_city_options(self._search_url, chihou, todofuken)
+            except Exception as e:
+                self.logger.warning(f"工事場所階層復元エラー: {e}")
+            self.root.after(0, lambda: self._apply_restored_place_options(results, chihou, todofuken, shichouson))
+        Thread(target=load, daemon=True).start()
+
+    def _apply_restored_place_options(
+        self, results: dict, chihou: str, todofuken: str, shichouson: str
+    ):
+        """工事場所の復元オプションをUIに反映"""
+        try:
+            if "todofuken" in results:
+                raw = results["todofuken"] or []
+                self.place_todofuken_combobox["values"] = [""] + raw
+                if todofuken and todofuken in raw:
+                    self.place_todofuken_combobox.current(raw.index(todofuken) + 1)
+            if "shichouson" in results:
+                raw = results["shichouson"] or []
+                self.place_shichouson_combobox["values"] = [""] + raw
+                if shichouson and raw and shichouson in raw:
+                    self.place_shichouson_combobox.current(raw.index(shichouson) + 1)
+        except Exception as e:
+            self.logger.warning(f"工事場所階層反映エラー: {e}")
 
     def get_config_from_ui(self) -> AppConfig:
         """UIから設定を取得"""
@@ -891,11 +1171,20 @@ class MainWindow:
         # 工事名
         search_conditions.koji_name = self.koji_name_var.get()
 
-        # 工事場所
-        search_conditions.place_chihou = self.place_chihou_var.get()
-        search_conditions.place_todofuken = self.place_todofuken_var.get()
-        search_conditions.place_shichouson = self.place_shichouson_var.get()
-        search_conditions.place_text = self.place_text_var.get()
+        # 工事場所（place_search_type を必ず設定：文字列が非空なら text、空なら list）
+        place_text_raw = (self.place_text_var.get() or "").strip()
+        if place_text_raw:
+            search_conditions.place_search_type = "text"
+            search_conditions.place_text = place_text_raw
+            search_conditions.place_chihou = ""
+            search_conditions.place_todofuken = ""
+            search_conditions.place_shichouson = ""
+        else:
+            search_conditions.place_search_type = "list"
+            search_conditions.place_text = ""
+            search_conditions.place_chihou = self.place_chihou_var.get()
+            search_conditions.place_todofuken = self.place_todofuken_var.get()
+            search_conditions.place_shichouson = self.place_shichouson_var.get()
 
         # 入札契約方式
         search_conditions.contract_types = [
@@ -909,15 +1198,18 @@ class MainWindow:
         except ValueError:
             search_conditions.update_date_days = None
 
-        # 公告日、開札日、契約日
+        # 公告日、開札日、契約日（UIに無い end は残さない＝None でクリア）
         search_conditions.koukoku_date_type = self.koukoku_date_type_var.get()
         search_conditions.koukoku_date_start = self.koukoku_date_start_var.get() or None
-        
+        search_conditions.koukoku_date_end = None
+
         search_conditions.kaisatsu_date_type = self.kaisatsu_date_type_var.get()
         search_conditions.kaisatsu_date_start = self.kaisatsu_date_start_var.get() or None
-        
+        search_conditions.kaisatsu_date_end = None
+
         search_conditions.keiyaku_date_type = self.keiyaku_date_type_var.get()
         search_conditions.keiyaku_date_start = self.keiyaku_date_start_var.get() or None
+        search_conditions.keiyaku_date_end = None
 
         # 工事種別、工事の業種（単一選択）
         # GUIから取得したラベルをコードに変換して保存

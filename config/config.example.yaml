@@ -22,8 +22,8 @@ save_paths:
   run_subfolder_mode: none  # none | datetime | search
   enable_hash_check: false
   keep_part_on_cancel: true
-  # 発注機関ごとのルートフォルダ（OFFのときは従来どおり）
-  enable_agency_root_folders: false
+  # 発注機関ごとのルートフォルダ（ONでダウンロードごとに 発注機関/大分類/中分類/小分類/細分類 の階層で作成）
+  enable_agency_root_folders: true
   agency_root_label: "発注機関"
   agency_folder_levels: ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]
   include_search_tab_folder: true   # 工事/業務でフォルダを分ける

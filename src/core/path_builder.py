@@ -69,7 +69,7 @@ def build_save_dir(
     - True のときは base_dir / 発注機関 / 大分類 / 中分類 / 小分類 / 細分類 / 工事 or 業務 / (日付) を生成し mkdir して返す。
     """
     save_paths = config.save_paths
-    if not getattr(save_paths, "enable_agency_root_folders", False):
+    if not getattr(save_paths, "enable_agency_root_folders", True):
         return base_dir
 
     base = base_dir

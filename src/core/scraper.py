@@ -791,6 +791,93 @@ class Scraper:
             self.logger.error(f"中分類オプション取得エラー: {str(e)}", exc_info=True)
             return []
 
+    def get_koji_prefecture_options(self, search_url: str, district_text: str) -> List[str]:
+        """工事場所・都道府県のオプションを取得（地方の表示テキストを指定）"""
+        try:
+            normalized_url = self._normalize_search_url(search_url)
+            initial_soup = self.fetch_page(normalized_url)
+            if not initial_soup:
+                self.logger.warning("検索ページの取得に失敗しました（都道府県オプション）")
+                return []
+            district_value = self._get_dropdown_value_from_text(
+                initial_soup, "drpKojiDistrict", district_text
+            )
+            if not district_value:
+                self.logger.warning(f"地方のvalueが見つかりませんでした: {district_text}")
+                return []
+            form_data = self._get_all_hidden_inputs(initial_soup)
+            form_data["__EVENTTARGET"] = "drpKojiDistrict"
+            form_data["__EVENTARGUMENT"] = ""
+            form_data["KojiRadioGroup"] = "rbKojiDropList"
+            form_data["drpKojiDistrict"] = district_value
+            response = self.http_client.post(normalized_url, data=form_data)
+            self._set_response_encoding(response)
+            response_text = response.text
+            soup = self._parse_response_to_soup(response)
+            if "setListItemSub" in response_text:
+                options_from_js = self._parse_setListItemSub(response_text, "drpKojiPrefecture2")
+                if options_from_js:
+                    return [text for _, text in options_from_js]
+            opts = self._parse_html_options(soup, "drpKojiPrefecture2")
+            if opts:
+                return [text for _, text in opts]
+            return []
+        except Exception as e:
+            self.logger.error(f"都道府県オプション取得エラー: {str(e)}", exc_info=True)
+            return []
+
+    def get_koji_city_options(
+        self, search_url: str, district_text: str, prefecture_text: str
+    ) -> List[str]:
+        """工事場所・市町村のオプションを取得（地方と都道府県の表示テキストを指定）"""
+        try:
+            normalized_url = self._normalize_search_url(search_url)
+            initial_soup = self.fetch_page(normalized_url)
+            if not initial_soup:
+                return []
+            district_value = self._get_dropdown_value_from_text(
+                initial_soup, "drpKojiDistrict", district_text
+            )
+            if not district_value:
+                self.logger.warning(f"地方のvalueが見つかりませんでした: {district_text}")
+                return []
+            form_data = self._get_all_hidden_inputs(initial_soup)
+            form_data["__EVENTTARGET"] = "drpKojiDistrict"
+            form_data["__EVENTARGUMENT"] = ""
+            form_data["KojiRadioGroup"] = "rbKojiDropList"
+            form_data["drpKojiDistrict"] = district_value
+            response = self.http_client.post(normalized_url, data=form_data)
+            self._set_response_encoding(response)
+            response_text = response.text
+            soup_after_district = self._parse_response_to_soup(response)
+            prefecture_value = self._get_dropdown_value_from_text(
+                soup_after_district, "drpKojiPrefecture2", prefecture_text
+            )
+            if not prefecture_value:
+                self.logger.warning(f"都道府県のvalueが見つかりませんでした: {prefecture_text}")
+                return []
+            form_data2 = self._get_all_hidden_inputs(soup_after_district)
+            form_data2["__EVENTTARGET"] = "drpKojiPrefecture2"
+            form_data2["__EVENTARGUMENT"] = ""
+            form_data2["KojiRadioGroup"] = "rbKojiDropList"
+            form_data2["drpKojiDistrict"] = district_value
+            form_data2["drpKojiPrefecture2"] = prefecture_value
+            response2 = self.http_client.post(normalized_url, data=form_data2)
+            self._set_response_encoding(response2)
+            response_text2 = response2.text
+            soup_after_pref = self._parse_response_to_soup(response2)
+            if "setListItemSub" in response_text2:
+                options_from_js = self._parse_setListItemSub(response_text2, "drpKojiCity")
+                if options_from_js:
+                    return [text for _, text in options_from_js]
+            opts = self._parse_html_options(soup_after_pref, "drpKojiCity")
+            if opts:
+                return [text for _, text in opts]
+            return []
+        except Exception as e:
+            self.logger.error(f"市町村オプション取得エラー: {str(e)}", exc_info=True)
+            return []
+
     def get_hachu_shoubunrui_options(
         self, search_url: str, daibunrui_value: str, chubunrui_value: str
     ) -> List[str]:
@@ -1120,12 +1207,27 @@ class Scraper:
                 if not saibunrui_value:
                     self.logger.warning(f"細分類の値が取得できませんでした: '{search_conditions.hachu_saibunrui}'")
             
+            # 5b. 工事場所（リスト）で地区・都道府県/市町村を指定している場合、地区でPOSTバックして都道府県/市町村のoptionを読み込む
+            if (
+                search_conditions.place_search_type == "list"
+                and search_conditions.place_chihou
+                and (search_conditions.place_todofuken or search_conditions.place_shichouson)
+            ):
+                district_value = self._get_dropdown_value_from_text(
+                    soup, "drpKojiDistrict", search_conditions.place_chihou
+                )
+                if district_value:
+                    self.logger.debug(f"工事場所・地区のPOSTバック: '{search_conditions.place_chihou}' -> '{district_value}'")
+                    soup = self._do_postback(
+                        normalized_url, soup, "drpKojiDistrict", {"drpKojiDistrict": district_value}
+                    )
+            
             # 6. 検索フォームのデータを構築
             form_data = self._get_all_hidden_inputs(soup)
             search_form_data = self._build_search_form_data(search_conditions, soup)
             form_data.update(search_form_data)
             
-            # 階層的ドロップダウンの値を明示的に設定
+            # 階層的ドロップダウンの値を明示的に設定（地区POSTバック後は発注機関がリセットされている可能性があるため再設定）
             if daibunrui_value:
                 form_data["drpTopKikanInf"] = daibunrui_value
             if chubunrui_value:
@@ -1192,20 +1294,43 @@ class Scraper:
             form_data["tbxKojiNm"] = search_conditions.koji_name
         
         # 工事場所（リスト検索、正しいフィールド名: drpKojiDistrict, drpKojiPrefecture2, drpKojiCity）
+        # 表示テキスト→option value に変換してから POST（サーバは value で受け取る）
         if search_conditions.place_search_type == "list":
-            # ラジオボタンでリスト検索を選択
             form_data["KojiRadioGroup"] = "rbKojiDropList"
             if search_conditions.place_chihou:
-                form_data["drpKojiDistrict"] = search_conditions.place_chihou
+                value = self._get_dropdown_value_from_text(
+                    initial_soup, "drpKojiDistrict", search_conditions.place_chihou
+                )
+                if value:
+                    form_data["drpKojiDistrict"] = value
+                else:
+                    form_data["drpKojiDistrict"] = search_conditions.place_chihou
             if search_conditions.place_todofuken:
-                form_data["drpKojiPrefecture2"] = search_conditions.place_todofuken
+                value = self._get_dropdown_value_from_text(
+                    initial_soup, "drpKojiPrefecture2", search_conditions.place_todofuken
+                )
+                if value:
+                    form_data["drpKojiPrefecture2"] = value
+                else:
+                    form_data["drpKojiPrefecture2"] = search_conditions.place_todofuken
             if search_conditions.place_shichouson:
-                form_data["drpKojiCity"] = search_conditions.place_shichouson
+                value = self._get_dropdown_value_from_text(
+                    initial_soup, "drpKojiCity", search_conditions.place_shichouson
+                )
+                if value:
+                    form_data["drpKojiCity"] = value
+                else:
+                    form_data["drpKojiCity"] = search_conditions.place_shichouson
         
         # 工事場所（文字列検索、正しいフィールド名: tbxKojiPlace）
+        self.logger.debug(
+            f"place_search_type={getattr(search_conditions, 'place_search_type', None)}, "
+            f"place_text={getattr(search_conditions, 'place_text', None)}"
+        )
         if search_conditions.place_search_type == "text" and search_conditions.place_text:
             form_data["KojiRadioGroup"] = "rbStrKojiPlace"
             form_data["tbxKojiPlace"] = search_conditions.place_text
+            self.logger.debug(f"POSTに tbxKojiPlace を送信: {form_data.get('tbxKojiPlace')}")
         
         # 入札契約方式（チェックボックス形式、正しいフィールド名: chkKojiNyusatsu*）
         contract_type_map = {
@@ -1351,18 +1476,23 @@ class Scraper:
         return all_file_links
 
     def _infer_search_tab_from_url(self, url: str) -> str:
-        """URL の tab パラメータから検索種別を推定。works=工事, services=業務。"""
+        """URL の tab パラメータまたはパスから検索種別を推定。works=工事, services=業務。"""
         if not url:
             return "unknown"
         try:
             parsed = urlparse(url)
+            # 1) クエリの tab=4(工事) / tab=6(業務) を優先
             qs = parse_qs(parsed.query)
             tab = (qs.get("tab") or [None])[0]
             if tab == "4":
                 return "works"
             if tab == "6":
                 return "services"
-            return tab or "unknown"
+            # 2) パスに SearchWorks が含まれる場合（tab なし URL 用）
+            path = (parsed.path or "").lower()
+            if "searchworks" in path:
+                return "works"
+            return tab if tab else "unknown"
         except Exception:
             return "unknown"
 

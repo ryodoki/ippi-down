@@ -6,6 +6,7 @@ from typing import Optional, Callable
 from pathlib import Path
 from ..models.config_model import AppConfig
 from ..models.download_result import DownloadResult
+from ..models.file_info import FileInfo
 from ..utils.logger import Logger
 from ..utils.http_client import HTTPClient
 from ..utils.notifier import Notifier
@@ -186,10 +187,13 @@ class ApplicationService:
                     metadata={"type": "info"}
                 ))
 
-            # 検索条件のチェック
+            # Search.aspx の場合は条件の有無にかかわらず検索フォーム送信が必要（条件空だと fetch_page のみだと0件になりやすい）
+            is_search_aspx = "Search.aspx" in url
             has_search_conditions = self._has_search_conditions(config.search_conditions)
+            if is_search_aspx and not has_search_conditions:
+                self.logger.info("検索条件は空ですが Search.aspx のため検索フォームを送信します")
 
-            if has_search_conditions:
+            if is_search_aspx or has_search_conditions:
                 # 検索フォームを送信
                 if progress_callback:
                     progress_callback(ProgressEvent(
@@ -223,7 +227,7 @@ class ApplicationService:
                 else:
                     self.logger.error(f"検索の実行に失敗しました: {url}")
             else:
-                # 通常のページ解析
+                # 通常のページ解析（Search.aspx 以外で条件なしの場合）
                 soup = self._scraper.fetch_page(url)
                 if soup:
                     files = self._scraper.extract_file_links(

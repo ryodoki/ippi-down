@@ -32,7 +32,7 @@
 | **FR-021-2** | ログローテーション | ✅ Implemented | `src/utils/logger.py` `RotatingFileHandler` | サイズベースローテーション実装 |
 | **FR-022** | エラーログ記録 | ✅ Implemented | `src/utils/logger.py` | スタックトレース含む詳細情報を記録 |
 | **FR-023** | ログレベル設定 | ✅ Implemented | `src/models/config_model.py:141` `level: str` | DEBUG/INFO/WARNING/ERROR対応 |
-| **FR-024** | CLI提供 | ❌ Not Implemented | `src/main.py:127-183` `main()` | GUIのみ実装。要件定義では「開発・デバッグ用」とされているが未実装 |
+| **FR-024** | CLI提供 | ✅ Implemented | `src/cli/main.py` | `--config`, `--once`, `--dry-run` 等をサポート（開発・デバッグ用） |
 | **FR-025** | GUI提供 | ✅ Implemented | `src/gui/main_window.py` | tkinterで実装 |
 | **FR-026** | 実行ファイル形式 | ✅ Implemented | `scripts/build/build.spec` PyInstaller設定 | Windows 10/11対応 |
 | **FR-SET-001** | 設定ダイアログ表示 | ✅ Implemented | `src/gui/settings_dialog.py:23-58` | 実装済み |
@@ -130,46 +130,23 @@ python src\main.py
 # 2回目実行時にスキップされることを確認
 ```
 
-#### 3. FR-024: CLI未実装
+#### 3. FR-024: CLI提供（実装済み）
 
-**乖離内容:**
+**実装状況:**
 - 要件: 「コマンドラインインターフェース（CLI）を提供すること（開発・デバッグ用）」
-- 現状: GUIのみ実装。CLIが未実装
+- 現状: `src/cli/main.py` で CLI を実装済み
 
-**現状実装:**
-- `src/main.py:127-183` `main()` - GUI/バックグラウンドモードのみ
-
-**影響:**
-- 開発・デバッグ時にGUIを起動する必要がある
-- 自動化スクリプトから実行できない
-- CI/CDでのテストが困難
-
-**修正方針:**
-- `argparse` を使用してCLIを実装
-- `--config` オプションで設定ファイルを指定
-- `--dry-run` オプションで実行前の確認
-- `--output` オプションで結果をJSON形式で出力
-
-**実装ステップ:**
-1. `src/cli/main.py` を新規作成（CLIエントリーポイント）
-2. `argparse` でコマンドライン引数を解析
-3. `ApplicationService` を使用してダウンロードを実行
-4. 結果をJSON形式で出力
-
-**テスト方針:**
-- CLIコマンドが正常に実行されることを確認
-- 各種オプションが正しく動作することを確認
+**実装箇所:**
+- `src/cli/main.py` - `--config`, `--once`, `--dry-run` 等をサポート
+- `src/main.py` - GUI/バックグラウンドモード用
 
 **受け入れ確認:**
 ```powershell
-# CLI実行
-python src\cli\main.py --config config\config.yaml
+# CLI実行（1回だけ検索・ダウンロード）
+python src\cli\main.py --config config\config.yaml --once
 
 # ドライラン実行
-python src\cli\main.py --config config\config.yaml --dry-run
-
-# 結果をJSON形式で出力
-python src\cli\main.py --config config\config.yaml --output result.json
+python src\cli\main.py --config config\config.yaml --once --dry-run
 ```
 
 ### P1（重要・推奨修正）

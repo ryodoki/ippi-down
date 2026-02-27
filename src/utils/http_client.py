@@ -281,7 +281,26 @@ class HTTPClient:
                         f"保存先='{save_path}'"
                     )
                     if attempt == max_retries - 1:
-                        self.logger.error(f"ダウンロード失敗（HTMLレスポンス）: URL='{url[:100]}...'")
+                        # HTMLレスポンスの診断情報を保存
+                        try:
+                            html_body = response.text[:2000]
+                            diag_dir = Path("logs/html_diagnostics")
+                            diag_dir.mkdir(parents=True, exist_ok=True)
+                            from urllib.parse import urlparse, parse_qs
+                            parsed = urlparse(url)
+                            qs = parse_qs(parsed.query)
+                            suffix = qs.get("BunshoKanriId", ["unknown"])[0]
+                            anken = qs.get("AnkenKanriNo", ["unknown"])[0][-8:]
+                            diag_file = diag_dir / f"failed_{anken}_{suffix}.html"
+                            with open(diag_file, "w", encoding="utf-8") as df:
+                                df.write(response.text)
+                            self.logger.error(
+                                f"ダウンロード失敗（HTMLレスポンス）: URL='{url[:100]}...'\n"
+                                f"  診断HTML保存先: {diag_file}\n"
+                                f"  HTML先頭: {html_body[:200]}..."
+                            )
+                        except Exception:
+                            self.logger.error(f"ダウンロード失敗（HTMLレスポンス）: URL='{url[:100]}...'")
                         return (False, {
                             "http_status": response.status_code,
                             "error_type": "other",

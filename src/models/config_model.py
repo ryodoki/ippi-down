@@ -28,16 +28,8 @@ class SearchConditions:
     place_shichouson: str = ""  # 市町村
     place_text: str = ""  # 文字列検索
 
-    # 入札契約方式
-    contract_types: List[str] = field(
-        default_factory=lambda: [
-            "一般競争入札",
-            "公募型指名競争入札",
-            "指名競争入札",
-            "随意契約",
-            "その他方式",
-        ]
-    )
+    # 入札契約方式（デフォルトは未指定=空リスト。config に無い場合も勝手に全選択にしない）
+    contract_types: List[str] = field(default_factory=list)
 
     # 最終更新日
     update_date_type: str = "none"  # "none" or "past"
@@ -104,8 +96,8 @@ class SavePaths:
     enable_hash_check: bool = False
     keep_part_on_cancel: bool = True
 
-    # 発注機関ごとのルートフォルダ（オプション、デフォルトOFFで現行互換）
-    enable_agency_root_folders: bool = False
+    # 発注機関ごとのルートフォルダ（デフォルトON：ダウンロードごとに大→中→小→細の階層でフォルダを作成）
+    enable_agency_root_folders: bool = True
     agency_root_label: str = "発注機関"
     agency_folder_levels: List[str] = field(
         default_factory=lambda: ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]

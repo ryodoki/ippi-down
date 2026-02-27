@@ -65,19 +65,19 @@ class Logger:
         file_handler.setFormatter(file_formatter)
         self.logger.addHandler(file_handler)
 
-    def debug(self, message: str):
-        """DEBUGレベルのログを出力"""
-        self.logger.debug(message)
+    def debug(self, message: str, *args, **kwargs):
+        """DEBUGレベルのログを出力（標準logging互換: %sスタイル・exc_info等を透過）"""
+        self.logger.debug(message, *args, **kwargs)
 
-    def info(self, message: str):
-        """INFOレベルのログを出力"""
-        self.logger.info(message)
+    def info(self, message: str, *args, **kwargs):
+        """INFOレベルのログを出力（標準logging互換）"""
+        self.logger.info(message, *args, **kwargs)
 
-    def warning(self, message: str):
-        """WARNINGレベルのログを出力"""
-        self.logger.warning(message)
+    def warning(self, message: str, *args, **kwargs):
+        """WARNINGレベルのログを出力（標準logging互換）"""
+        self.logger.warning(message, *args, **kwargs)
 
-    def error(self, message: str, exc_info: bool = False):
-        """ERRORレベルのログを出力"""
-        self.logger.error(message, exc_info=exc_info)
+    def error(self, message: str, *args, **kwargs):
+        """ERRORレベルのログを出力（標準logging互換: exc_info等を透過）"""
+        self.logger.error(message, *args, **kwargs)
 
