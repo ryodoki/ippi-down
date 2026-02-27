@@ -25,7 +25,6 @@ class MainWindow:
         self.config = config
         self.config_manager = config_manager
         self.logger = logger or Logger()
-        self.event_handler = EventHandler(root, self.logger)
 
         # ダウンロード関連
         self.download_callback: Optional[Callable] = None
@@ -41,6 +40,10 @@ class MainWindow:
 
         self.setup_font()
         self.setup_ui()
+
+        self.event_handler = EventHandler(root, self)
+        self.event_handler.start_polling()
+
         self.load_config_to_ui()
         self.search_frame.load_daibunrui_options()
 
