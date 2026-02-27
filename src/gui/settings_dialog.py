@@ -19,7 +19,7 @@ from ..config.config_manager import ConfigManager
 from ..config.config_validator import ConfigValidator
 from ..utils.logger import Logger
 from ..utils.http_client import HTTPClient
-from ..core.scraper import Scraper
+from ..app.lookup_service import LookupService
 from ..core.ppi_dropdowns import get_labels, code_to_label, label_to_code
 from threading import Thread
 
@@ -42,7 +42,7 @@ class SettingsDialog:
         self.validator = ConfigValidator(self.logger)
         self.result = None  # 保存された設定
         self._http_client = None
-        self._scraper = None
+        self._lookup_service = None
         self._search_url = (
             config.target_urls[0]
             if (getattr(config, "target_urls", None) and config.target_urls)
@@ -849,19 +849,19 @@ class SettingsDialog:
             # 表示件数
             self.display_count_var.set(str(sc.display_count or 20))
 
-    def _get_scraper(self) -> Scraper:
-        if self._scraper is None:
+    def _get_lookup_service(self) -> LookupService:
+        if self._lookup_service is None:
             if self._http_client is None:
                 self._http_client = HTTPClient(self.logger)
-            self._scraper = Scraper(self._http_client, self.logger)
-        return self._scraper
+            self._lookup_service = LookupService(self._http_client, self.logger, self._search_url)
+        return self._lookup_service
 
     def _load_search_condition_options(self):
         """発注機関大分類・中分類と工事場所のオプションをロードし、保存値で復元する"""
         def load():
             try:
-                scraper = self._get_scraper()
-                daibunrui_opts = scraper.get_hachu_daibunrui_options(self._search_url)
+                svc = self._get_lookup_service()
+                daibunrui_opts = svc.get_hachu_daibunrui()
                 self.dialog.after(0, lambda: self._apply_daibunrui_and_restore(daibunrui_opts))
             except Exception as e:
                 self.logger.warning(f"設定ダイアログ 発注機関オプション読み込みエラー: {e}")
@@ -876,8 +876,8 @@ class SettingsDialog:
         if d:
             def load_chubunrui():
                 try:
-                    scraper = self._get_scraper()
-                    opts = scraper.get_hachu_chubunrui_options(self._search_url, d)
+                    svc = self._get_lookup_service()
+                    opts = svc.get_hachu_chubunrui(d)
                     self.dialog.after(0, lambda: self._update_hachu_chubunrui_options(opts))
                 except Exception as e:
                     self.logger.warning(f"中分類オプション読み込みエラー: {e}")
@@ -889,8 +889,8 @@ class SettingsDialog:
         if chihou:
             def load_place():
                 try:
-                    scraper = self._get_scraper()
-                    pref = scraper.get_koji_prefecture_options(self._search_url, chihou)
+                    svc = self._get_lookup_service()
+                    pref = svc.get_koji_prefecture(chihou)
                     self.dialog.after(0, lambda: self._apply_restored_place_todofuken(pref))
                 except Exception as e:
                     self.logger.warning(f"都道府県オプション読み込みエラー: {e}")
@@ -919,8 +919,8 @@ class SettingsDialog:
             if chihou:
                 def load_city():
                     try:
-                        scraper = self._get_scraper()
-                        city_opts = scraper.get_koji_city_options(self._search_url, chihou, todofuken)
+                        svc = self._get_lookup_service()
+                        city_opts = svc.get_koji_city(chihou, todofuken)
                         self.dialog.after(0, lambda: self._update_place_shichouson_options(city_opts))
                     except Exception as e:
                         self.logger.warning(f"市町村オプション読み込みエラー: {e}")
@@ -945,8 +945,8 @@ class SettingsDialog:
             return
         def load():
             try:
-                scraper = self._get_scraper()
-                opts = scraper.get_hachu_chubunrui_options(self._search_url, d)
+                svc = self._get_lookup_service()
+                opts = svc.get_hachu_chubunrui(d)
                 self.dialog.after(0, lambda: self._update_hachu_chubunrui_options(opts))
             except Exception as e:
                 self.logger.warning(f"中分類オプション読み込みエラー: {e}")
@@ -963,8 +963,8 @@ class SettingsDialog:
             return
         def load():
             try:
-                scraper = self._get_scraper()
-                opts = scraper.get_koji_prefecture_options(self._search_url, chihou)
+                svc = self._get_lookup_service()
+                opts = svc.get_koji_prefecture(chihou)
                 self.dialog.after(0, lambda: self._apply_restored_place_todofuken(opts))
             except Exception as e:
                 self.logger.warning(f"都道府県オプション読み込みエラー: {e}")
@@ -980,8 +980,8 @@ class SettingsDialog:
             return
         def load():
             try:
-                scraper = self._get_scraper()
-                opts = scraper.get_koji_city_options(self._search_url, chihou, todofuken)
+                svc = self._get_lookup_service()
+                opts = svc.get_koji_city(chihou, todofuken)
                 self.dialog.after(0, lambda: self._update_place_shichouson_options(opts))
             except Exception as e:
                 self.logger.warning(f"市町村オプション読み込みエラー: {e}")

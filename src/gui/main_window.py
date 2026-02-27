@@ -11,8 +11,8 @@ from ..models.config_model import AppConfig
 from ..utils.logger import Logger
 from ..gui.event_handler import EventHandler
 from ..utils.http_client import HTTPClient
-from ..core.scraper import Scraper
 from ..config.config_manager import ConfigManager
+from ..app.lookup_service import LookupService
 from ..core.ppi_dropdowns import get_labels, code_to_label, label_to_code
 
 
@@ -31,9 +31,9 @@ class MainWindow:
         self.cancel_flag = Event()
         self.download_thread: Optional[Thread] = None
 
-        # 階層ドロップダウン用のHTTPClientとScraper（遅延初期化）
+        # 階層ドロップダウン用のHTTPClientとLookupService（遅延初期化）
         self._http_client = None
-        self._scraper = None
+        self._lookup_service = None
         # 検索URL: config の target_urls[0] を優先し、無ければ tab=4(工事) をデフォルトに
         default_search_url = "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"
         self._search_url = (config.target_urls[0] if (config.target_urls and config.target_urls[0]) else default_search_url)
@@ -586,20 +586,20 @@ class MainWindow:
         """イベントバインディングをセットアップ"""
         pass
 
-    def _get_scraper(self):
-        """Scraperインスタンスを取得（遅延初期化）"""
-        if self._scraper is None:
+    def _get_lookup_service(self) -> LookupService:
+        """LookupService を取得（遅延初期化）"""
+        if self._lookup_service is None:
             if self._http_client is None:
                 self._http_client = HTTPClient(self.logger)
-            self._scraper = Scraper(self._http_client, self.logger)
-        return self._scraper
+            self._lookup_service = LookupService(self._http_client, self.logger, self._search_url)
+        return self._lookup_service
 
     def load_hachu_daibunrui_options(self):
         """大分類のオプションを読み込む"""
         def load_in_thread():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_hachu_daibunrui_options(self._search_url)
+                svc = self._get_lookup_service()
+                options = svc.get_hachu_daibunrui()
                 # GUIスレッドで更新
                 self.root.after(0, lambda: self._update_hachu_daibunrui_options(options))
             except Exception as e:
@@ -632,12 +632,12 @@ class MainWindow:
         def load_in_thread():
             results = {}
             try:
-                scraper = self._get_scraper()
-                results["chubunrui"] = scraper.get_hachu_chubunrui_options(self._search_url, d)
+                svc = self._get_lookup_service()
+                results["chubunrui"] = svc.get_hachu_chubunrui(d)
                 if c:
-                    results["shoubunrui"] = scraper.get_hachu_shoubunrui_options(self._search_url, d, c)
+                    results["shoubunrui"] = svc.get_hachu_shoubunrui(d, c)
                 if c and s:
-                    results["saibunrui"] = scraper.get_hachu_saibunrui_options(self._search_url, d, c, s)
+                    results["saibunrui"] = svc.get_hachu_saibunrui(d, c, s)
             except Exception as e:
                 self.logger.error(f"発注機関階層復元エラー: {str(e)}")
             self.root.after(0, lambda: self._apply_restored_hachu_options(results, d, c, s, a))
@@ -701,8 +701,8 @@ class MainWindow:
         # 中分類のオプションを読み込む
         def load_in_thread():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_hachu_chubunrui_options(self._search_url, daibunrui_value)
+                svc = self._get_lookup_service()
+                options = svc.get_hachu_chubunrui(daibunrui_value)
                 self.root.after(0, lambda: self._update_hachu_chubunrui_options(options))
             except Exception as e:
                 self.logger.error(f"中分類オプション読み込みエラー: {str(e)}")
@@ -740,8 +740,8 @@ class MainWindow:
         # 小分類のオプションを読み込む
         def load_in_thread():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_hachu_shoubunrui_options(self._search_url, daibunrui_value, chubunrui_value)
+                svc = self._get_lookup_service()
+                options = svc.get_hachu_shoubunrui(daibunrui_value, chubunrui_value)
                 self.root.after(0, lambda: self._update_hachu_shoubunrui_options(options))
             except Exception as e:
                 self.logger.error(f"小分類オプション読み込みエラー: {str(e)}")
@@ -777,8 +777,8 @@ class MainWindow:
         # 細分類のオプションを読み込む
         def load_in_thread():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_hachu_saibunrui_options(self._search_url, daibunrui_value, chubunrui_value, shoubunrui_value)
+                svc = self._get_lookup_service()
+                options = svc.get_hachu_saibunrui(daibunrui_value, chubunrui_value, shoubunrui_value)
                 self.root.after(0, lambda: self._update_hachu_saibunrui_options(options))
             except Exception as e:
                 self.logger.error(f"細分類オプション読み込みエラー: {str(e)}")
@@ -815,8 +815,8 @@ class MainWindow:
             return
         def load():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_hachu_chubunrui_options(self._search_url, d)
+                svc = self._get_lookup_service()
+                options = svc.get_hachu_chubunrui(d)
                 self.root.after(0, lambda: self._update_hachu_chubunrui_options(options))
             except Exception as e:
                 self.logger.warning(f"中分類再読み込みエラー: {e}")
@@ -832,8 +832,8 @@ class MainWindow:
             return
         def load():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_hachu_shoubunrui_options(self._search_url, d, c)
+                svc = self._get_lookup_service()
+                options = svc.get_hachu_shoubunrui(d, c)
                 self.root.after(0, lambda: self._update_hachu_shoubunrui_options(options))
             except Exception as e:
                 self.logger.warning(f"小分類再読み込みエラー: {e}")
@@ -850,8 +850,8 @@ class MainWindow:
             return
         def load():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_hachu_saibunrui_options(self._search_url, d, c, s)
+                svc = self._get_lookup_service()
+                options = svc.get_hachu_saibunrui(d, c, s)
                 self.root.after(0, lambda: self._update_hachu_saibunrui_options(options))
             except Exception as e:
                 self.logger.warning(f"細分類再読み込みエラー: {e}")
@@ -953,6 +953,8 @@ class MainWindow:
             self.config = result
             default_search_url = "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"
             self._search_url = (result.target_urls[0] if (result.target_urls and result.target_urls[0]) else default_search_url)
+            if self._lookup_service is not None:
+                self._lookup_service.search_url = self._search_url
             self.load_config_to_ui()
             # 発注機関オプションを再ロード（設定でURLが変わった場合に備える）
             self.root.after(100, self.load_hachu_daibunrui_options)
@@ -1071,8 +1073,8 @@ class MainWindow:
             return
         def load():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_koji_prefecture_options(self._search_url, chihou)
+                svc = self._get_lookup_service()
+                options = svc.get_koji_prefecture(chihou)
                 self.root.after(0, lambda: self._update_place_todofuken_options(options))
             except Exception as e:
                 self.logger.warning(f"都道府県オプション読み込みエラー: {e}")
@@ -1097,8 +1099,8 @@ class MainWindow:
             return
         def load():
             try:
-                scraper = self._get_scraper()
-                options = scraper.get_koji_city_options(self._search_url, chihou, todofuken)
+                svc = self._get_lookup_service()
+                options = svc.get_koji_city(chihou, todofuken)
                 self.root.after(0, lambda: self._update_place_shichouson_options(options))
             except Exception as e:
                 self.logger.warning(f"市町村オプション読み込みエラー: {e}")
@@ -1123,10 +1125,10 @@ class MainWindow:
         def load():
             results = {}
             try:
-                scraper = self._get_scraper()
-                results["todofuken"] = scraper.get_koji_prefecture_options(self._search_url, chihou)
+                svc = self._get_lookup_service()
+                results["todofuken"] = svc.get_koji_prefecture(chihou)
                 if todofuken:
-                    results["shichouson"] = scraper.get_koji_city_options(self._search_url, chihou, todofuken)
+                    results["shichouson"] = svc.get_koji_city(chihou, todofuken)
             except Exception as e:
                 self.logger.warning(f"工事場所階層復元エラー: {e}")
             self.root.after(0, lambda: self._apply_restored_place_options(results, chihou, todofuken, shichouson))
