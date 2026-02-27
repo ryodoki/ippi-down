@@ -78,3 +78,35 @@ class TestSearchConditions:
         sc = SearchConditions()
         assert sc.contract_types == []
 
+    def test_is_effectively_empty_default(self):
+        """デフォルト状態は空と判定される"""
+        sc = SearchConditions()
+        assert sc.is_effectively_empty() is True
+
+    def test_is_effectively_empty_with_daibunrui(self):
+        """大分類が設定されていれば空でない"""
+        sc = SearchConditions(hachu_daibunrui="国の機関")
+        assert sc.is_effectively_empty() is False
+
+    def test_is_effectively_empty_with_koji_name(self):
+        """工事名が設定されていれば空でない"""
+        sc = SearchConditions(koji_name="テスト工事")
+        assert sc.is_effectively_empty() is False
+
+    def test_is_effectively_empty_with_full_contract_types(self):
+        """入札方式5つ全選択はデフォルト扱い（空と判定）"""
+        sc = SearchConditions(contract_types=[
+            "一般競争入札", "公募型指名競争入札", "指名競争入札", "随意契約", "その他方式"
+        ])
+        assert sc.is_effectively_empty() is True
+
+    def test_is_effectively_empty_with_partial_contract_types(self):
+        """入札方式が一部選択なら空でない"""
+        sc = SearchConditions(contract_types=["一般競争入札"])
+        assert sc.is_effectively_empty() is False
+
+    def test_is_effectively_empty_with_price(self):
+        """予定価格が設定されていれば空でない"""
+        sc = SearchConditions(yotei_price_min=1000000)
+        assert sc.is_effectively_empty() is False
+

@@ -244,38 +244,7 @@ class ApplicationService:
         """検索条件が設定されているかチェック"""
         if not search_conditions:
             return False
-        
-        sc = search_conditions
-        # contract_typesはデフォルトで全選択されているため、空でない場合のみチェック
-        # ただし、デフォルト値（全選択）の場合は検索条件として扱わない
-        has_contract_types = bool(
-            sc.contract_types and 
-            len(sc.contract_types) > 0 and
-            len(sc.contract_types) < 5  # デフォルトは5つ全て選択されている
-        )
-        
-        return bool(
-            (sc.hachu_daibunrui and sc.hachu_daibunrui.strip()) or 
-            (sc.hachu_chubunrui and sc.hachu_chubunrui.strip()) or 
-            (sc.hachu_shoubunrui and sc.hachu_shoubunrui.strip()) or 
-            (sc.hachu_saibunrui and sc.hachu_saibunrui.strip()) or
-            (sc.hachu_multi and len(sc.hachu_multi) > 0) or
-            (sc.koji_name and sc.koji_name.strip()) or
-            (sc.place_search_type == "list" and (sc.place_chihou or sc.place_todofuken or sc.place_shichouson)) or
-            (sc.place_search_type == "text" and sc.place_text and sc.place_text.strip()) or
-            has_contract_types or
-            sc.update_date_type == "past" or
-            sc.koukoku_date_type == "range" or
-            sc.kaisatsu_date_type == "range" or
-            sc.keiyaku_date_type == "range" or
-            (sc.koji_shubetsu and sc.koji_shubetsu.strip()) or
-            (sc.koji_gyoushu and sc.koji_gyoushu.strip()) or
-            sc.yotei_price_min is not None or sc.yotei_price_max is not None or
-            sc.rakusatsu_price_min is not None or sc.rakusatsu_price_max is not None or
-            (sc.rakusatsu_name and sc.rakusatsu_name.strip()) or
-            sc.denshi or
-            sc.koukai
-        )
+        return not search_conditions.is_effectively_empty()
 
     def _filter_files(
         self,

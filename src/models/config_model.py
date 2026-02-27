@@ -76,6 +76,37 @@ class SearchConditions:
     # 表示件数
     display_count: int = 20  # 20, 30, 50, 100
 
+    def is_effectively_empty(self) -> bool:
+        """検索条件が実質的に空かどうか（全デフォルト状態なら True）"""
+        has_contract_types = bool(
+            self.contract_types
+            and 0 < len(self.contract_types) < 5
+        )
+        return not any((
+            (self.hachu_daibunrui or "").strip(),
+            (self.hachu_chubunrui or "").strip(),
+            (self.hachu_shoubunrui or "").strip(),
+            (self.hachu_saibunrui or "").strip(),
+            self.hachu_multi,
+            (self.koji_name or "").strip(),
+            self.place_search_type == "list" and (self.place_chihou or self.place_todofuken or self.place_shichouson),
+            self.place_search_type == "text" and (self.place_text or "").strip(),
+            has_contract_types,
+            self.update_date_type == "past",
+            self.koukoku_date_type == "range",
+            self.kaisatsu_date_type == "range",
+            self.keiyaku_date_type == "range",
+            (self.koji_shubetsu or "").strip(),
+            (self.koji_gyoushu or "").strip(),
+            self.yotei_price_min is not None,
+            self.yotei_price_max is not None,
+            self.rakusatsu_price_min is not None,
+            self.rakusatsu_price_max is not None,
+            (self.rakusatsu_name or "").strip(),
+            self.denshi,
+            self.koukai,
+        ))
+
 
 @dataclass
 class DownloadConditions:
