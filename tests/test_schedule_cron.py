@@ -12,15 +12,18 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
+croniter = pytest.importorskip("croniter", reason="croniter not installed")
+
+
 class TestCroniterNextRun:
     """croniter による次回実行時刻の算出"""
 
     def test_cron_valid_and_next_run(self):
         """有効な cron 式で次回実行時刻が算出できる"""
-        from croniter import croniter
+        from croniter import croniter as Croniter
 
         base = datetime(2026, 2, 15, 8, 0, 0)
-        cron = croniter("0 9 * * *", base)  # 毎日9時
+        cron = Croniter("0 9 * * *", base)
         next_run = cron.get_next(datetime)
         assert next_run.year == 2026
         assert next_run.month == 2
@@ -30,13 +33,17 @@ class TestCroniterNextRun:
 
     def test_cron_invalid_rejected(self):
         """無効な cron 式が is_valid で False になる"""
-        from croniter import croniter
+        from croniter import croniter as Croniter
 
-        assert croniter.is_valid("0 9 * * *") is True
-        assert croniter.is_valid("invalid") is False
-        assert croniter.is_valid("") is False
+        assert Croniter.is_valid("0 9 * * *") is True
+        assert Croniter.is_valid("invalid") is False
+        assert Croniter.is_valid("") is False
 
 
+@pytest.mark.skipif(
+    not pytest.importorskip("croniter", reason="croniter not installed"),
+    reason="croniter not installed",
+)
 class TestSchedulerCustomCron:
     """Scheduler の custom cron 設定で無効な式が検出されること"""
 
