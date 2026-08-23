@@ -23,6 +23,7 @@ from ..models.config_model import (
 from ..config.config_manager import ConfigManager
 from ..config.config_validator import ConfigValidator
 from ..utils.logger import Logger
+from ..core.ppi_dropdowns import get_labels, code_to_label, label_to_code
 
 
 class SettingsDialog:
@@ -190,6 +191,53 @@ class SettingsDialog:
         ctk.CTkEntry(save_input_frame, textvariable=self.save_path_var, width=500, height=36, corner_radius=4).pack(side=tk.LEFT, padx=(0, 10))
         ctk.CTkButton(save_input_frame, text="📁 参照", command=self.on_browse_path, width=80, height=36, corner_radius=4).pack(side=tk.LEFT)
 
+        run_folder_frame = ttk.Frame(save_frame)
+        run_folder_frame.pack(fill=tk.X, pady=(5, 0))
+        ttk.Label(run_folder_frame, text="実行単位のルートフォルダ:").pack(side=tk.LEFT, padx=(0, 5))
+        self.run_subfolder_mode_var = tk.StringVar(value="none")
+        run_combo = ttk.Combobox(
+            run_folder_frame,
+            textvariable=self.run_subfolder_mode_var,
+            values=("none", "datetime", "search"),
+            state="readonly",
+            width=12,
+        )
+        run_combo.pack(side=tk.LEFT)
+        ttk.Label(
+            run_folder_frame,
+            text="(none=作成しない / datetime=日時 / search=検索条件)",
+            font=("", 8),
+        ).pack(side=tk.LEFT, padx=(5, 0))
+
+        # 発注機関ごとのルートフォルダ
+        agency_frame = ttk.LabelFrame(scrollable_frame, text="発注機関フォルダ構造", padding="5")
+        agency_frame.pack(fill=tk.X, pady=(0, 10))
+        self.enable_agency_root_folders_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            agency_frame,
+            text="発注機関ごとにルートフォルダを作成（大分類/中分類/小分類/細分類で枝分かれ）",
+            variable=self.enable_agency_root_folders_var,
+        ).pack(anchor=tk.W, pady=(0, 3))
+        self.include_search_tab_folder_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            agency_frame,
+            text="工事/業務でフォルダを分ける",
+            variable=self.include_search_tab_folder_var,
+        ).pack(anchor=tk.W, pady=(0, 3))
+        date_partition_frame = ttk.Frame(agency_frame)
+        date_partition_frame.pack(fill=tk.X, pady=(0, 3))
+        ttk.Label(date_partition_frame, text="日付フォルダ分割:").pack(side=tk.LEFT, padx=(0, 5))
+        self.date_partition_var = tk.StringVar(value="none")
+        date_partition_combo = ttk.Combobox(
+            date_partition_frame,
+            textvariable=self.date_partition_var,
+            values=("none", "yyyy", "yyyy_mm", "yyyy_mm_dd"),
+            state="readonly",
+            width=14,
+        )
+        date_partition_combo.pack(side=tk.LEFT)
+        ttk.Label(date_partition_frame, text="(なし/年/年_月/年_月_日)", font=("", 8)).pack(side=tk.LEFT, padx=(5, 0))
+
         # ファイル命名規則
         naming_frame = ctk.CTkFrame(scrollable_frame, corner_radius=3, border_width=1, border_color="#555555")
         naming_frame.pack(fill=tk.X, pady=(0, 4))
@@ -200,10 +248,16 @@ class SettingsDialog:
         ctk.CTkEntry(naming_frame, textvariable=self.naming_rule_var, width=500, height=36, corner_radius=4).pack(padx=10, fill=tk.X)
         ctk.CTkLabel(
             naming_frame,
+<<<<<<< HEAD
             text="使用可能変数: {category}, {title}, {date}, {index}, {filename}, {file_type}",
             font=ctk.CTkFont(size=13),
             text_color="gray",
         ).pack(anchor=tk.W, padx=10, pady=(2, 4))
+=======
+            text="使用可能変数: {category}, {title}, {date}, {index}, {filename}, {file_type}, {ext}, {koji_name}, {daibunrui}, {chubunrui}, {shoubunrui}, {saibunrui}",
+            font=("", 8),
+        ).pack(anchor=tk.W)
+>>>>>>> 44d78a093e6bf3e7a6997a5b9c4c1d188ad04c11
 
         # スケジュール設定
         schedule_frame = ctk.CTkFrame(scrollable_frame, corner_radius=3, border_width=1, border_color="#555555")
@@ -395,38 +449,11 @@ class SettingsDialog:
         koji_shubetsu_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.koji_shubetsu_var = tk.StringVar()
+        # 工事種別のオプションを一元管理された定義から取得
         koji_shubetsu_combo = ttk.Combobox(
             koji_shubetsu_frame,
             textvariable=self.koji_shubetsu_var,
-            values=[
-                "",
-                "一般土木工事",
-                "アスファルト舗装工事",
-                "鋼橋上部工事",
-                "造園工事",
-                "建築工事",
-                "木造建築工事",
-                "電気設備工事",
-                "暖冷房衛生設備工事",
-                "セメント・コンクリート舗装工事",
-                "プレストレスト・コンクリート工事",
-                "法面処理工事",
-                "塗装工事",
-                "維持修繕工事",
-                "浚渫工事",
-                "グラウト工事",
-                "杭打工事",
-                "さく井工事",
-                "プレハブ建築工事",
-                "機械設備工事",
-                "通信設備工事",
-                "受変電設備工事",
-                "港湾土木工事",
-                "農林土木工事",
-                "農林建築工事",
-                "橋梁補修工事",
-                "その他",
-            ],
+            values=get_labels("koji_shubetsu"),
             state="readonly",
             width=40,
         )
@@ -437,42 +464,11 @@ class SettingsDialog:
         koji_gyoushu_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.koji_gyoushu_var = tk.StringVar()
+        # 工事の業種のオプションを一元管理された定義から取得
         koji_gyoushu_combo = ttk.Combobox(
             koji_gyoushu_frame,
             textvariable=self.koji_gyoushu_var,
-            values=[
-                "",
-                "土木一式工事",
-                "建築一式工事",
-                "大工工事",
-                "左官工事",
-                "とび・土工・コンクリート工事",
-                "石工事",
-                "屋根工事",
-                "電気工事",
-                "管工事",
-                "タイル・れんが・ブロック工事",
-                "鋼構造物工事",
-                "鉄筋工事",
-                "舗装工事",
-                "浚渫工事",
-                "板金工事",
-                "ガラス工事",
-                "塗装工事",
-                "防水工事",
-                "内装仕上工事",
-                "機械器具設置工事",
-                "熱絶縁工事",
-                "電気通信工事",
-                "造園工事",
-                "さく井工事",
-                "建具工事",
-                "水道施設工事",
-                "消防施設工事",
-                "清掃施設工事",
-                "解体工事",
-                "その他",
-            ],
+            values=get_labels("koji_gyoushu"),
             state="readonly",
             width=40,
         )
@@ -678,6 +674,14 @@ class SettingsDialog:
 
         # 保存先
         self.save_path_var.set(config.save_paths.local)
+        if hasattr(self, "run_subfolder_mode_var"):
+            self.run_subfolder_mode_var.set(getattr(config.save_paths, "run_subfolder_mode", "none"))
+        if hasattr(self, "enable_agency_root_folders_var"):
+            self.enable_agency_root_folders_var.set(getattr(config.save_paths, "enable_agency_root_folders", False))
+        if hasattr(self, "include_search_tab_folder_var"):
+            self.include_search_tab_folder_var.set(getattr(config.save_paths, "include_search_tab_folder", True))
+        if hasattr(self, "date_partition_var"):
+            self.date_partition_var.set(getattr(config.save_paths, "date_partition", "none"))
 
         # ファイル命名規則
         self.naming_rule_var.set(config.naming_rule)
@@ -736,9 +740,9 @@ class SettingsDialog:
             if sc.keiyaku_date_end:
                 self.keiyaku_date_end_var.set(sc.keiyaku_date_end)
 
-            # 工事種別・業種
-            self.koji_shubetsu_var.set(sc.koji_shubetsu or "")
-            self.koji_gyoushu_var.set(sc.koji_gyoushu or "")
+            # 工事種別・業種（コードまたはラベルをラベルに変換して表示）
+            self.koji_shubetsu_var.set(code_to_label("koji_shubetsu", sc.koji_shubetsu or "", self.logger))
+            self.koji_gyoushu_var.set(code_to_label("koji_gyoushu", sc.koji_gyoushu or "", self.logger))
 
             # 価格
             if sc.yotei_price_min:
@@ -773,8 +777,21 @@ class SettingsDialog:
         )
 
         # 保存先
+        run_mode = getattr(self, "run_subfolder_mode_var", None)
+        run_mode_val = run_mode.get() if run_mode else getattr(self.config.save_paths, "run_subfolder_mode", "none")
+        sp = self.config.save_paths
         save_paths = SavePaths(
             local=self.save_path_var.get(),
+            use_subfolders=getattr(sp, "use_subfolders", True),
+            run_subfolder_mode=run_mode_val,
+            enable_hash_check=getattr(sp, "enable_hash_check", False),
+            keep_part_on_cancel=getattr(sp, "keep_part_on_cancel", True),
+            enable_agency_root_folders=self.enable_agency_root_folders_var.get() if getattr(self, "enable_agency_root_folders_var", None) else getattr(sp, "enable_agency_root_folders", False),
+            agency_root_label=getattr(sp, "agency_root_label", "発注機関"),
+            agency_folder_levels=getattr(sp, "agency_folder_levels", ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]),
+            include_search_tab_folder=self.include_search_tab_folder_var.get() if getattr(self, "include_search_tab_folder_var", None) else getattr(sp, "include_search_tab_folder", True),
+            search_tab_labels=getattr(sp, "search_tab_labels", {"works": "工事_入札公告等", "services": "業務_入札公告等"}),
+            date_partition=self.date_partition_var.get() if getattr(self, "date_partition_var", None) else getattr(sp, "date_partition", "none"),
         )
 
         # スケジュール設定
@@ -861,8 +878,8 @@ class SettingsDialog:
             keiyaku_date_type=self.keiyaku_date_radio_var.get(),
             keiyaku_date_start=self.keiyaku_date_start_var.get() or None,
             keiyaku_date_end=self.keiyaku_date_end_var.get() or None,
-            koji_shubetsu=self.koji_shubetsu_var.get(),
-            koji_gyoushu=self.koji_gyoushu_var.get(),
+            koji_shubetsu=label_to_code("koji_shubetsu", self.koji_shubetsu_var.get(), self.logger),
+            koji_gyoushu=label_to_code("koji_gyoushu", self.koji_gyoushu_var.get(), self.logger),
             yotei_price_min=safe_int(self.yotei_price_min_var.get()),
             yotei_price_max=safe_int(self.yotei_price_max_var.get()),
             rakusatsu_price_min=safe_int(self.rakusatsu_price_min_var.get()),

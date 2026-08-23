@@ -1,4 +1,4 @@
-﻿# ppi-file-downloader 設定ファイル例
+# ppi-file-downloader 設定ファイル例
 
 # 対象URL
 target_urls:
@@ -12,23 +12,38 @@ download_conditions:
     - .docx
   keywords: []  # 空の場合はすべて
   date_range:
-    start: null  # YYYY-MM-DD形式
-    end: null
+    start: null  # YYYY-MM-DD形式（実装済み、メタデータから日付を取得してフィルタ）
+    end: null    # YYYY-MM-DD形式（実装済み、メタデータから日付を取得してフィルタ）
 
 # 保存先
 save_paths:
   local: ./downloads
+  use_subfolders: true
+  run_subfolder_mode: none  # none | datetime | search
+  enable_hash_check: false
+  keep_part_on_cancel: true
+  # 発注機関ごとのルートフォルダ（OFFのときは従来どおり）
+  enable_agency_root_folders: false
+  agency_root_label: "発注機関"
+  agency_folder_levels: ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]
+  include_search_tab_folder: true   # 工事/業務でフォルダを分ける
+  search_tab_labels:               # tab種別→フォルダ名（表示用）
+    works: "工事_入札公告等"
+    services: "業務_入札公告等"
+  date_partition: none  # none | yyyy | yyyy_mm | yyyy_mm_dd
 
-# ファイル命名規則
-# 使用可能な変数: {filename}, {file_type}, {category}, {title}, {date}, {index}
+# ファイル命名規則（テンプレート）
+# 使用可能: {category},{title},{date},{index},{filename},{file_type},{ext},{koji_name},{daibunrui},{chubunrui},{shoubunrui},{saibunrui}
+# - file_type: ドットなし（例: pdf）。ext: ドット付き（例: .pdf）。{index}{ext} で "0.pdf" に
+# 未知の変数は設定保存時にエラー。空の場合は従来ロジックを使用。
 naming_rule: "{category}_{title}_{date}_{index}"
 
 # スケジュール設定
 schedule:
   enabled: false
-  interval: "daily"  # daily, weekly, custom
-  time: "09:00"      # HH:MM形式
-  cron: null         # cron形式（intervalがcustomの場合）
+  interval: "daily"  # daily, weekly, monthly, custom（実装済み）
+  time: "09:00"      # HH:MM形式（intervalがcustom以外の場合に使用）
+  cron: null         # cron形式（intervalがcustomの場合に使用、実装済み、croniter使用）
 
 # ログ設定
 logging:

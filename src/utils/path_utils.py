@@ -86,6 +86,17 @@ def get_resource_path(relative_path: str) -> Path:
     return base / relative_path
 
 
+def resolve_save_path(local_path: str) -> Path:
+    """保存先パスを絶対パスに解決する（相対の場合はベースパス基準）
+    
+    exe/開発どちらでも意図通りの場所に作成するため、相対パスは get_base_path() 基準にする。
+    """
+    p = Path(local_path)
+    if p.is_absolute():
+        return p
+    return (get_base_path() / p).resolve()
+
+
 def ensure_directory(path: Path) -> None:
     """ディレクトリが存在することを保証する
     

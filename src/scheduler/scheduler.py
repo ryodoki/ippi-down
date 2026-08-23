@@ -70,9 +70,7 @@ class Scheduler:
             self._schedule_monthly()
         elif self.config.interval == "custom" and self.config.cron:
             # カスタム（cron形式）
-            # 注意: scheduleライブラリはcron形式を直接サポートしていないため、
-            # 簡易的な実装とする
-            self.logger.warning("カスタムcron形式は現在サポートされていません")
+            self._schedule_custom()
 
     def _schedule_daily(self):
         """毎日のスケジュールを設定"""
@@ -107,6 +105,42 @@ class Scheduler:
             self.logger.info(f"毎月1日 {self.config.time} に実行するように設定しました")
         except Exception as e:
             self.logger.error(f"スケジュール設定エラー: {str(e)}")
+
+    def _schedule_custom(self):
+        """カスタム（cron形式）のスケジュールを設定"""
+        try:
+            from croniter import croniter  # pyright: ignore[reportMissingModuleSource]
+            
+            cron_expr = self.config.cron
+            if not croniter.is_valid(cron_expr):
+                raise ValueError(f"無効なcron式: {cron_expr}")
+            
+            # croniterを使用して次の実行時刻を計算
+            base_time = datetime.now()
+            cron = croniter(cron_expr, base_time)
+            next_run = cron.get_next(datetime)
+            
+            self.logger.info(f"カスタムcron形式を設定: {cron_expr}, 次回実行予定: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # scheduleライブラリではcron形式を直接サポートしていないため、
+            # 1分ごとにチェックしてcron式に一致するか確認する方式を採用
+            def cron_job():
+                now = datetime.now()
+                cron_check = croniter(cron_expr, now)
+                prev_run = cron_check.get_prev(datetime)
+                # 前回実行時刻から1分以内なら実行（重複実行を防ぐ）
+                if (now - prev_run).total_seconds() < 60:
+                    self._execute_download()
+            
+            # 1分ごとにチェック
+            schedule.every(1).minutes.do(cron_job)
+            
+        except ImportError:
+            self.logger.error("croniter がインストールされていません。pip install croniter を実行してください。")
+            raise
+        except Exception as e:
+            self.logger.error(f"カスタムcron形式の設定エラー: {str(e)}")
+            raise
 
     def _run_scheduler(self):
         """スケジューラーを実行（バックグラウンド）"""

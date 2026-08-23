@@ -15,6 +15,7 @@ requests>=2.31.0
 
 # スケジューリング
 schedule>=1.2.0
+croniter>=2.0.0
 
 # 設定管理
 pyyaml>=6.0.1
@@ -22,8 +23,8 @@ pyyaml>=6.0.1
 # 日時処理
 python-dateutil>=2.8.2
 
-# 進捗表示
-tqdm>=4.66.1
+# 進捗表示（オプション、現在未使用）
+# tqdm>=4.66.1
 
 # リトライ処理
 tenacity>=8.2.3
@@ -43,8 +44,9 @@ win10toast>=0.9
 # Windowsスタートアップ登録（オプション）
 pywin32>=306
 
-# テスト（開発用）
+# テスト（開発用、requirements-dev.txt に移動推奨）
+# 注意: 開発環境では requirements-dev.txt をインストールしてください
 pytest>=7.4.0
 pytest-cov>=4.1.0
 pytest-mock>=3.12.0
-pytest-timeout>=2.2.0
+# pytest-timeout>=2.2.0  # requirements-dev.txt に移動

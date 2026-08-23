@@ -18,6 +18,7 @@ from ..gui.event_handler import EventHandler
 from ..utils.http_client import HTTPClient
 from ..core.scraper import Scraper
 from ..config.config_manager import ConfigManager
+from ..core.ppi_dropdowns import get_labels, code_to_label, label_to_code
 
 # CustomTkinter テーマ設定
 ctk.set_appearance_mode("dark")  # ダークモード
@@ -276,6 +277,7 @@ class MainWindow:
         
         ctk.CTkLabel(place_grid, text="文字列:", font=label_font).grid(row=3, column=0, sticky=tk.W, pady=3)
         self.place_text_var = tk.StringVar(value=search_conditions.place_text)
+<<<<<<< HEAD
         ctk.CTkEntry(place_grid, textvariable=self.place_text_var, width=180, height=entry_h, corner_radius=input_radius, font=input_font).grid(row=3, column=1, sticky=tk.W, padx=(6, 0), pady=3)
         
         # ===== 中央列 =====
@@ -293,6 +295,208 @@ class MainWindow:
         name_frame = ctk.CTkFrame(center_col, corner_radius=frame_radius, border_width=1, border_color=frame_border)
         name_frame.pack(fill=tk.X, pady=(0, 4))
         ctk.CTkLabel(name_frame, text="👤 落札者名", font=title_font).pack(anchor=tk.W, padx=8, pady=(6, 4))
+=======
+        ttk.Label(place_text_frame, text="工事場所:").pack(side=tk.LEFT, padx=5)
+        ttk.Entry(place_text_frame, textvariable=self.place_text_var, width=60).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=5
+        )
+        ttk.Label(
+            place_text_frame,
+            text="※条件の複数指定はできません。",
+            font=("", 8),
+            foreground="gray",
+        ).pack(anchor=tk.W, padx=5, pady=(5, 0))
+
+        # 入札契約方式
+        contract_frame = ttk.LabelFrame(parent, text="入札契約方式", padding="5")
+        contract_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        # 入札契約方式はWebページでは複数の選択肢が並んでいるが、実際の動作は不明
+        # 一旦チェックボックスで実装（Webページの表示通りに並べる）
+        contract_types = ["一般競争入札", "公募型指名競争入札", "指名競争入札", "随意契約", "その他方式"]
+        self.contract_type_vars = {}
+        for i, contract_type in enumerate(contract_types):
+            var = tk.BooleanVar(value=contract_type in search_conditions.contract_types)
+            self.contract_type_vars[contract_type] = var
+            ttk.Checkbutton(contract_frame, text=contract_type, variable=var).grid(
+                row=i // 3, column=i % 3, sticky=tk.W, padx=5, pady=2
+            )
+
+        # 最終更新日
+        update_date_frame = ttk.LabelFrame(parent, text="最終更新日", padding="5")
+        update_date_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        self.update_date_type_var = tk.StringVar(
+            value="none" if search_conditions.update_date_type == "none" else "past"
+        )
+        ttk.Radiobutton(update_date_frame, text="指定なし", variable=self.update_date_type_var, value="none").pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Radiobutton(update_date_frame, text="過去", variable=self.update_date_type_var, value="past").pack(
+            side=tk.LEFT, padx=5
+        )
+        self.update_date_days_var = tk.StringVar(
+            value=str(search_conditions.update_date_days) if search_conditions.update_date_days else "30"
+        )
+        ttk.Entry(update_date_frame, textvariable=self.update_date_days_var, width=5).pack(side=tk.LEFT, padx=5)
+        ttk.Label(update_date_frame, text="日以内").pack(side=tk.LEFT)
+
+        # 公告日
+        koukoku_frame = ttk.LabelFrame(parent, text="公告日", padding="5")
+        koukoku_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        self.koukoku_date_type_var = tk.StringVar(value=search_conditions.koukoku_date_type)
+        ttk.Radiobutton(koukoku_frame, text="指定なし", variable=self.koukoku_date_type_var, value="none").pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Radiobutton(koukoku_frame, text="期間指定", variable=self.koukoku_date_type_var, value="range").pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Label(koukoku_frame, text="から").pack(side=tk.LEFT, padx=5)
+        self.koukoku_date_start_var = tk.StringVar(
+            value=search_conditions.koukoku_date_start or ""
+        )
+        ttk.Entry(koukoku_frame, textvariable=self.koukoku_date_start_var, width=12).pack(side=tk.LEFT, padx=5)
+        ttk.Label(koukoku_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=2)
+        # Webページでは「まで」は表示されていないため削除
+
+        # 開札日
+        kaisatsu_frame = ttk.LabelFrame(parent, text="開札日", padding="5")
+        kaisatsu_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        self.kaisatsu_date_type_var = tk.StringVar(value=search_conditions.kaisatsu_date_type)
+        ttk.Radiobutton(kaisatsu_frame, text="指定なし", variable=self.kaisatsu_date_type_var, value="none").pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Radiobutton(kaisatsu_frame, text="期間指定", variable=self.kaisatsu_date_type_var, value="range").pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Label(kaisatsu_frame, text="から").pack(side=tk.LEFT, padx=5)
+        self.kaisatsu_date_start_var = tk.StringVar(
+            value=search_conditions.kaisatsu_date_start or ""
+        )
+        ttk.Entry(kaisatsu_frame, textvariable=self.kaisatsu_date_start_var, width=12).pack(side=tk.LEFT, padx=5)
+        ttk.Label(kaisatsu_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=2)
+        # Webページでは「まで」は表示されていないため削除
+
+        # 契約日
+        keiyaku_frame = ttk.LabelFrame(parent, text="契約日", padding="5")
+        keiyaku_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        self.keiyaku_date_type_var = tk.StringVar(value=search_conditions.keiyaku_date_type)
+        ttk.Radiobutton(keiyaku_frame, text="指定なし", variable=self.keiyaku_date_type_var, value="none").pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Radiobutton(keiyaku_frame, text="期間指定", variable=self.keiyaku_date_type_var, value="range").pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Label(keiyaku_frame, text="から").pack(side=tk.LEFT, padx=5)
+        self.keiyaku_date_start_var = tk.StringVar(
+            value=search_conditions.keiyaku_date_start or ""
+        )
+        ttk.Entry(keiyaku_frame, textvariable=self.keiyaku_date_start_var, width=12).pack(side=tk.LEFT, padx=5)
+        ttk.Label(keiyaku_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=2)
+        # Webページでは「まで」は表示されていないため削除
+
+        # 工事種別（プルダウン）
+        koji_shubetsu_frame = ttk.LabelFrame(parent, text="工事種別", padding="5")
+        koji_shubetsu_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        # 工事種別のオプションを一元管理された定義から取得
+        koji_shubetsu_options = get_labels("koji_shubetsu")
+        koji_shubetsu_input_frame = ttk.Frame(koji_shubetsu_frame)
+        koji_shubetsu_input_frame.pack(fill=tk.X)
+        # コードまたはラベルをラベルに変換して表示
+        display_value = code_to_label("koji_shubetsu", search_conditions.koji_shubetsu, self.logger)
+        self.koji_shubetsu_var = tk.StringVar(value=display_value)
+        ttk.Label(koji_shubetsu_input_frame, text="▽以下から選択").pack(side=tk.LEFT, padx=5)
+        ttk.Combobox(
+            koji_shubetsu_input_frame,
+            textvariable=self.koji_shubetsu_var,
+            values=koji_shubetsu_options,
+            state="readonly",
+            width=40,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Label(
+            koji_shubetsu_frame,
+            text="※国土交通省及び内閣府沖縄総合事務局の区分。",
+            font=("", 8),
+            foreground="gray",
+        ).pack(anchor=tk.W, padx=5, pady=(5, 0))
+
+        # 工事の業種（プルダウン）
+        koji_gyoushu_frame = ttk.LabelFrame(parent, text="工事の業種", padding="5")
+        koji_gyoushu_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        # 工事の業種のオプションを一元管理された定義から取得
+        koji_gyoushu_options = get_labels("koji_gyoushu")
+        koji_gyoushu_input_frame = ttk.Frame(koji_gyoushu_frame)
+        koji_gyoushu_input_frame.pack(fill=tk.X)
+        # コードまたはラベルをラベルに変換して表示
+        display_value = code_to_label("koji_gyoushu", search_conditions.koji_gyoushu, self.logger)
+        self.koji_gyoushu_var = tk.StringVar(value=display_value)
+        ttk.Label(koji_gyoushu_input_frame, text="▽以下から選択").pack(side=tk.LEFT, padx=5)
+        ttk.Combobox(
+            koji_gyoushu_input_frame,
+            textvariable=self.koji_gyoushu_var,
+            values=koji_gyoushu_options,
+            state="readonly",
+            width=40,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Label(
+            koji_gyoushu_frame,
+            text="※建設業法（別表第一）準拠。",
+            font=("", 8),
+            foreground="gray",
+        ).pack(anchor=tk.W, padx=5, pady=(5, 0))
+
+        # 予定価格（範囲指定）
+        yotei_price_frame = ttk.LabelFrame(parent, text="予定価格（範囲指定）", padding="5")
+        yotei_price_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        self.yotei_price_min_var = tk.StringVar(
+            value=str(search_conditions.yotei_price_min) if search_conditions.yotei_price_min else ""
+        )
+        self.yotei_price_max_var = tk.StringVar(
+            value=str(search_conditions.yotei_price_max) if search_conditions.yotei_price_max else ""
+        )
+        ttk.Label(yotei_price_frame, text="（円）").pack(side=tk.LEFT, padx=5)
+        ttk.Entry(yotei_price_frame, textvariable=self.yotei_price_min_var, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Label(yotei_price_frame, text="～").pack(side=tk.LEFT, padx=5)
+        ttk.Entry(yotei_price_frame, textvariable=self.yotei_price_max_var, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Label(yotei_price_frame, text="（円）").pack(side=tk.LEFT, padx=5)
+
+        # 落札価格／契約価格（範囲指定）
+        rakusatsu_price_frame = ttk.LabelFrame(parent, text="落札価格／契約価格（範囲指定）", padding="5")
+        rakusatsu_price_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+        self.rakusatsu_price_min_var = tk.StringVar(
+            value=str(search_conditions.rakusatsu_price_min) if search_conditions.rakusatsu_price_min else ""
+        )
+        self.rakusatsu_price_max_var = tk.StringVar(
+            value=str(search_conditions.rakusatsu_price_max) if search_conditions.rakusatsu_price_max else ""
+        )
+        ttk.Label(rakusatsu_price_frame, text="（円）").pack(side=tk.LEFT, padx=5)
+        ttk.Entry(rakusatsu_price_frame, textvariable=self.rakusatsu_price_min_var, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Label(rakusatsu_price_frame, text="～").pack(side=tk.LEFT, padx=5)
+        ttk.Entry(rakusatsu_price_frame, textvariable=self.rakusatsu_price_max_var, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Label(rakusatsu_price_frame, text="（円）").pack(side=tk.LEFT, padx=5)
+
+        # 落札者名／契約者名（文字列検索）
+        rakusatsu_name_frame = ttk.LabelFrame(parent, text="落札者名／契約者名（文字列検索）", padding="5")
+        rakusatsu_name_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5), padx=5)
+        row += 1
+
+>>>>>>> 44d78a093e6bf3e7a6997a5b9c4c1d188ad04c11
         self.rakusatsu_name_var = tk.StringVar(value=search_conditions.rakusatsu_name)
         ctk.CTkEntry(name_frame, textvariable=self.rakusatsu_name_var, height=entry_h, corner_radius=input_radius, font=input_font).pack(fill=tk.X, padx=8, pady=(0, 6))
         
@@ -594,8 +798,8 @@ class MainWindow:
                 self.download_callback(self)
         except Exception as e:
             if not self.cancel_flag.is_set():
-            self.logger.error(f"ダウンロードエラー: {str(e)}")
-            self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
+                self.logger.error(f"ダウンロードエラー: {str(e)}")
+                self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
         finally:
             self.root.after(0, lambda: self._reset_download_ui())
 
@@ -706,9 +910,9 @@ class MainWindow:
         self.keiyaku_date_type_var.set(search_conditions.keiyaku_date_type)
         self.keiyaku_date_start_var.set(search_conditions.keiyaku_date_start or "")
 
-        # 工事種別、工事の業種
-        self.koji_shubetsu_var.set(search_conditions.koji_shubetsu)
-        self.koji_gyoushu_var.set(search_conditions.koji_gyoushu)
+        # 工事種別、工事の業種（コードまたはラベルをラベルに変換して表示）
+        self.koji_shubetsu_var.set(code_to_label("koji_shubetsu", search_conditions.koji_shubetsu, self.logger))
+        self.koji_gyoushu_var.set(code_to_label("koji_gyoushu", search_conditions.koji_gyoushu, self.logger))
 
         # 価格
         if search_conditions.yotei_price_min:
@@ -780,8 +984,9 @@ class MainWindow:
         search_conditions.keiyaku_date_start = self.keiyaku_date_start_var.get() or None
 
         # 工事種別、工事の業種（単一選択）
-        search_conditions.koji_shubetsu = self.koji_shubetsu_var.get()
-        search_conditions.koji_gyoushu = self.koji_gyoushu_var.get()
+        # GUIから取得したラベルをコードに変換して保存
+        search_conditions.koji_shubetsu = label_to_code("koji_shubetsu", self.koji_shubetsu_var.get(), self.logger)
+        search_conditions.koji_gyoushu = label_to_code("koji_gyoushu", self.koji_gyoushu_var.get(), self.logger)
 
         # 価格
         try:

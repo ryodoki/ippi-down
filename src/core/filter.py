@@ -78,7 +78,11 @@ class Filter:
         return False
 
     def match_date_range(self, file_info: FileInfo) -> bool:
-        """日付範囲が条件に一致するかチェック"""
+        """日付範囲が条件に一致するかチェック
+        
+        日付範囲が指定されていない場合は True を返す。
+        日付が取得できない場合は False を返す（フィルタ不一致）。
+        """
         if not self.conditions.date_range:
             return True  # 日付範囲が指定されていない場合はすべて一致
 
@@ -89,30 +93,53 @@ class Filter:
         if not start_date and not end_date:
             return True
 
-        # メタデータから日付を取得（実装は必要に応じて拡張）
+        # メタデータから日付を取得
         file_date = None
         if file_info.metadata:
-            # メタデータから日付を抽出する処理（実装が必要）
-            pass
-
+            # 優先順位: koukoku_date > kaisatsu_date > keiyaku_date > update_date
+            for date_key in ["koukoku_date", "kaisatsu_date", "keiyaku_date", "update_date", "date"]:
+                if date_key in file_info.metadata:
+                    file_date = file_info.metadata[date_key]
+                    break
+        
         if not file_date:
-            return True  # 日付が取得できない場合は一致とみなす
+            # 日付が取得できない場合はフィルタ不一致（False）を返す
+            self.logger.debug(f"日付が取得できませんでした（フィルタ不一致）: {file_info.filename}")
+            return False
 
         try:
-            file_datetime = date_parser.parse(file_date) if isinstance(file_date, str) else file_date
+            # 日付文字列を datetime に変換
+            if isinstance(file_date, str):
+                file_datetime = date_parser.parse(file_date)
+            elif isinstance(file_date, datetime):
+                file_datetime = file_date
+            else:
+                self.logger.warning(f"日付の形式が不正です: {file_date} (type: {type(file_date)})")
+                return False
 
+            # 開始日チェック
             if start_date:
                 start_datetime = date_parser.parse(start_date) if isinstance(start_date, str) else start_date
                 if file_datetime < start_datetime:
+                    self.logger.debug(
+                        f"日付範囲外（開始日より前）: {file_info.filename}, "
+                        f"ファイル日付={file_datetime.strftime('%Y-%m-%d')}, 開始日={start_datetime.strftime('%Y-%m-%d')}"
+                    )
                     return False
 
+            # 終了日チェック
             if end_date:
                 end_datetime = date_parser.parse(end_date) if isinstance(end_date, str) else end_date
                 if file_datetime > end_datetime:
+                    self.logger.debug(
+                        f"日付範囲外（終了日より後）: {file_info.filename}, "
+                        f"ファイル日付={file_datetime.strftime('%Y-%m-%d')}, 終了日={end_datetime.strftime('%Y-%m-%d')}"
+                    )
                     return False
 
             return True
         except Exception as e:
-            self.logger.warning(f"日付解析エラー: {str(e)}")
-            return True  # エラーの場合は一致とみなす
+            self.logger.warning(f"日付解析エラー: {str(e)}, file_info={file_info.filename}")
+            # エラーの場合はフィルタ不一致（False）を返す
+            return False
 

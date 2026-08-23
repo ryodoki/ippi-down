@@ -16,6 +16,12 @@ class DownloadTask:
     status: str = "pending"  # pending, downloading, completed, failed
     error_message: str = ""
     retry_count: int = 0
+    # 失敗理由別サマリー用のフィールド（FR-005）
+    http_status: Optional[int] = None  # HTTPステータスコード
+    error_type: str = ""  # エラー種別: network, rate_limit, http_4xx, http_5xx, filesystem, other
+    exception_type: str = ""  # 例外クラス名（無ければ空文字）
+    url: str = ""  # ダウンロードURL（FileInfoからコピー）
+    retry_attempts: int = 0  # 実際に試行した回数
 
     def mark_downloading(self):
         """ダウンロード中にマーク"""

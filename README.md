@@ -1,24 +1,30 @@
-﻿# ippi-down
+# ippi-down
 
 建設情報サービス「ppi.jp」から条件に基づいてファイルを自動ダウンロードするツール
 
 ## 概要
 
-ppi.jpのWebサイトを解析し、ユーザーが指定した条件に一致するファイルを自動的にダウンロードして、指定したフォルダ（ローカルまたはBox）に整理して保存します。
+ppi.jpのWebサイトを解析し、ユーザーが指定した条件に一致するファイルを自動的にダウンロードして、指定したフォルダ（ローカル）に整理して保存します。
+
+**注意**: Box保存機能は将来対応予定です。現在はローカル保存のみサポートしています。
 
 ## 主な機能
 
 - HTML構造の解析
 - 条件に基づくファイルの自動ダウンロード
-- HTML構造に基づく自動ファイル命名
+- HTML構造に基づく自動ファイル命名（テンプレート文字列対応）
 - ローカルフォルダへの保存
-- 定期実行（スケジューリング）
+- 定期実行（スケジューリング、cron形式対応）
 - HTTPレート制限（429エラー）の自動処理
 - Windowsパス長制限（260文字）の自動対応
 - ダウンロード中のキャンセル機能
 - 詳細なメタデータ抽出（発注機関、工事名、日付など）
+- 日付範囲フィルタリング
+- PostBackリンク対応（javascript:__doPostBack形式）
 
 ## プロジェクト構成
+
+**正として固定するもの**: ソース（`src/`）、テスト（`tests/`）、ドキュメント（`docs/`）、設定テンプレ（`config/config.example.yaml`）、スクリプト（`scripts/`）。
 
 ```
 ippi-down/
@@ -26,50 +32,49 @@ ippi-down/
 │   ├── main.py           # エントリーポイント（GUI版）
 │   ├── gui/              # GUIモジュール
 │   ├── core/             # コア機能（scraper, downloader等）
-│   ├── storage/          # ストレージ（local, box）
+│   ├── storage/          # ストレージ（local、Boxは将来対応予定）
 │   ├── config/           # 設定管理
 │   ├── utils/            # ユーティリティ
 │   ├── models/           # データモデル
 │   └── scheduler/        # スケジューラー
 ├── docs/                  # ドキュメント
 │   ├── requirements.md          # 要件定義書
-│   ├── requirements_revision.md # 要件定義見直し
-│   ├── technology_selection.md  # 技術選定書
-│   ├── system_design.md         # システム設計書
-│   ├── implementation_design.md # 実装設計書
+│   ├── requirement_gap_report.md # 要件ギャップレポート
 │   ├── settings_requirements.md # 設定機能要件定義書
-│   ├── dev/                     # 開発ドキュメント
-│   ├── git/                     # Git関連ドキュメント
-│   └── test-results/            # テスト結果
-├── config/               # 設定ファイル
-│   └── config.example.yaml
+│   ├── INVESTIGATION_TOOL.md     # 調査ツールの使い方
+│   ├── SITE_CHANGE_MONITORING.md # サイト変更監視
+│   └── dev-notes/               # 開発メモ
+├── config/               # 設定（テンプレのみリポジトリに含める）
+│   └── config.example.yaml       # 実設定 config.yaml は同梱しない・.gitignore 済み
 ├── scripts/              # スクリプト
-│   ├── build/            # ビルドスクリプト
-│   │   ├── build_exe.bat     # 実行ファイルビルド（バッチ）
-│   │   ├── build_exe.ps1     # 実行ファイルビルド（PowerShell）
-│   │   ├── rebuild_exe.bat   # 実行ファイル再ビルド（バッチ）
-│   │   ├── rebuild_exe.ps1   # 実行ファイル再ビルド（PowerShell）
-│   │   └── build.spec        # PyInstaller設定
+│   ├── build/            # PyInstaller ビルド（build_exe.ps1, build.spec 等）
+│   ├── tools/            # 梱包・リリース用（pack_for_review.ps1, make_release_zip.ps1）
+│   ├── investigate/      # 調査ツール（investigate_i_ppi.py, i_ppi_inspector）
 │   ├── utils/            # ユーティリティスクリプト
-│   ├── tools/            # 配布用ツール
-│   ├── start_background.bat  # バックグラウンド起動（バッチ）
-│   └── start_background.ps1  # バックグラウンド起動（PowerShell）
+│   ├── start_background.bat
+│   └── start_background.ps1
 ├── tests/                # テストコード
-│   ├── test_config.py    # 設定テスト
-│   ├── test_settings.py  # 設定ダイアログテスト
-│   ├── test_file_utils.py # FileUtilsテスト
-│   ├── test_config_model.py # ConfigModelテスト
-│   └── test_http_client.py # HTTPClientテスト
-├── logs/                 # ログファイル（実行時に生成、Git追跡対象外）
-├── downloads/            # ダウンロード結果ファイル（Git追跡対象外）
-├── build/                # PyInstallerビルド作業ディレクトリ（Git追跡対象外）
-├── dist/                 # PyInstaller生成物（Git追跡対象外）
-├── .venv/                # 仮想環境（Git追跡対象外）
-├── requirements.txt      # 依存関係
-├── pytest.ini           # pytest設定
-├── pyrightconfig.json   # Pyright設定
-└── README.md             # プロジェクト概要
+│   ├── fixtures/         # テスト用固定データ（例: test_detail_page.html）
+│   └── test_*.py
+├── requirements.txt
+├── pytest.ini
+├── pyrightconfig.json
+└── README.md
 ```
+
+### 生成物の場所（Git 管理外・再生成可能）
+
+| 場所 | 説明 |
+|------|------|
+| `.venv/` | 仮想環境（`python -m venv .venv` で再作成） |
+| `build/`, `dist/` | PyInstaller ビルド成果物 |
+| `logs/` | アプリログ |
+| `downloads/` | ダウンロード保存先 |
+| `scripts/snapshots/` | サイト変更監視のスナップショット |
+| `release/`, `*.zip`, `_review_pack/` | 配布ZIP・レビュー用パック |
+| `artifacts/`, `debug/*.html` | デバッグ出力 |
+
+`.gitignore` で上記を除外しています。**`config/config.yaml` は同梱せず、`config.example.yaml` からローカルでコピーして編集してください。**
 
 ## セットアップ
 
@@ -118,7 +123,21 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-5. 設定ファイルをコピーして作成
+5. 開発環境のセットアップ（開発・テストを行う場合）
+
+開発・テストを行う場合は、追加の依存関係をインストールしてください:
+
+```powershell
+# 開発用依存関係をインストール
+pip install -r requirements-dev.txt
+```
+
+これにより、pytest-timeout などの開発ツールがインストールされます。
+
+**重要**: テストを実行する場合は、必ず `requirements-dev.txt` をインストールしてください。  
+`pytest.ini` の `addopts` に `--timeout` オプションが含まれているため、`pytest-timeout` が必要です。
+
+6. 設定ファイルをコピーして作成
 
    **重要**: Gitで管理されるのは `config/config.example.yaml` のみです。  
    実際に使用する設定ファイル `config/config.yaml` はローカルで作成してください。
@@ -136,7 +155,63 @@ pip install -r requirements.txt
    `config/config.yaml` を開いて、必要に応じて設定を変更してください。  
    このファイルは Git で追跡されません（ローカル専用設定）。
 
-### 実行方法
+### 実行手順（PowerShell・コピペ可）
+
+第三者でもそのままコピペして実行できる手順です。**まずプロジェクトルート（ippi-down フォルダ）に移動してから**以下を実行してください。
+
+```powershell
+# プロジェクトルートに移動（例: ダウンロードした ippi-down のパスに置き換え）
+cd <プロジェクトのパス>
+
+# 仮想環境が無い場合のみ作成
+if (-not (Test-Path .venv)) { python -m venv .venv }
+
+# 有効化（PowerShell）
+.\.venv\Scripts\Activate.ps1
+
+# 依存関係インストール
+pip install -r requirements.txt
+
+# 設定ファイルが無い場合のみコピー（config.yaml は同梱せず example のみ配布）
+if (-not (Test-Path config\config.yaml)) { Copy-Item config\config.example.yaml config\config.yaml }
+
+# GUI 起動
+python src/main.py
+```
+
+**CLI で1回だけ実行する場合:**
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python src/cli/main.py --config config/config.yaml --once
+```
+
+**設定例（config/config.yaml）:**  
+`config.example.yaml` をコピーしたあと、`target_urls`・`download_conditions`・`save_paths.local`・**`naming_rule`**・**`save_paths.run_subfolder_mode`** を編集してください。
+
+- **命名規則**: 使用可能な変数は `{category}`, `{title}`, `{date}`, `{index}`, `{filename}`, `{file_type}`, `{ext}`, `{koji_name}`, `{daibunrui}`, `{chubunrui}`, `{shoubunrui}`, `{saibunrui}`。`{ext}` はドット付き（例: `.pdf`）。未知の変数は設定保存時にエラーになります。
+- **保存先**: 相対パス（例: `./downloads`）の場合は exe/プロジェクトルート基準で絶対パスに解決されます。
+- **実行単位フォルダ**: `run_subfolder_mode: datetime` で保存先の下に `YYYYMMDD_HHMMSS` フォルダを自動作成。`search` で検索条件からフォルダ名を生成。
+- **発注機関フォルダ**: `save_paths.enable_agency_root_folders: true` にすると、保存先が発注機関の階層（大分類/中分類/小分類/細分類）＋工事/業務＋日付で枝分かれします。設定例は `config/config.example.yaml` の `save_paths` を参照。GUI の「発注機関ごとにルートフォルダを作成」で ON/OFF 可能。
+
+**回帰テスト（pytest）:**
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+python -m pytest tests/ -v --tb=short
+```
+
+**動作確認（命名規則・保存先フォルダ）:**
+
+1. 上記の手順で venv 作成 → `pip install -r requirements.txt` → `config\config.yaml` を example からコピー
+2. `config\config.yaml` を編集: `naming_rule`（例: `"{index}{ext}"` や `"{category}_{title}_{date}_{index}"`）、`save_paths.local`、必要なら `run_subfolder_mode: datetime` を設定
+3. GUI 起動: `python src/main.py`
+4. 設定画面で「ファイル命名規則」と「実行単位のルートフォルダ」を確認・保存（未知の変数があると保存時にエラーで止まる）
+5. ダウンロードを1回実行
+6. 確認: 保存先に意図したファイル名・フォルダができていること。ログ（`logs/app.log` またはコンソール）に「テンプレート文字列を使用」および「保存先:」が出ていること
+
+### 実行方法（要約）
 
 ```bash
 python src/main.py
@@ -246,18 +321,65 @@ PyInstallerを使用して実行ファイル（.exe）を作成できます。
 
 pytestを使用したテストスイートが用意されています。
 
+### テスト環境のセットアップ
+
+テストを実行する前に、開発用依存関係をインストールしてください：
+
+```powershell
+# 開発用依存関係をインストール（pytest-timeout等を含む）
+pip install -r requirements-dev.txt
+```
+
+**重要**: `pytest.ini` の `addopts` に `--timeout` オプションが含まれているため、`pytest-timeout` が必要です。  
+`requirements-dev.txt` をインストールすることで、必要な依存関係がすべてインストールされます。
+
 ### テストの実行
 
-```bash
-# すべてのテストを実行
-pytest tests/ -v
+**推奨**: `python -m pytest` を使用してください（コマンドPATH依存を避けるため）
+
+```powershell
+# すべてのテストを実行（GUI除外）
+python -m pytest -q -m "not gui"
+
+# すべてのテストを実行（詳細表示）
+python -m pytest tests/ -v
 
 # カバレッジレポート付きで実行
-pytest tests/ --cov=src --cov-report=html
+python -m pytest tests/ --cov=src --cov-report=html
 
 # 特定のテストファイルを実行
-pytest tests/test_file_utils.py -v
+python -m pytest tests/test_file_utils.py -v
+
+# GUIテストを含むすべてのテストを実行
+python -m pytest tests/ -v
 ```
+
+**注意**: デフォルトでは `pytest.ini` の設定により、GUI依存テスト・ネットワーク依存テスト・統合テストはスキップされます。
+
+### 調査ツール（i-ppi サイト確認用）
+
+検索・HTML 構造・ファイル抽出をコマンドラインで確認する統合ツールです。
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python scripts/investigate/investigate_i_ppi.py search
+python scripts/investigate/investigate_i_ppi.py paginate --output-json
+python scripts/investigate/investigate_i_ppi.py html
+python scripts/investigate/investigate_i_ppi.py extract-files --url "https://www.i-ppi.jp/.../Detail.aspx?..." --out result.json
+```
+
+**サイト変更監視**（スナップショット取得・差分検知・影響範囲の特定）:
+
+```powershell
+# スナップショット取得（定期実行で変更検知に利用）
+python scripts/investigate/investigate_i_ppi.py snapshot "https://www.i-ppi.jp/.../Search.aspx?tab=4" --out-dir scripts/snapshots
+# 2 つのスナップショットを比較して差分レポート生成
+python scripts/investigate/investigate_i_ppi.py diff scripts/snapshots/旧ディレクトリ scripts/snapshots/新ディレクトリ -o report.md
+# 差分 JSON から Scraper/Parser の修正ポイントを列挙
+python scripts/investigate/investigate_i_ppi.py impact report.json -o impact.json
+```
+
+詳細は [調査ツールの使い方](./docs/INVESTIGATION_TOOL.md) と [サイト変更監視の使い方](./docs/SITE_CHANGE_MONITORING.md) を参照してください。
 
 ### テストカバレッジ
 
@@ -266,7 +388,64 @@ pytest tests/test_file_utils.py -v
 - ConfigModel: スケジュール設定の検証
 - HTTPClient: 初期化、タイムアウト設定
 
+## 設定項目の説明
+
+### 発注機関ごとのルートフォルダ（オプション）
+
+`save_paths.enable_agency_root_folders` を有効にすると、i-ppi の発注機関階層に沿って保存先フォルダが自動作成されます。**デフォルトは OFF** で、従来どおりの保存先（`save_paths.local` ＋ 実行単位フォルダ ＋ サブフォルダ）です。
+
+**ON 時の出力例（ツリー）:**
+
+```
+<保存先（local）>/
+  （実行単位フォルダがある場合はその直下）
+  発注機関/
+    国の機関/
+      国交省/
+        東北/
+          トンネル/
+            工事_入札公告等/    # または 業務_入札公告等
+              （日付分割する場合は 2025_02 など）
+                <naming_rule で命名されたファイル>
+```
+
+- **フォルダ階層**: 発注機関（大分類→中分類→小分類→細分類）・検索種別（工事/業務）・日付パーティション（任意）で決まります。メタデータが欠損している項目は `unknown` にフォールバックし、Windows 禁則文字は除去されます。
+- **ファイル名**: 従来どおり **naming_rule** のテンプレート（`{category}`, `{title}`, `{date}`, `{index}` 等）で決まります。フォルダ階層とファイル名は役割が分離されており、naming_rule は「そのフォルダ内のファイル名」にのみ適用されます。
+- 設定項目の詳細は `config/config.example.yaml` の `save_paths` コメントを参照してください。
+
+### 使用される設定項目
+
+- **target_urls**: 対象URLリスト（使用中）
+- **download_conditions.file_types**: ファイルタイプフィルタ（使用中）
+- **download_conditions.keywords**: キーワードフィルタ（使用中）
+- **download_conditions.date_range**: 日付範囲フィルタ（**実装済み**）
+- **save_paths.local**: ローカル保存先（使用中）
+- **save_paths.enable_agency_root_folders**: 発注機関ごとにルートフォルダを自動作成（**実装済み**、デフォルト OFF）
+- **save_paths.agency_folder_levels / date_partition / include_search_tab_folder**: 発注機関フォルダ ON 時の階層・日付分割・工事/業務分け（**実装済み**）
+- **naming_rule**: ファイル命名規則テンプレート（**実装済み**）
+- **schedule.enabled**: スケジュール有効化（使用中）
+- **schedule.interval**: 実行間隔（daily/weekly/monthly/custom、**custom cron対応済み**）
+- **schedule.time**: 実行時刻（HH:MM形式、使用中）
+- **schedule.cron**: cron形式（interval="custom"の場合、**実装済み**）
+- **logging.level**: ログレベル（使用中）
+- **logging.file**: ログファイルパス（使用中）
+
+### 使用されていない設定項目
+
+- **tqdm**: 進捗表示ライブラリ（現在未使用、requirements.txtでコメントアウト）
+
 ## 最近の改善点
+
+### v0.3.0 (2025-01-XX)
+
+- ✅ naming_rule テンプレート文字列の実装
+- ✅ date_range フィルタリングの実装
+- ✅ custom cron 形式のスケジュール対応（croniter導入）
+- ✅ PostBackリンク対応（javascript:__doPostBack形式）
+- ✅ リトライ設計の見直し（tenacity の実効性向上）
+- ✅ ログ設計の統一（handlers.clear の副作用排除）
+- ✅ Accept-Encoding の矛盾解消（br を削除）
+- ✅ 配布/レビューZIP作成スクリプトの不具合修正
 
 ### v0.2.0 (2026-01-08)
 
@@ -359,33 +538,38 @@ Get-ChildItem -Recurse -Directory -Filter "__pycache__" | ForEach-Object { git r
 Get-ChildItem -Recurse -Filter "*.pyc" | ForEach-Object { git rm --cached $_.FullName -ErrorAction SilentlyContinue }
 ```
 
-### クリーンなzip配布用パッケージの作成
+### リリース・レビュー用ZIPの作成（PowerShell コピペ可）
 
-配布用のzipファイルを作成する際は、不要なファイルを除外してください。
-
-**推奨方法**: `scripts/tools/make_release_zip.ps1` スクリプトを使用します。
+梱包スクリプトは **`scripts/tools/`** に一本化しています。**`config/config.yaml` は同梱しません。** 含まれるのは `config.example.yaml` のみです。
 
 ```powershell
-# PowerShellで実行
-.\scripts\tools\make_release_zip.ps1
+# プロジェクトルートで実行
+cd <プロジェクトのパス>
+
+# レビュー用ZIP作成（_review_pack に展開後、ippi-down_review.zip を出力）
+powershell -ExecutionPolicy Bypass -File .\scripts\tools\pack_for_review.ps1
 ```
 
-このスクリプトは以下を自動的に除外します：
-- `.git/` - Gitメタ情報（配布物としては不要）
-- `.venv/` - 仮想環境
-- `__pycache__/`, `*.pyc` - Pythonキャッシュ
-- `.pytest_cache/` - pytestキャッシュ
-- `build/`, `dist/` - PyInstaller生成物
-- `logs/`, `downloads/` - 実行結果
-- `config/config.yaml` - ローカル設定
+- 出力: ルートに `ippi-down_review.zip`、一時フォルダ `_review_pack/`（ZIP作成後に削除可）
+- 除外: `.venv`, `build`, `dist`, `logs`, `downloads`, `config/config.yaml`, `__pycache__` 等
 
-生成物は `release/ippi-down-clean.zip` に出力されます。
+**クリーンな配布用ZIP**（別名で出力したい場合）:
 
-詳細は [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md) を参照してください。
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\tools\make_release_zip.ps1 -OutputName ippi-down-clean.zip
+```
+
+- 出力: `release/ippi-down-clean.zip`
+
+詳細は [リリース・梱包手順](./docs/RELEASE_AND_PACK.md) を参照してください。
 
 ## 参考資料
 
 - [要件定義書](./docs/requirements.md)
+- [要件トレーサビリティ表](./docs/REQUIREMENTS_TRACEABILITY.md)（FR/FR-SET と実装・テストの対応）
+- [要件ギャップレポート](./docs/requirement_gap_report.md)（FR-001〜FR-026 の突合・状態）
+- [調査ツールの使い方](./docs/INVESTIGATION_TOOL.md)（scripts/investigate/investigate_i_ppi.py）
+- [サイト変更監視の使い方](./docs/SITE_CHANGE_MONITORING.md)（snapshot / diff / impact）
 - [技術選定書](./docs/technology_selection.md)
 - [システム設計書](./docs/system_design.md)
 - [実装設計書](./docs/implementation_design.md)
@@ -400,5 +584,5 @@ Get-ChildItem -Recurse -Filter "*.pyc" | ForEach-Object { git rm --cached $_.Ful
 ---
 
 **作成日**: 2025年12月17日  
-**最終更新**: 2026年1月8日
+**最終更新**: 2026年2月15日
 

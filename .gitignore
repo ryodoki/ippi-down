@@ -1,4 +1,26 @@
-# Python
+# ========== 生成物・リポジトリ管理外（ソースと分離） ==========
+# 以下は再生成可能なためコミットしない
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+dist/
+logs/
+scripts/snapshots/
+release/
+*.zip
+# 配布ZIP内のexe等も管理外
+release/**/ippi-down.exe
+# 実設定は同梱しない（config.example.yaml のみリポジトリに含める）
+config/config.yaml
+# ルートに出力されるデバッグ用HTML（scraper が書き出す場合）
+test_detail_page.html
+# 配布用パック一時フォルダ
+_review_pack/
+
+# ========== Python ==========
 __pycache__/
 *.py[cod]
 *.pyc
@@ -22,14 +44,16 @@ pip-wheel-metadata/
 share/python-wheels/
 
 # Virtual Environment
-.venv/
-venv/
 ENV/
 env/
 
 # PyInstaller生成物
+<<<<<<< HEAD
 build/
 dist/
+=======
+*.spec
+>>>>>>> 44d78a093e6bf3e7a6997a5b9c4c1d188ad04c11
 *.exe
 *.dll
 *.dylib
@@ -49,16 +73,12 @@ htmlcov/
 *~
 
 # Logs（運用生成物）
-logs/
 *.log
 
 # OS
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# 設定ファイル（機密情報を含む可能性）
-config/config.yaml
 
 # ダウンロードファイル（運用生成物）
 downloads/
@@ -71,7 +91,9 @@ test_downloads/
 
 # 調査・デバッグ生成物（artifacts/配下は全てGit管理外）
 artifacts/
+# 調査ツールの出力（debug/ に保存した HTML/JSON）
+debug/*.html
+debug/*.json
 
-# リリース生成物
-release/
-*.zip
+# サイト変更監視スナップショット（investigate snapshot の出力）
+# （scripts/snapshots/ は上記「生成物」セクションで除外済み）

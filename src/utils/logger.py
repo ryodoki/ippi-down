@@ -28,22 +28,27 @@ class Logger:
         
         self.logger = logging.getLogger("ppi_file_downloader")
         self.logger.setLevel(getattr(logging, self.config.level.upper(), logging.INFO))
-        self.logger.handlers.clear()  # 既存のハンドラーをクリア
+        # handlers.clear() を削除（他のLoggerインスタンスに影響を与えないようにする）
+        # 既にハンドラーが設定されている場合は追加しない（二重出力を防ぐ）
+        if not self.logger.handlers:
+            # コンソールハンドラー
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            console_formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            console_handler.setFormatter(console_formatter)
+            self.logger.addHandler(console_handler)
 
-        # コンソールハンドラー
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        console_handler.setFormatter(console_formatter)
-        self.logger.addHandler(console_handler)
-
-        # ファイルハンドラー
-        self.setup_file_handler()
+            # ファイルハンドラー
+            self.setup_file_handler()
 
     def setup_file_handler(self):
         """ファイルハンドラーを設定"""
+        # 既にファイルハンドラーが設定されている場合は追加しない（二重出力を防ぐ）
+        if any(isinstance(h, logging.handlers.RotatingFileHandler) for h in self.logger.handlers):
+            return
+        
         log_file = Path(self.config.file)
         log_file.parent.mkdir(parents=True, exist_ok=True)
 
