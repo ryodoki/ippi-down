@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""Logger Factory（安全なLogger生成）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""Logger Factory（安全なLogger生成）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import logging
 import uuid

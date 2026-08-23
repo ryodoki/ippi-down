@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 """メインウィンドウクラス（CustomTkinter版）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""メインウィンドウクラス"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import customtkinter as ctk
 import tkinter as tk
@@ -28,7 +34,7 @@ class MainWindow:
         self.config_manager = config_manager
         self.logger = logger or Logger()
         self.download_callback: Optional[Callable] = None
-        
+
         # ダウンロードキャンセル用のフラグ
         self.cancel_flag = Event()
         self.download_thread: Optional[Thread] = None
@@ -68,10 +74,20 @@ class MainWindow:
         except Exception:
             pass
 
+<<<<<<< HEAD
         # フォントが見つかった場合は設定（CustomTkinterでは内部で管理されるため、tkのみ設定）
         if default_font:
             try:
                 # tkウィジェットのデフォルトフォントを設定
+=======
+        # フォントが見つかった場合は設定
+        if default_font:
+            try:
+                # ttkスタイルのデフォルトフォントを設定
+                style = ttk.Style()
+                style.configure(".", font=(default_font, 9))
+                # tkウィジェットのデフォルトフォントも設定
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
                 default_font_obj = tk.font.nametofont("TkDefaultFont")
                 default_font_obj.configure(family=default_font, size=9)
             except Exception as e:
@@ -493,7 +509,11 @@ class MainWindow:
         
         # 小分類・細分類をクリア
         self.hachu_shoubunrui_var.set("")
+<<<<<<< HEAD
         self.hachu_shoubunrui_combo.configure(values=[])
+=======
+        self.hachu_shoubunrui_combo['values'] = []
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
         self.hachu_saibunrui_var.set("")
         self.hachu_saibunrui_combo.configure(values=[])
         
@@ -574,8 +594,8 @@ class MainWindow:
                 self.download_callback(self)
         except Exception as e:
             if not self.cancel_flag.is_set():
-                self.logger.error(f"ダウンロードエラー: {str(e)}")
-                self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
+            self.logger.error(f"ダウンロードエラー: {str(e)}")
+            self.root.after(0, lambda: messagebox.showerror("エラー", f"ダウンロードエラー: {str(e)}"))
         finally:
             self.root.after(0, lambda: self._reset_download_ui())
 

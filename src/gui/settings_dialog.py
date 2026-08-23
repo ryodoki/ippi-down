@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 """設定ダイアログクラス（CustomTkinter版）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""設定ダイアログクラス"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import customtkinter as ctk
 import tkinter as tk
@@ -53,6 +59,38 @@ class SettingsDialog:
         self.setup_ui()
         self.load_config_to_ui()
 
+<<<<<<< HEAD
+=======
+    def setup_font(self):
+        """日本語フォントを設定（Windows専用）"""
+        # Windowsで利用可能な日本語フォントを試す
+        fonts_to_try = ["Yu Gothic UI", "MS UI Gothic", "Meiryo UI", "MS PGothic"]
+        default_font = None
+
+        # 利用可能なフォントを確認
+        try:
+            available_fonts = tk.font.families()
+            for font in fonts_to_try:
+                if font in available_fonts:
+                    default_font = font
+                    break
+        except Exception:
+            pass
+
+        # フォントが見つかった場合は設定
+        if default_font:
+            try:
+                # ttkスタイルのデフォルトフォントを設定
+                style = ttk.Style()
+                style.configure(".", font=(default_font, 9))
+                # tkウィジェットのデフォルトフォントも設定
+                default_font_obj = tk.font.nametofont("TkDefaultFont")
+                default_font_obj.configure(family=default_font, size=9)
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"フォント設定エラー: {str(e)}")
+
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
     def setup_ui(self):
         """UIをセットアップ"""
         # メインフレーム
@@ -68,9 +106,16 @@ class SettingsDialog:
         self.tabview.add("📁 基本設定")
         self.setup_basic_tab(self.tabview.tab("📁 基本設定"))
 
+<<<<<<< HEAD
         # 検索条件タブ
         self.tabview.add("🔍 検索条件")
         self.setup_search_tab(self.tabview.tab("🔍 検索条件"))
+=======
+        # 検索条件タブ（ppi.jpの検索条件を網羅）
+        search_tab = ttk.Frame(notebook, padding="10")
+        notebook.add(search_tab, text="検索条件")
+        self.setup_search_tab(search_tab)
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
         # 詳細設定タブ
         self.tabview.add("⚙️ 詳細設定")
@@ -249,6 +294,7 @@ class SettingsDialog:
             fg_color="#4a9f4a", hover_color="#5cb85c",
             font=ctk.CTkFont(size=13)
         ).pack(side=tk.LEFT, padx=(0, 10))
+<<<<<<< HEAD
         
         ctk.CTkButton(
             button_frame, text="✗ すべて解除", 
@@ -256,6 +302,283 @@ class SettingsDialog:
             width=120, height=32, corner_radius=4,
             fg_color="#666666", hover_color="#888888",
             font=ctk.CTkFont(size=13)
+=======
+
+        ttk.Label(koukoku_date_input_frame, text="から").pack(side=tk.LEFT, padx=(0, 5))
+        self.koukoku_date_start_var = tk.StringVar()
+        ttk.Entry(
+            koukoku_date_input_frame, textvariable=self.koukoku_date_start_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(koukoku_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(koukoku_date_input_frame, text="まで").pack(side=tk.LEFT, padx=(0, 5))
+        self.koukoku_date_end_var = tk.StringVar()
+        ttk.Entry(
+            koukoku_date_input_frame, textvariable=self.koukoku_date_end_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(koukoku_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT)
+
+        # 開札日
+        kaisatsu_date_frame = ttk.LabelFrame(scrollable_frame, text="開札日", padding="5")
+        kaisatsu_date_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.kaisatsu_date_radio_var = tk.StringVar(value="none")
+        ttk.Radiobutton(
+            kaisatsu_date_frame,
+            text="指定なし",
+            variable=self.kaisatsu_date_radio_var,
+            value="none",
+        ).pack(anchor=tk.W)
+
+        kaisatsu_date_input_frame = ttk.Frame(kaisatsu_date_frame)
+        kaisatsu_date_input_frame.pack(fill=tk.X, pady=(5, 0))
+
+        ttk.Radiobutton(
+            kaisatsu_date_input_frame,
+            text="期間指定",
+            variable=self.kaisatsu_date_radio_var,
+            value="range",
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(kaisatsu_date_input_frame, text="から").pack(side=tk.LEFT, padx=(0, 5))
+        self.kaisatsu_date_start_var = tk.StringVar()
+        ttk.Entry(
+            kaisatsu_date_input_frame, textvariable=self.kaisatsu_date_start_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(kaisatsu_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(kaisatsu_date_input_frame, text="まで").pack(side=tk.LEFT, padx=(0, 5))
+        self.kaisatsu_date_end_var = tk.StringVar()
+        ttk.Entry(
+            kaisatsu_date_input_frame, textvariable=self.kaisatsu_date_end_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(kaisatsu_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT)
+
+        # 契約日
+        keiyaku_date_frame = ttk.LabelFrame(scrollable_frame, text="契約日", padding="5")
+        keiyaku_date_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.keiyaku_date_radio_var = tk.StringVar(value="none")
+        ttk.Radiobutton(
+            keiyaku_date_frame,
+            text="指定なし",
+            variable=self.keiyaku_date_radio_var,
+            value="none",
+        ).pack(anchor=tk.W)
+
+        keiyaku_date_input_frame = ttk.Frame(keiyaku_date_frame)
+        keiyaku_date_input_frame.pack(fill=tk.X, pady=(5, 0))
+
+        ttk.Radiobutton(
+            keiyaku_date_input_frame,
+            text="期間指定",
+            variable=self.keiyaku_date_radio_var,
+            value="range",
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(keiyaku_date_input_frame, text="から").pack(side=tk.LEFT, padx=(0, 5))
+        self.keiyaku_date_start_var = tk.StringVar()
+        ttk.Entry(
+            keiyaku_date_input_frame, textvariable=self.keiyaku_date_start_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(keiyaku_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(keiyaku_date_input_frame, text="まで").pack(side=tk.LEFT, padx=(0, 5))
+        self.keiyaku_date_end_var = tk.StringVar()
+        ttk.Entry(
+            keiyaku_date_input_frame, textvariable=self.keiyaku_date_end_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(keiyaku_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT)
+
+        # 工事種別
+        koji_shubetsu_frame = ttk.LabelFrame(scrollable_frame, text="工事種別", padding="5")
+        koji_shubetsu_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.koji_shubetsu_var = tk.StringVar()
+        koji_shubetsu_combo = ttk.Combobox(
+            koji_shubetsu_frame,
+            textvariable=self.koji_shubetsu_var,
+            values=[
+                "",
+                "一般土木工事",
+                "アスファルト舗装工事",
+                "鋼橋上部工事",
+                "造園工事",
+                "建築工事",
+                "木造建築工事",
+                "電気設備工事",
+                "暖冷房衛生設備工事",
+                "セメント・コンクリート舗装工事",
+                "プレストレスト・コンクリート工事",
+                "法面処理工事",
+                "塗装工事",
+                "維持修繕工事",
+                "浚渫工事",
+                "グラウト工事",
+                "杭打工事",
+                "さく井工事",
+                "プレハブ建築工事",
+                "機械設備工事",
+                "通信設備工事",
+                "受変電設備工事",
+                "港湾土木工事",
+                "農林土木工事",
+                "農林建築工事",
+                "橋梁補修工事",
+                "その他",
+            ],
+            state="readonly",
+            width=40,
+        )
+        koji_shubetsu_combo.pack(fill=tk.X)
+
+        # 工事の業種
+        koji_gyoushu_frame = ttk.LabelFrame(scrollable_frame, text="工事の業種", padding="5")
+        koji_gyoushu_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.koji_gyoushu_var = tk.StringVar()
+        koji_gyoushu_combo = ttk.Combobox(
+            koji_gyoushu_frame,
+            textvariable=self.koji_gyoushu_var,
+            values=[
+                "",
+                "土木一式工事",
+                "建築一式工事",
+                "大工工事",
+                "左官工事",
+                "とび・土工・コンクリート工事",
+                "石工事",
+                "屋根工事",
+                "電気工事",
+                "管工事",
+                "タイル・れんが・ブロック工事",
+                "鋼構造物工事",
+                "鉄筋工事",
+                "舗装工事",
+                "浚渫工事",
+                "板金工事",
+                "ガラス工事",
+                "塗装工事",
+                "防水工事",
+                "内装仕上工事",
+                "機械器具設置工事",
+                "熱絶縁工事",
+                "電気通信工事",
+                "造園工事",
+                "さく井工事",
+                "建具工事",
+                "水道施設工事",
+                "消防施設工事",
+                "清掃施設工事",
+                "解体工事",
+                "その他",
+            ],
+            state="readonly",
+            width=40,
+        )
+        koji_gyoushu_combo.pack(fill=tk.X)
+
+        # 予定価格（範囲指定）
+        yotei_price_frame = ttk.LabelFrame(scrollable_frame, text="予定価格（範囲指定）", padding="5")
+        yotei_price_frame.pack(fill=tk.X, pady=(0, 10))
+
+        price_input_frame = ttk.Frame(yotei_price_frame)
+        price_input_frame.pack(fill=tk.X)
+
+        self.yotei_price_min_var = tk.StringVar()
+        ttk.Entry(price_input_frame, textvariable=self.yotei_price_min_var, width=15).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        ttk.Label(price_input_frame, text="（円）～").pack(side=tk.LEFT, padx=(0, 5))
+        self.yotei_price_max_var = tk.StringVar()
+        ttk.Entry(price_input_frame, textvariable=self.yotei_price_max_var, width=15).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        ttk.Label(price_input_frame, text="（円）").pack(side=tk.LEFT)
+
+        # 落札価格／契約価格（範囲指定）
+        rakusatsu_price_frame = ttk.LabelFrame(
+            scrollable_frame, text="落札価格／契約価格（範囲指定）", padding="5"
+        )
+        rakusatsu_price_frame.pack(fill=tk.X, pady=(0, 10))
+
+        rakusatsu_price_input_frame = ttk.Frame(rakusatsu_price_frame)
+        rakusatsu_price_input_frame.pack(fill=tk.X)
+
+        self.rakusatsu_price_min_var = tk.StringVar()
+        ttk.Entry(
+            rakusatsu_price_input_frame, textvariable=self.rakusatsu_price_min_var, width=15
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(rakusatsu_price_input_frame, text="（円）～").pack(side=tk.LEFT, padx=(0, 5))
+        self.rakusatsu_price_max_var = tk.StringVar()
+        ttk.Entry(
+            rakusatsu_price_input_frame, textvariable=self.rakusatsu_price_max_var, width=15
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(rakusatsu_price_input_frame, text="（円）").pack(side=tk.LEFT)
+
+        # 落札者名／契約者名（文字列検索）
+        rakusatsu_name_frame = ttk.LabelFrame(
+            scrollable_frame, text="落札者名／契約者名（文字列検索）", padding="5"
+        )
+        rakusatsu_name_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.rakusatsu_name_var = tk.StringVar()
+        ttk.Entry(rakusatsu_name_frame, textvariable=self.rakusatsu_name_var, width=60).pack(fill=tk.X)
+        ttk.Label(
+            rakusatsu_name_frame,
+            text="※条件の複数指定はできません。",
+            font=("", 8),
+            foreground="gray",
+        ).pack(anchor=tk.W, pady=(5, 0))
+
+        # 電子入札
+        denshi_frame = ttk.LabelFrame(scrollable_frame, text="電子入札", padding="5")
+        denshi_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.denshi_var = tk.BooleanVar()
+        ttk.Checkbutton(denshi_frame, text="対象案件のみ", variable=self.denshi_var).pack(anchor=tk.W)
+
+        # 公開文書
+        koukai_frame = ttk.LabelFrame(scrollable_frame, text="公開文書", padding="5")
+        koukai_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.koukai_var = tk.BooleanVar()
+        ttk.Checkbutton(koukai_frame, text="公開中のみ", variable=self.koukai_var).pack(anchor=tk.W)
+
+        # 一覧画面の表示件数
+        display_count_frame = ttk.LabelFrame(scrollable_frame, text="一覧画面の表示件数", padding="5")
+        display_count_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.display_count_var = tk.StringVar(value="20")
+        ttk.Combobox(
+            display_count_frame,
+            textvariable=self.display_count_var,
+            values=["20", "30", "50", "100"],
+            state="readonly",
+            width=10,
+        ).pack(anchor=tk.W)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def setup_advanced_tab(self, parent: ttk.Frame):
+        """詳細設定タブをセットアップ"""
+        # ログ設定
+        log_frame = ttk.LabelFrame(parent, text="ログ設定", padding="5")
+        log_frame.pack(fill=tk.X, pady=(0, 10))
+
+        log_input_frame = ttk.Frame(log_frame)
+        log_input_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Label(log_input_frame, text="ログレベル:").pack(side=tk.LEFT, padx=(0, 10))
+        self.log_level_var = tk.StringVar()
+        ttk.Combobox(
+            log_input_frame,
+            textvariable=self.log_level_var,
+            values=["DEBUG", "INFO", "WARNING", "ERROR"],
+            state="readonly",
+            width=15,
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
         ).pack(side=tk.LEFT)
 
         # チェックボックスリスト
@@ -619,6 +942,13 @@ class SettingsDialog:
         if path:
             self.log_file_var.set(path)
 
+<<<<<<< HEAD
+=======
+    def on_hachu_multi_select(self):
+        """発注機関複数選択ボタンのハンドラ"""
+        messagebox.showinfo("情報", "発注機関の複数選択機能は今後実装予定です")
+
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
     def show(self) -> Optional[AppConfig]:
         """ダイアログを表示して結果を返す"""
         self.dialog.wait_window()

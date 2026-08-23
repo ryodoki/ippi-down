@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""ファイル名を生成するクラス"""
+=======
+# -*- coding: utf-8 -*-
+
+"""ファイル名を生成するクラス"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from typing import Dict, Any, Optional
 from datetime import datetime

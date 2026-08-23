@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""Secret Provider（機密情報管理）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""Secret Provider（機密情報管理）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from abc import ABC, abstractmethod
 from typing import Optional

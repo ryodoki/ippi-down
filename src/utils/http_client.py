@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""HTTP通信を行うクラス（セッション管理含む）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""HTTP通信を行うクラス（セッション管理含む）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import requests
 from requests.adapters import HTTPAdapter

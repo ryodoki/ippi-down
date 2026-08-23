@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""Storage抽象化インターフェース"""
+=======
+# -*- coding: utf-8 -*-
+
+"""Storage抽象化インターフェース"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from abc import ABC, abstractmethod
 from typing import Optional, BinaryIO

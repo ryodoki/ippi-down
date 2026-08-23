@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""Metadata Extractor（FileInfoへメタデータ正規化）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""Metadata Extractor（FileInfoへメタデータ正規化）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from typing import Optional, Dict, Any
 from ...models.file_info import FileInfo

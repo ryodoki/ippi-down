@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""Detail Page Parser（詳細ページ→ファイル一覧抽出）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""Detail Page Parser（詳細ページ→ファイル一覧抽出）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from typing import List, Optional
 from bs4 import BeautifulSoup

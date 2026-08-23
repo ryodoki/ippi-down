@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""実行結果データモデル"""
+=======
+# -*- coding: utf-8 -*-
+
+"""実行結果データモデル"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from dataclasses import dataclass
 from typing import Optional

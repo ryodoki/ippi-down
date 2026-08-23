@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""進捗イベント定義"""
+=======
+# -*- coding: utf-8 -*-
+
+"""進捗イベント定義"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from dataclasses import dataclass
 from typing import Optional, Any

@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""ASP.NET Form Parser（__VIEWSTATE等hidden解析 + postback組み立て）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""ASP.NET Form Parser（__VIEWSTATE等hidden解析 + postback組み立て）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from typing import Dict, Optional
 from bs4 import BeautifulSoup

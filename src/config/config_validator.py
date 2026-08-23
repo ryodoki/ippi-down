@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""設定検証を行うクラス"""
+=======
+# -*- coding: utf-8 -*-
+
+"""設定検証を行うクラス"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from typing import Tuple, List
 from urllib.parse import urlparse

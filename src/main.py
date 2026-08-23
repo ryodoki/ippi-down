@@ -1,8 +1,16 @@
+<<<<<<< HEAD
 """エントリーポイント（GUI版 - CustomTkinter）"""
+=======
+# -*- coding: utf-8 -*-
+
+"""エントリーポイント（GUI版）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import customtkinter as ctk
 import tkinter as tk
 import sys
+import os
+import time
 from pathlib import Path
 
 # プロジェクトルートをパスに追加（開発時のみ必要、exe配布時は不要）
@@ -123,7 +131,8 @@ def run_scheduled_download(config: AppConfig, logger: Logger):
 
 def main():
     """メイン関数"""
-    import os
+    # NOTE: moved to top-level imports (keep for reference during refactor)
+    # import os
 
     # 設定を読み込み
     config_manager = ConfigManager()
@@ -145,7 +154,9 @@ def main():
             scheduler.start()
 
             # スケジューラーを実行し続ける
-            import time
+            # NOTE: moved to top-level imports (keep for reference during refactor)
+            # import time
+
             try:
                 while True:
                     time.sleep(60)  # 1分ごとにチェック

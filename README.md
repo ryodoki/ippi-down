@@ -44,10 +44,14 @@ ippi-down/
 ├── config/               # 設定ファイル
 │   └── config.example.yaml
 ├── scripts/              # スクリプト
-│   ├── build_exe.bat     # 実行ファイルビルド（バッチ）
-│   ├── build_exe.ps1     # 実行ファイルビルド（PowerShell）
-│   ├── rebuild_exe.bat   # 実行ファイル再ビルド（バッチ）
-│   ├── rebuild_exe.ps1   # 実行ファイル再ビルド（PowerShell）
+│   ├── build/            # ビルドスクリプト
+│   │   ├── build_exe.bat     # 実行ファイルビルド（バッチ）
+│   │   ├── build_exe.ps1     # 実行ファイルビルド（PowerShell）
+│   │   ├── rebuild_exe.bat   # 実行ファイル再ビルド（バッチ）
+│   │   ├── rebuild_exe.ps1   # 実行ファイル再ビルド（PowerShell）
+│   │   └── build.spec        # PyInstaller設定
+│   ├── utils/            # ユーティリティスクリプト
+│   ├── tools/            # 配布用ツール
 │   ├── start_background.bat  # バックグラウンド起動（バッチ）
 │   └── start_background.ps1  # バックグラウンド起動（PowerShell）
 ├── tests/                # テストコード
@@ -200,21 +204,21 @@ PyInstallerを使用して実行ファイル（.exe）を作成できます。
    
    **Windows (コマンドプロンプト):**
    ```cmd
-   scripts\build_exe.bat
+   scripts\build\build_exe.bat
    ```
    
    **Windows (PowerShell):**
    ```powershell
-   .\scripts\build_exe.ps1
+   .\scripts\build\build_exe.ps1
    ```
    
    **再ビルド（依存関係を再インストール）:**
    ```cmd
    # コマンドプロンプト
-   scripts\rebuild_exe.bat
+   scripts\build\rebuild_exe.bat
    
    # PowerShell
-   .\scripts\rebuild_exe.ps1
+   .\scripts\build\rebuild_exe.ps1
    ```
 
 2. **手動でビルド**
@@ -227,7 +231,7 @@ PyInstallerを使用して実行ファイル（.exe）を作成できます。
    .venv\Scripts\Activate.ps1
 
    # PyInstallerでビルド
-   pyinstaller build.spec
+   pyinstaller scripts\build\build.spec
    ```
 
 ビルドが完了すると、`dist/ippi-down.exe` が生成されます。

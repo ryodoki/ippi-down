@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 ﻿"""設定データモデル"""
+=======
+# -*- coding: utf-8 -*-
+
+"""設定データモデル"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from dataclasses import dataclass, field
 from typing import List, Optional
