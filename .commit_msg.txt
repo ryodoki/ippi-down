@@ -1,0 +1,6 @@
+fix(phase4): EventHandler初期化の2つのバグを修正
+
+1. EventHandler に Logger ではなく MainWindow 自身を渡すよう修正
+   （_handle_event が main_window.show_message 等を呼ぶため必須）
+2. event_handler.start_polling() の呼び出しを復元
+   （未呼び出しだとイベントキューがポーリングされず進捗が表示されない）

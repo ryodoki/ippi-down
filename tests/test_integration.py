@@ -107,19 +107,25 @@ def test_exception_handling():
     from src.utils.logger import Logger
     from unittest.mock import patch, MagicMock
 
+    import pytest
+    from src.models.config_model import NetworkConfig, RobotsConfig
+
     logger = Logger()
-    http_client = HTTPClient(logger, timeout=1)  # 短いタイムアウトを設定
+    # 許可ホストへのリクエストで接続エラーを起こす（許可外URLだと送信前に弾かれ、
+    # 接続エラーの処理を通らないため）
+    http_client = HTTPClient(
+        logger,
+        timeout=1,  # 短いタイムアウトを設定
+        network_config=NetworkConfig(
+            min_interval_seconds=0.0, robots=RobotsConfig(enabled=False), audit_log=None
+        ),
+    )
 
     # NetworkErrorが発生することを確認（モック）
     # session.getを直接パッチして、即座に例外を発生させる
     with patch.object(http_client.session, 'get', side_effect=requests.exceptions.ConnectionError("Connection error")):
-        try:
-            http_client.get("https://invalid-url-that-will-fail.com")
-        except NetworkError:
-            pass  # 期待される例外
-        except Exception as e:
-            # 他の例外も許容（リトライロジックによる）
-            pass
+        with pytest.raises(NetworkError):
+            http_client.get("https://www.i-ppi.jp/invalid-path", max_retries=1)
 
 
 def test_page_fetcher_integration_removed():

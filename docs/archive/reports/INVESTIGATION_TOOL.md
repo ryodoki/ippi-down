@@ -5,6 +5,8 @@ i-ppi サイトの検索・HTML 構造・ファイル抽出をコマンドライ
 
 **サイト変更監視**（スナップショット・差分・影響範囲）については [サイト変更監視の使い方](./SITE_CHANGE_MONITORING.md) を参照してください。
 
+**ダウンロード仕様の要件突合**（保存先・命名・フォルダ階層の乖離調査）は [DOWNLOAD_SPEC_GAP_REPORT.md](./investigation/DOWNLOAD_SPEC_GAP_REPORT.md) および `scripts/investigate/audit_download_spec.py` を参照してください。
+
 ## 前提
 
 - プロジェクトルートで実行するか、`python scripts/investigate/investigate_i_ppi.py` で実行してください。
@@ -19,6 +21,16 @@ cd C:\Users\ryout\Workspaces\ippi-down
 # 仮想環境を有効化
 .\.venv\Scripts\Activate.ps1
 ```
+
+### ダウンロード仕様の要件突合監査
+
+```powershell
+python scripts/investigate/audit_download_spec.py
+python scripts/investigate/audit_download_spec.py --config config/config.yaml --out docs/investigation
+```
+
+- 出力: `docs/investigation/DOWNLOAD_SPEC_GAP_REPORT.md`（最新版を常に上書き）
+- 対象: FR-005/008/009/012/013 と config・app.log・download_history.jsonl の突合
 
 ### 検索結果 1 ページ目の概要
 

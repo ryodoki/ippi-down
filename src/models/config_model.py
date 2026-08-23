@@ -127,8 +127,8 @@ class SavePaths:
     enable_hash_check: bool = False
     keep_part_on_cancel: bool = True
 
-    # 発注機関ごとのルートフォルダ（デフォルトON：ダウンロードごとに大→中→小→細の階層でフォルダを作成）
-    enable_agency_root_folders: bool = True
+    # 発注機関ごとのルートフォルダ（デフォルトOFF。ONで大→中→小→細＋工事名の階層を作成）
+    enable_agency_root_folders: bool = False
     agency_root_label: str = "発注機関"
     agency_folder_levels: List[str] = field(
         default_factory=lambda: ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]
@@ -184,6 +184,38 @@ class LoggingConfig:
 
 
 @dataclass
+class RobotsConfig:
+    """robots.txt の取り扱い"""
+
+    enabled: bool = True
+    on_error: str = "block"  # block | allow（取得失敗時の既定動作）
+    cache_ttl_seconds: int = 86400
+
+
+@dataclass
+class NetworkConfig:
+    """通信ポリシー（許可先・作法・監査）"""
+
+    allowed_hosts: List[str] = field(default_factory=lambda: ["www.i-ppi.jp"])
+    allowed_schemes: List[str] = field(default_factory=lambda: ["https"])
+    allowed_ports: List[int] = field(default_factory=lambda: [443])
+    block_private_ips: bool = True
+
+    # 負荷抑制
+    min_interval_seconds: float = 1.0
+    max_concurrency: int = 1
+    max_requests_per_run: int = 500
+    allowed_hours: Optional[str] = None  # 例 "08:00-22:00"
+
+    # 身元の明示
+    user_agent: Optional[str] = None  # 完全上書きする場合のみ指定
+    user_agent_suffix: str = "ippi-down/1.0 (+社内利用)"
+
+    robots: RobotsConfig = field(default_factory=RobotsConfig)
+    audit_log: Optional[str] = "./logs/network.log"
+
+
+@dataclass
 class AppConfig:
     """アプリケーション設定のデータモデル"""
 
@@ -198,4 +230,5 @@ class AppConfig:
     naming_rule: str = "{category}_{title}_{date}_{index}"
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    network: NetworkConfig = field(default_factory=NetworkConfig)
 

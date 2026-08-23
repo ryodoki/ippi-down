@@ -29,7 +29,9 @@ pip install -r requirements.txt
 #### 方法1: ビルドスクリプトを使用（推奨）
 
 ```bash
-scripts\build_exe.bat
+scripts\build\build_exe.bat
+# または
+.\scripts\build\build_exe.ps1
 ```
 
 このスクリプトは以下を自動的に実行します：
@@ -44,8 +46,8 @@ scripts\build_exe.bat
 # 仮想環境を有効化
 .venv\Scripts\activate
 
-# PyInstallerでビルド
-pyinstaller build.spec
+# PyInstallerでビルド（spec は scripts/build/ 配下）
+pyinstaller scripts\build\build.spec
 ```
 
 ### ビルド結果

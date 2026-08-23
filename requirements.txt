@@ -6,6 +6,8 @@ lxml>=4.9.0
 
 # HTTPクライアント
 requests>=2.31.0
+# Windows: OS 証明書ストアを利用（Norton SSL 検査環境対応）
+truststore>=0.10.0; sys_platform == "win32"
 
 # スケジューリング
 schedule>=1.2.0

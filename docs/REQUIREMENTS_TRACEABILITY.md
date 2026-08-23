@@ -1,6 +1,6 @@
 # 要件トレーサビリティ表
 
-本ドキュメントは `docs/requirements.md` および `docs/settings_requirements.md` の機能要件（FR）を実装・テストと対応付けたものです。
+本ドキュメントは `docs/requirements.md` および（歴史文書の）`docs/archive/reports/settings_requirements.md` の機能要件（FR）を実装・テストと対応付けたものです。設定 GUI は実装済みです。旧「未実装」記述はアーカイブ側の文書を参照してください。
 
 **凡例**
 - **状態**: OK=要件を満たす / Partial=一部未対応 / NG=未対応
@@ -83,4 +83,4 @@
 ---
 
 **作成日**: 2026年2月  
-**参照**: docs/requirements.md, docs/settings_requirements.md, README.md
+**参照**: docs/requirements.md, docs/archive/reports/settings_requirements.md, README.md

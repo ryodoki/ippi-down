@@ -26,39 +26,45 @@ ppi.jpのWebサイトを解析し、ユーザーが指定した条件に一致�
 
 **正として固定するもの**: ソース（`src/`）、テスト（`tests/`）、ドキュメント（`docs/`）、設定テンプレ（`config/config.example.yaml`）、スクリプト（`scripts/`）。
 
+文書の索引は [docs/README.md](docs/README.md) を参照（歴史文書は `docs/archive/` に隔離）。
+
 ```
 ippi-down/
-├── src/                   # ソースコード
-│   ├── main.py           # エントリーポイント（GUI版）
-│   ├── gui/              # GUIモジュール
-│   ├── core/             # コア機能（scraper, downloader等）
-│   ├── storage/          # ストレージ（local、Boxは将来対応予定）
-│   ├── config/           # 設定管理
-│   ├── utils/            # ユーティリティ
-│   ├── models/           # データモデル
-│   └── scheduler/        # スケジューラー
-├── docs/                  # ドキュメント
-│   ├── requirements.md          # 要件定義書
-│   ├── requirement_gap_report.md # 要件ギャップレポート
-│   ├── settings_requirements.md # 設定機能要件定義書
-│   ├── INVESTIGATION_TOOL.md     # 調査ツールの使い方
-│   ├── SITE_CHANGE_MONITORING.md # サイト変更監視
-│   └── dev-notes/               # 開発メモ
-├── config/               # 設定（テンプレのみリポジトリに含める）
-│   └── config.example.yaml       # 実設定 config.yaml は同梱しない・.gitignore 済み
-├── scripts/              # スクリプト
-│   ├── build/            # PyInstaller ビルド（build_exe.ps1, build.spec 等）
-│   ├── tools/            # 梱包・リリース用（pack_for_review.ps1, make_release_zip.ps1）
-│   ├── investigate/      # 調査ツール（investigate_i_ppi.py, i_ppi_inspector）
-│   ├── utils/            # ユーティリティスクリプト
+├── src/
+│   ├── main.py            # GUI エントリーポイント
+│   ├── cli/               # CLI（--once / --dry-run / --report）
+│   ├── app/               # ApplicationService などアプリ層
+│   ├── gui/               # GUI（設定ダイアログ・検索条件タブ含む）
+│   ├── core/              # scraper / downloader / naming 等
+│   ├── infrastructure/    # ppi.jp 向け HTML・検索・詳細・ドロップダウン
+│   ├── storage/           # ローカル保存（Box は将来対応予定）
+│   ├── config/            # 設定の読込・検証
+│   ├── models/            # AppConfig / SearchConditions 等
+│   ├── scheduler/         # GUI/--background 用の常駐スケジューラ
+│   └── utils/
+│       ├── http_client.py     # 通信の唯一の出口（URL検査・robots・レート制限・監査）
+│       ├── netguard.py        # 許可リスト方式のエグレスガード
+│       ├── robots.py          # robots.txt の取得・キャッシュ・判定
+│       ├── rate_limiter.py    # ホスト単位の間隔・同時接続・総量制限
+│       └── network_audit.py   # 監査ログ
+├── docs/
+│   ├── README.md                 # 文書索引（現行 / アーカイブ）
+│   ├── network-policy.md
+│   ├── batch-operation.md
+│   └── archive/                  # 歴史文書（実装と一致しない可能性あり）
+├── config/
+│   └── config.example.yaml
+├── scripts/
+│   ├── schedule/          # タスクスケジューラ用（register / run / status / unregister）
+│   ├── build/             # PyInstaller（build_exe.ps1, build.spec 等）
+│   ├── tools/             # 梱包・リリース
+│   ├── investigate/       # サイト調査ツール
+│   ├── check_guardrails.ps1
 │   ├── start_background.bat
 │   └── start_background.ps1
-├── tests/                # テストコード
-│   ├── fixtures/         # テスト用固定データ（例: test_detail_page.html）
-│   └── test_*.py
+├── tests/
 ├── requirements.txt
 ├── pytest.ini
-├── pyrightconfig.json
 └── README.md
 ```
 
@@ -95,7 +101,7 @@ ippi-down/
   ```
 - または、スクリプトを直接実行:
   ```powershell
-  powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1
+  powershell -ExecutionPolicy Bypass -File .\scripts\build\build_exe.ps1
   ```
 
 ### インストール手順
@@ -379,7 +385,7 @@ python scripts/investigate/investigate_i_ppi.py diff scripts/snapshots/旧ディ
 python scripts/investigate/investigate_i_ppi.py impact report.json -o impact.json
 ```
 
-詳細は [調査ツールの使い方](./docs/INVESTIGATION_TOOL.md) と [サイト変更監視の使い方](./docs/SITE_CHANGE_MONITORING.md) を参照してください。
+詳細は [調査ツールの使い方](./docs/archive/reports/INVESTIGATION_TOOL.md)（アーカイブ）と [サイト変更監視の使い方](./docs/SITE_CHANGE_MONITORING.md) を参照してください。
 
 ### テストカバレッジ
 
@@ -429,10 +435,52 @@ python scripts/investigate/investigate_i_ppi.py impact report.json -o impact.jso
 - **schedule.cron**: cron形式（interval="custom"の場合、**実装済み**）
 - **logging.level**: ログレベル（使用中）
 - **logging.file**: ログファイルパス（使用中）
+- **network.\***: 通信ポリシー（許可ホスト・robots・レート制限・監査ログ、**実装済み**）→ [ネットワークポリシー](#ネットワークポリシー)
 
 ### 使用されていない設定項目
 
 - **tqdm**: 進捗表示ライブラリ（現在未使用、requirements.txtでコメントアウト）
+
+## 定期実行（バッチ）
+
+Windows タスクスケジューラで定期実行できます。ローカル PC でも Azure VM でも同じスクリプトを使います。
+
+```powershell
+cd scripts\schedule
+.\register_task.ps1 -Time "09:30" -Interval Daily   # 登録
+.\status_task.ps1                                   # 状態と履歴の確認
+.\unregister_task.ps1                               # 削除
+```
+
+- CLI の `--report` により、実行ごとに `logs\reports\batch_*.json`（件数・失敗理由・所要時間）を出力
+- `network.allowed_hours` が実行時刻を含む必要があります（登録時に整合を検査して警告）
+- 詳細は [docs/batch-operation.md](docs/batch-operation.md)、Azure VM での運用は [../azure-batch-vm/docs/runbook.md](../azure-batch-vm/docs/runbook.md) を参照（Workspaces 直下の兄弟フォルダ）
+
+## ネットワークポリシー
+
+相手のサーバーは共有資源なので、「許可した宛先だけ」「robots.txt に従う」「負荷をかけない」
+「身元を明かす」の4点を設定ではなく仕組みとして強制しています。
+
+| 項目 | 既定値 |
+|---|---|
+| 許可ホスト / スキーム | `www.i-ppi.jp` / `https` のみ |
+| 内部ネットワーク宛（プライベート IP） | 遮断（SSRF 対策） |
+| 同一ホストへの最小間隔 / 同時接続 | 1.0 秒（`Crawl-delay` が長ければそちら） / 1 |
+| 1回の実行のリクエスト上限 | 500 |
+| robots.txt | 遵守（取得失敗時は既定でブロック） |
+| 監査ログ | `./logs/network.log`（allow / blocked / robots_denied / rate_limited） |
+
+- 許可外のホストは**名前解決の時点で**遮断されます（`src/utils/netguard.py`）。IP 直打ちでも回避できません。
+- `target_urls` のホストが `network.allowed_hosts` に無い場合、**起動時にエラーで停止**します。
+- 設定は `config/config.example.yaml` の `network` セクションを参照してください。
+
+```powershell
+# ガードレールのテストだけを実行
+.\scripts\check_guardrails.ps1
+```
+
+許可先の追加やレート緩和の手順、やらないこと（認証回避・CAPTCHA 回避・`Disallow` 領域の取得・
+取得データの再配布・過負荷）は [docs/network-policy.md](./docs/network-policy.md) にまとめています。
 
 ## 最近の改善点
 
@@ -565,17 +613,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\tools\make_release_zip.ps1 -O
 
 ## 参考資料
 
+現行ドキュメントの一覧は [docs/README.md](./docs/README.md) を参照してください。
+
 - [要件定義書](./docs/requirements.md)
 - [要件トレーサビリティ表](./docs/REQUIREMENTS_TRACEABILITY.md)（FR/FR-SET と実装・テストの対応）
-- [要件ギャップレポート](./docs/requirement_gap_report.md)（FR-001〜FR-026 の突合・状態）
-- [調査ツールの使い方](./docs/INVESTIGATION_TOOL.md)（scripts/investigate/investigate_i_ppi.py）
 - [サイト変更監視の使い方](./docs/SITE_CHANGE_MONITORING.md)（snapshot / diff / impact）
-- [技術選定書](./docs/technology_selection.md)
-- [システム設計書](./docs/system_design.md)
-- [実装設計書](./docs/implementation_design.md)
-- [設定機能要件定義書](./docs/settings_requirements.md)
-- [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md)
-- [Gitクリーンアップレポート](./docs/dev/GIT_CLEANUP_REPORT.md)
+- [デプロイ手順](./docs/DEPLOYMENT.md)
+- [リリース・梱包手順](./docs/RELEASE_AND_PACK.md)
+- [ネットワークポリシー](./docs/network-policy.md)
+- [定期バッチ運用](./docs/batch-operation.md)
+
+歴史文書（ギャップレポート・旧設計書・調査メモなど）は [docs/archive/](./docs/archive/) にあります。実装と一致しない可能性があります。
 
 ## ライセンス
 

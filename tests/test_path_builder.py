@@ -129,6 +129,56 @@ class TestBuildSaveDir:
         assert result.exists()
         assert expected.exists()
 
+    def test_agency_on_includes_koji_name_folder(self, tmp_path):
+        """発注機関フォルダON時も工事名サブフォルダが作成されること（GAP-001）"""
+        config = _config(enable_agency=True, date_partition="none")
+        file_info = FileInfo(
+            url="https://example.com/doc.pdf",
+            filename="doc.pdf",
+            file_type=".pdf",
+            metadata={
+                "daibunrui": "国の機関",
+                "chubunrui": "国交省",
+                "shoubunrui": "東北",
+                "saibunrui": "トンネル",
+                "search_tab": "works",
+                "koji_name": "桂巣トンネル外照明設備工事",
+            },
+        )
+        result = build_save_dir(tmp_path, file_info, config, logger=None)
+        expected = (
+            tmp_path
+            / "発注機関"
+            / "国の機関"
+            / "国交省"
+            / "東北"
+            / "トンネル"
+            / "工事_入札公告等"
+            / "桂巣トンネル外照明設備工事"
+        )
+        assert result == expected
+        assert result.exists()
+
+    def test_empty_saibunrui_skipped(self, tmp_path):
+        """細分類が空のとき unknown フォルダを作らないこと"""
+        config = _config(enable_agency=True, date_partition="none")
+        file_info = FileInfo(
+            url="https://example.com/a.pdf",
+            filename="a.pdf",
+            file_type=".pdf",
+            metadata={
+                "daibunrui": "国の機関",
+                "chubunrui": "国交省",
+                "shoubunrui": "東北",
+                "saibunrui": "",
+                "search_tab": "works",
+            },
+        )
+        result = build_save_dir(tmp_path, file_info, config, logger=None)
+        assert result.name == "工事_入札公告等"
+        assert PLACEHOLDER not in str(result)
+        assert (tmp_path / "発注機関" / "国の機関" / "国交省" / "東北" / "工事_入札公告等").exists()
+
     def test_missing_metadata_uses_unknown(self, tmp_path):
         """欠損値があるとき unknown にフォールバックすること"""
         config = _config(enable_agency=True, date_partition="none")

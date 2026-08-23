@@ -205,7 +205,7 @@ class SettingsDialog:
         # 発注機関ごとのルートフォルダ
         agency_frame = ttk.LabelFrame(scrollable_frame, text="発注機関フォルダ構造", padding="5")
         agency_frame.pack(fill=tk.X, pady=(0, 10))
-        self.enable_agency_root_folders_var = tk.BooleanVar(value=True)
+        self.enable_agency_root_folders_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             agency_frame,
             text="発注機関ごとにルートフォルダを作成（大分類/中分類/小分類/細分類で枝分かれ）",
@@ -338,7 +338,7 @@ class SettingsDialog:
         if hasattr(self, "run_subfolder_mode_var"):
             self.run_subfolder_mode_var.set(getattr(config.save_paths, "run_subfolder_mode", "none"))
         if hasattr(self, "enable_agency_root_folders_var"):
-            self.enable_agency_root_folders_var.set(getattr(config.save_paths, "enable_agency_root_folders", True))
+            self.enable_agency_root_folders_var.set(getattr(config.save_paths, "enable_agency_root_folders", False))
         if hasattr(self, "include_search_tab_folder_var"):
             self.include_search_tab_folder_var.set(getattr(config.save_paths, "include_search_tab_folder", True))
         if hasattr(self, "date_partition_var"):
@@ -366,7 +366,9 @@ class SettingsDialog:
     def _get_lookup_service(self) -> LookupService:
         if self._lookup_service is None:
             if self._http_client is None:
-                self._http_client = HTTPClient(self.logger)
+                self._http_client = HTTPClient(
+                    self.logger, network_config=getattr(self.config, "network", None)
+                )
             self._lookup_service = LookupService(self._http_client, self.logger, self._search_url)
         return self._lookup_service
 
@@ -392,7 +394,7 @@ class SettingsDialog:
             run_subfolder_mode=run_mode_val,
             enable_hash_check=getattr(sp, "enable_hash_check", False),
             keep_part_on_cancel=getattr(sp, "keep_part_on_cancel", True),
-            enable_agency_root_folders=self.enable_agency_root_folders_var.get() if getattr(self, "enable_agency_root_folders_var", None) else getattr(sp, "enable_agency_root_folders", True),
+            enable_agency_root_folders=self.enable_agency_root_folders_var.get() if getattr(self, "enable_agency_root_folders_var", None) else getattr(sp, "enable_agency_root_folders", False),
             agency_root_label=getattr(sp, "agency_root_label", "発注機関"),
             agency_folder_levels=getattr(sp, "agency_folder_levels", ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]),
             include_search_tab_folder=self.include_search_tab_folder_var.get() if getattr(self, "include_search_tab_folder_var", None) else getattr(sp, "include_search_tab_folder", True),

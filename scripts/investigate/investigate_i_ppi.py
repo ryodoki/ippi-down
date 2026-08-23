@@ -372,6 +372,10 @@ def cmd_extract_files(
 
 
 def main() -> int:
+    _ensure_src()
+    from src.utils.ssl_config import configure_ssl
+    configure_ssl()
+
     # 共通引数（全サブコマンドで利用）
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"検索画面 URL (default: ...Search.aspx?tab=4)")

@@ -12,6 +12,8 @@ from ..models.config_model import (
     SavePaths,
     ScheduleConfig,
     LoggingConfig,
+    NetworkConfig,
+    RobotsConfig,
 )
 from ..utils.logger import Logger
 from ..utils.path_utils import get_config_path, get_logs_path, get_downloads_path
@@ -50,6 +52,14 @@ class ConfigManager:
                 config_dict = yaml.safe_load(f) or {}
 
             config = self._dict_to_config(config_dict)
+
+            # 通信ポリシー違反はデフォルトへのフォールバックで隠さず、起動を止める
+            network_errors = self.validator.validate_network(config)
+            if network_errors:
+                message = "通信ポリシー設定が不正です: " + ", ".join(network_errors)
+                self.logger.error(message)
+                raise ConfigError(message)
+
             is_valid, errors = self.validator.validate_config(config)
 
             if not is_valid:
@@ -60,6 +70,8 @@ class ConfigManager:
             self.logger.info(f"設定ファイルを読み込みました: {self.config_path}")
             return config
 
+        except ConfigError:
+            raise
         except (IOError, OSError) as e:
             self.logger.error(f"設定ファイルの読み込みエラー: {str(e)}")
             self.logger.info("デフォルト設定を使用します")
@@ -131,7 +143,7 @@ class ConfigManager:
             run_subfolder_mode=sp.get("run_subfolder_mode", "none"),
             enable_hash_check=sp.get("enable_hash_check", False),
             keep_part_on_cancel=sp.get("keep_part_on_cancel", True),
-            enable_agency_root_folders=sp.get("enable_agency_root_folders", True),
+            enable_agency_root_folders=sp.get("enable_agency_root_folders", False),
             agency_root_label=(sp.get("agency_root_label") or "発注機関").strip() or "発注機関",
             agency_folder_levels=sp.get("agency_folder_levels") or ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"],
             include_search_tab_folder=sp.get("include_search_tab_folder", True),
@@ -193,6 +205,8 @@ class ConfigManager:
             display_count=search_dict.get("display_count", 20),
         )
 
+        network = self._dict_to_network(config_dict.get("network") or {})
+
         # target_urls が欠落または空リストのときは既定URLでフォールバック（起動不能にしない）
         raw_urls = config_dict.get("target_urls")
         if not raw_urls or (isinstance(raw_urls, list) and len(raw_urls) == 0):
@@ -207,6 +221,39 @@ class ConfigManager:
             naming_rule=config_dict.get("naming_rule", "{category}_{title}_{date}_{index}"),
             schedule=schedule,
             logging=logging_config,
+            network=network,
+        )
+
+    def _dict_to_network(self, network_dict: dict) -> NetworkConfig:
+        """通信ポリシーを辞書から組み立てる（未指定は既定値のまま）"""
+        defaults = NetworkConfig()
+        robots_dict = network_dict.get("robots") or {}
+        robots_defaults = RobotsConfig()
+        return NetworkConfig(
+            allowed_hosts=network_dict.get("allowed_hosts") or list(defaults.allowed_hosts),
+            allowed_schemes=network_dict.get("allowed_schemes") or list(defaults.allowed_schemes),
+            allowed_ports=network_dict.get("allowed_ports") or list(defaults.allowed_ports),
+            block_private_ips=network_dict.get("block_private_ips", defaults.block_private_ips),
+            min_interval_seconds=float(
+                network_dict.get("min_interval_seconds", defaults.min_interval_seconds)
+            ),
+            max_concurrency=int(network_dict.get("max_concurrency", defaults.max_concurrency)),
+            max_requests_per_run=int(
+                network_dict.get("max_requests_per_run", defaults.max_requests_per_run)
+            ),
+            allowed_hours=network_dict.get("allowed_hours", defaults.allowed_hours),
+            user_agent=network_dict.get("user_agent", defaults.user_agent),
+            user_agent_suffix=network_dict.get(
+                "user_agent_suffix", defaults.user_agent_suffix
+            ),
+            robots=RobotsConfig(
+                enabled=robots_dict.get("enabled", robots_defaults.enabled),
+                on_error=robots_dict.get("on_error", robots_defaults.on_error),
+                cache_ttl_seconds=int(
+                    robots_dict.get("cache_ttl_seconds", robots_defaults.cache_ttl_seconds)
+                ),
+            ),
+            audit_log=network_dict.get("audit_log", defaults.audit_log),
         )
 
     def _config_to_dict(self, config: AppConfig) -> dict:
@@ -279,6 +326,24 @@ class ConfigManager:
                 "file": config.logging.file,
                 "max_bytes": config.logging.max_bytes,
                 "backup_count": config.logging.backup_count,
+            },
+            "network": {
+                "allowed_hosts": config.network.allowed_hosts,
+                "allowed_schemes": config.network.allowed_schemes,
+                "allowed_ports": config.network.allowed_ports,
+                "block_private_ips": config.network.block_private_ips,
+                "min_interval_seconds": config.network.min_interval_seconds,
+                "max_concurrency": config.network.max_concurrency,
+                "max_requests_per_run": config.network.max_requests_per_run,
+                "allowed_hours": config.network.allowed_hours,
+                "user_agent": config.network.user_agent,
+                "user_agent_suffix": config.network.user_agent_suffix,
+                "robots": {
+                    "enabled": config.network.robots.enabled,
+                    "on_error": config.network.robots.on_error,
+                    "cache_ttl_seconds": config.network.robots.cache_ttl_seconds,
+                },
+                "audit_log": config.network.audit_log,
             },
         }
 

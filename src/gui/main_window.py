@@ -168,7 +168,9 @@ class MainWindow:
         """LookupService を取得（遅延初期化）"""
         if self._lookup_service is None:
             if self._http_client is None:
-                self._http_client = HTTPClient(self.logger)
+                self._http_client = HTTPClient(
+                    self.logger, network_config=getattr(self.config, "network", None)
+                )
             self._lookup_service = LookupService(self._http_client, self.logger, self._search_url)
         return self._lookup_service
 

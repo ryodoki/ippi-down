@@ -15,6 +15,23 @@ download_conditions:
     start: null  # YYYY-MM-DD形式（実装済み、メタデータから日付を取得してフィルタ）
     end: null    # YYYY-MM-DD形式（実装済み、メタデータから日付を取得してフィルタ）
 
+# ppi.jp 検索条件（GUI の検索タブ / 設定ダイアログと対応）
+search_conditions:
+  hachu_daibunrui: ""      # 発注機関・大分類
+  hachu_chubunrui: ""
+  hachu_shoubunrui: ""
+  hachu_saibunrui: ""
+  hachu_multi: []          # 発注機関の複数選択
+  koji_name: ""            # 工事名
+  place_search_type: list  # list | text
+  place_chihou: ""
+  place_todofuken: ""
+  place_shichouson: ""
+  place_text: ""
+  contract_types: []       # 入札契約方式（空＝未指定）
+  update_date_type: none   # none | past
+  update_date_days: null   # update_date_type が past のとき「過去N日以内」
+
 # 保存先
 save_paths:
   local: ./downloads
@@ -22,8 +39,8 @@ save_paths:
   run_subfolder_mode: none  # none | datetime | search
   enable_hash_check: false
   keep_part_on_cancel: true
-  # 発注機関ごとのルートフォルダ（ONでダウンロードごとに 発注機関/大分類/中分類/小分類/細分類 の階層で作成）
-  enable_agency_root_folders: true
+  # 発注機関ごとのルートフォルダ（デフォルトOFF。ONで 発注機関/大分類/…/工事名/ の階層を作成）
+  enable_agency_root_folders: false
   agency_root_label: "発注機関"
   agency_folder_levels: ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]
   include_search_tab_folder: true   # 工事/業務でフォルダを分ける
@@ -51,4 +68,33 @@ logging:
   file: ./logs/app.log
   max_bytes: 10485760  # 10MB
   backup_count: 5
+
+# 通信ポリシー（許可先・スクレイピング作法・監査）
+# allowed_hosts を広げるときは、対象サイトの利用規約と許諾を必ず確認すること。
+# target_urls のホストが allowed_hosts に無い場合、起動時にエラーになる。
+network:
+  allowed_hosts:
+    - www.i-ppi.jp
+  allowed_schemes:
+    - https
+  allowed_ports:
+    - 443
+  block_private_ips: true      # 社内ネットワーク宛（SSRF）を遮断
+
+  # 負荷抑制
+  min_interval_seconds: 1.0    # 同一ホストへの最小間隔（robots の Crawl-delay の方が長ければそちらを採用）
+  max_concurrency: 1           # 同一ホストへの同時接続数
+  max_requests_per_run: 500    # 1回の実行で送るリクエスト上限
+  allowed_hours: null          # 稼働時間帯の制限。例 "08:00-22:00"
+
+  # 身元の明示（user_agent を指定すると完全上書き。既定は現行UAへ識別子を付加）
+  user_agent: null
+  user_agent_suffix: "ippi-down/1.0 (+社内利用)"
+
+  robots:
+    enabled: true
+    on_error: block            # robots.txt が取得できないときの既定動作（block | allow）
+    cache_ttl_seconds: 86400
+
+  audit_log: ./logs/network.log
 

@@ -171,22 +171,24 @@ class Scraper:
 
     def extract_file_links_from_search_results(self, soup, base_url, file_types, search_conditions=None):
         last_url = getattr(self, "_last_search_result_url", base_url)
-        files, total, new_url = _extract_file_links_from_search_results(
+        files, total, new_url, unavailable = _extract_file_links_from_search_results(
             self.http_client, soup, base_url, file_types, self.logger,
             search_conditions, last_url,
         )
         self.last_search_total_koji_count = total
+        self.last_search_unavailable_document_count = unavailable
         self._last_search_result_url = new_url
         return files
 
     def _extract_files_from_detail_page_via_postback(self, base_url, postback_href, file_types, current_soup, koji_name=None):
         last_url = getattr(self, "_last_search_result_url", base_url)
         saved = getattr(self, "_detail_page_saved", False)
-        files, new_saved = _extract_files_from_detail_via_postback(
+        files, new_saved, unavailable = _extract_files_from_detail_via_postback(
             self.http_client, base_url, postback_href, file_types, current_soup,
             self.logger, last_url, koji_name=koji_name, detail_page_saved_flag=saved,
         )
         self._detail_page_saved = new_saved
+        self._last_detail_unavailable_count = unavailable
         return files
 
     def _extract_files_from_detail_page(self, detail_url, file_types):

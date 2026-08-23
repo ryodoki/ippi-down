@@ -100,7 +100,38 @@ def test_application_service_run_without_files(mock_downloader, mock_naming, moc
 
     # 検証
     assert run_result.success is False
-    assert "ファイルが見つかりませんでした" in run_result.message
+    assert "対象ページの取得に失敗しました" in run_result.message
+
+
+@patch('src.app.service.HTTPClient')
+@patch('src.app.service.Scraper')
+@patch('src.app.service.Filter')
+@patch('src.app.service.Naming')
+@patch('src.app.service.Downloader')
+def test_application_service_run_search_failed(mock_downloader, mock_naming, mock_filter, mock_scraper, mock_http_client):
+    """ApplicationService.run() - 検索失敗時は接続エラーメッセージを返す"""
+    from src.app.service import ApplicationService
+    from src.models.config_model import AppConfig, SearchConditions, DownloadConditions, SavePaths, ScheduleConfig, LoggingConfig
+    from src.utils.logger import Logger
+
+    mock_scraper_instance = MagicMock()
+    mock_scraper_instance.submit_search_form.return_value = None
+    mock_scraper.return_value = mock_scraper_instance
+
+    config = AppConfig(
+        target_urls=["https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"],
+        download_conditions=DownloadConditions(),
+        search_conditions=SearchConditions(koji_name="トンネル"),
+        save_paths=SavePaths(local="./test_downloads"),
+        schedule=ScheduleConfig(),
+        logging=LoggingConfig(),
+    )
+
+    service = ApplicationService(Logger())
+    run_result = service.run(config)
+
+    assert run_result.success is False
+    assert "サイトへの接続または検索の実行に失敗しました" in run_result.message
 
 
 @patch('src.app.service.HTTPClient')

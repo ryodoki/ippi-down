@@ -14,6 +14,8 @@ from ..utils.file_utils import FileUtils
 # フォルダ名の最大長（Windows パス長を考慮）
 FOLDER_NAME_MAX_LENGTH = 80
 PLACEHOLDER = "unknown"
+# 空のときフォルダ階層を省略する任意レベル（細分類未指定時の unknown フォルダを避ける）
+OPTIONAL_FOLDER_LEVELS = frozenset({"saibunrui"})
 
 
 def sanitize_and_trim(name: Optional[str], max_length: int = FOLDER_NAME_MAX_LENGTH) -> str:
@@ -66,10 +68,10 @@ def build_save_dir(
     """発注機関階層・工事/業務・日付パーティションを反映した保存ディレクトリを組み立てる。
 
     - enable_agency_root_folders が False のときは base_dir をそのまま返す（呼び出し側で use_subfolders/folder_name を適用）。
-    - True のときは base_dir / 発注機関 / 大分類 / 中分類 / 小分類 / 細分類 / 工事 or 業務 / (日付) を生成し mkdir して返す。
+    - True のときは base_dir / 発注機関 / 大分類 / … / 工事or業務 / 工事名 / (日付) を生成し mkdir して返す。
     """
     save_paths = config.save_paths
-    if not getattr(save_paths, "enable_agency_root_folders", True):
+    if not getattr(save_paths, "enable_agency_root_folders", False):
         return base_dir
 
     base = base_dir
@@ -81,8 +83,14 @@ def build_save_dir(
     base = base / sanitize_and_trim(root_label)
 
     for level in levels:
-        value = meta.get(level) or PLACEHOLDER
-        base = base / sanitize_and_trim(str(value))
+        raw = meta.get(level)
+        if raw is None or not str(raw).strip() or str(raw).strip() == PLACEHOLDER:
+            if level in OPTIONAL_FOLDER_LEVELS:
+                continue
+            value = PLACEHOLDER
+        else:
+            value = str(raw).strip()
+        base = base / sanitize_and_trim(value)
 
     if getattr(save_paths, "include_search_tab_folder", True):
         tab = meta.get("search_tab") or PLACEHOLDER
@@ -92,6 +100,10 @@ def build_save_dir(
         }
         folder_name = labels.get(tab, tab if tab != PLACEHOLDER else "unknown")
         base = base / sanitize_and_trim(folder_name)
+
+    koji_name = meta.get("koji_name")
+    if koji_name and str(koji_name).strip() and str(koji_name).strip() != PLACEHOLDER:
+        base = base / sanitize_and_trim(str(koji_name))
 
     date_partition = getattr(save_paths, "date_partition", "none") or "none"
     if date_partition != "none":
@@ -103,6 +115,6 @@ def build_save_dir(
     if logger:
         logger.info(
             f"発注機関フォルダ: base_dir={base_dir}, 生成先={base}, "
-            f"metadata(daibunrui/chubunrui/search_tab)={meta.get('daibunrui')}/{meta.get('chubunrui')}/{meta.get('search_tab')}"
+            f"metadata(daibunrui/chubunrui/koji_name)={meta.get('daibunrui')}/{meta.get('chubunrui')}/{meta.get('koji_name')}"
         )
     return base

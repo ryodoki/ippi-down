@@ -121,6 +121,32 @@ def extract_files_from_tables(
     return files
 
 
+def count_unavailable_documents(soup: BeautifulSoup, logger: "Logger") -> int:
+    """公開文書テーブルで文書名はあるがリンク(href)が無い行を数える
+
+    ppi.jp の入札の経過ページなどでは、公開期限切れの文書が
+    「公開終了」表示となり <a> に href が付かない。これらは
+    ダウンロード不能だが「添付が存在しない」とは区別したいため件数を数える。
+    """
+    count = 0
+    for table_id in ("dgrKokoku", "dgrKeika"):
+        table = soup.find("table", id=table_id)
+        if not table:
+            continue
+        for row in table.find_all("tr")[1:]:
+            cells = row.find_all("td")
+            if len(cells) < 2:
+                continue
+            document_name = cells[0].get_text(strip=True)
+            if not document_name:
+                continue
+            if cells[1].find("a", href=True):
+                continue
+            count += 1
+            logger.debug(f"公開終了/リンクなしの文書を検出: '{document_name}' ({table_id})")
+    return count
+
+
 def extract_files_from_detail_via_postback(
     http_client: "HTTPClient",
     base_url: str,
@@ -131,16 +157,16 @@ def extract_files_from_detail_via_postback(
     last_search_result_url: str,
     koji_name: Optional[str] = None,
     detail_page_saved_flag: bool = False,
-) -> tuple[List[FileInfo], bool]:
+) -> tuple[List[FileInfo], bool, int]:
     """__doPostBack リンクから詳細ページを取得してファイルを抽出
 
     Returns:
-        (抽出ファイルリスト, detail_page_saved_flag の更新値)
+        (抽出ファイルリスト, detail_page_saved_flag の更新値, 公開終了等で取得不能だった文書数)
     """
     try:
         match = re.search(r"__doPostBack\('([^']+)','([^']+)'\)", postback_href)
         if not match:
-            return [], detail_page_saved_flag
+            return [], detail_page_saved_flag, 0
 
         event_target = match.group(1)
         event_argument = match.group(2)
@@ -159,7 +185,7 @@ def extract_files_from_detail_via_postback(
         response = http_client.post(post_url, data=form_data)
         detail_soup = parse_response_to_soup(response)
         if not detail_soup:
-            return [], detail_page_saved_flag
+            return [], detail_page_saved_flag, 0
 
         if not detail_page_saved_flag:
             output_file = Path("artifacts/test_detail_page.html")
@@ -198,11 +224,20 @@ def extract_files_from_detail_via_postback(
         )
 
         all_files = _merge_files(files, userentry_files, logger)
-        return all_files, detail_page_saved_flag
+
+        unavailable_count = 0
+        if not all_files:
+            unavailable_count = count_unavailable_documents(detail_soup, logger)
+            if unavailable_count:
+                logger.info(
+                    f"公開終了等で取得不能な文書が{unavailable_count}件ありました"
+                    f"（工事名: {koji_name or 'N/A'}）"
+                )
+        return all_files, detail_page_saved_flag, unavailable_count
 
     except Exception as e:
         logger.warning(f"詳細ページからのファイル抽出エラー（POST）: {postback_href} - {str(e)}")
-        return [], detail_page_saved_flag
+        return [], detail_page_saved_flag, 0
 
 
 def extract_files_from_detail_page(

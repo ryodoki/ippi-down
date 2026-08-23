@@ -1,0 +1,32 @@
+name: guardrails
+
+# 通信ガードレール（許可リスト・robots・レート制限・監査）を継続的に検証する雛形。
+# 実通信テストは既定でスキップされるため、CI からネットワークへは出ません。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  guardrails:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 依存関係をインストール
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: 通信ガードレールを検証
+        run: python -m pytest tests/test_network_static.py tests/test_netguard.py tests/test_url_policy.py tests/test_robots.py tests/test_rate_limiter.py tests/test_shared_rate_limiter.py tests/test_config_network.py tests/test_audit_log.py -q
+
+      - name: 全テスト
+        run: python -m pytest -q

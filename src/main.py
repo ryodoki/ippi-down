@@ -18,6 +18,8 @@ from src.config.config_manager import ConfigManager
 from src.models.config_model import AppConfig
 from src.gui.main_window import MainWindow
 from src.utils.logger import Logger
+from src.utils import netguard
+from src.utils.ssl_config import configure_ssl
 from src.utils.notifier import Notifier
 from src.app.service import ApplicationService
 from src.app.events import ProgressEvent
@@ -126,13 +128,16 @@ def run_scheduled_download(config: AppConfig, logger: Logger):
 
 def main():
     """メイン関数"""
-    # NOTE: moved to top-level imports (keep for reference during refactor)
-    # import os
+    # 設定より前に許可リストを有効化する（起動直後の通信も対象にする）
+    netguard.install_guard()
+    configure_ssl()
 
     # 設定を読み込み
     config_manager = ConfigManager()
     config = config_manager.load_config()
     logger = Logger(config.logging)
+    policy = netguard.install_from_config(config.network, logger=logger)
+    logger.info(f"通信の許可先: {', '.join(policy.allowed_hosts) or 'なし（全遮断）'}")
 
     # バックグラウンド実行モードかチェック（環境変数またはコマンドライン引数）
     background_mode = os.getenv("PPI_BACKGROUND_MODE", "").lower() == "true"

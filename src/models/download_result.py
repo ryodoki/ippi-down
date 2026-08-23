@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass, field
 from typing import List
+from pathlib import Path
 from .download_task import DownloadTask
 
 
@@ -69,3 +70,30 @@ class DownloadResult:
                     summary["other"] += 1
         
         return summary
+
+    def get_save_directories(self) -> List[str]:
+        """実際にファイルが保存されたディレクトリ一覧（重複なし・ソート済み）"""
+        dirs = set()
+        for task in self.tasks:
+            if task.local_path and task.status in ("completed", "skipped"):
+                dirs.add(str(Path(task.local_path).parent))
+        return sorted(dirs)
+
+    def summarize_skips(self) -> dict[str, int]:
+        """スキップ理由別件数（FR-005 / FR-008）"""
+        summary: dict[str, int] = {}
+        for task in self.tasks:
+            if task.status != "skipped":
+                continue
+            reason = task.error_message or "duplicate"
+            summary[reason] = summary.get(reason, 0) + 1
+        return summary
+
+    def get_completed_paths(self, limit: int = 5) -> List[str]:
+        """今回新規保存されたファイルパス（最大 limit 件）"""
+        paths = [
+            task.local_path
+            for task in self.tasks
+            if task.status == "completed" and task.local_path
+        ]
+        return paths[:limit]

@@ -9,6 +9,7 @@ from ..models.download_result import DownloadResult
 from ..models.file_info import FileInfo
 from ..utils.logger import Logger
 from ..utils.http_client import HTTPClient
+from ..utils.rate_limiter import reset_shared_limiter
 from ..utils.notifier import Notifier
 from ..core.scraper import Scraper
 from ..core.filter import Filter
@@ -18,6 +19,7 @@ from ..core.path_builder import build_save_dir as path_builder_build_save_dir
 from ..utils.path_utils import resolve_save_path
 from .run_result import RunResult
 from .events import ProgressEvent, EventType
+from .extract_result import ExtractResult
 
 
 class ApplicationService:
@@ -56,7 +58,8 @@ class ApplicationService:
                 ))
 
             # ファイル抽出
-            all_files = self._extract_files(config, progress_callback, cancel_flag)
+            extract_result = self._extract_files(config, progress_callback, cancel_flag)
+            all_files = extract_result.files
             
             if cancel_flag and cancel_flag():
                 return RunResult(
@@ -65,9 +68,19 @@ class ApplicationService:
                 )
 
             if not all_files:
+                message = self._build_no_files_message(extract_result)
+                # 接続/検索の失敗は赤いエラー表示、それ以外（案件はヒットしたが
+                # 添付が公開終了・存在しない等）は警告扱いにして誤解を避ける
+                is_connection_failure = extract_result.had_connection_failure
+                if progress_callback:
+                    progress_callback(ProgressEvent(
+                        type=EventType.FAIL if is_connection_failure else EventType.MESSAGE,
+                        message=message,
+                        metadata=None if is_connection_failure else {"type": "warning"},
+                    ))
                 return RunResult(
                     success=False,
-                    message="ファイルが見つかりませんでした"
+                    message=message
                 )
 
             # フィルタリング
@@ -111,6 +124,29 @@ class ApplicationService:
                 f"ダウンロード完了: 成功={result.success}, "
                 f"失敗={result.failed}, スキップ={result.skipped}"
             )
+            save_dirs = result.get_save_directories()
+            if save_dirs:
+                if len(save_dirs) == 1:
+                    result_message += f"\n保存先: {save_dirs[0]}"
+                else:
+                    result_message += f"\n保存先（{len(save_dirs)}フォルダ）:\n"
+                    result_message += "\n".join(f"  - {d}" for d in save_dirs[:5])
+                    if len(save_dirs) > 5:
+                        result_message += f"\n  ... 他 {len(save_dirs) - 5} 件"
+            elif save_dir:
+                result_message += f"\n保存先: {save_dir}"
+
+            skip_summary = result.summarize_skips()
+            if skip_summary:
+                skip_text = ", ".join(f"{k}={v}" for k, v in sorted(skip_summary.items()))
+                result_message += f"\nスキップ内訳: {skip_text}"
+
+            completed_paths = result.get_completed_paths(limit=5)
+            if completed_paths:
+                result_message += "\n新規保存:"
+                for p in completed_paths:
+                    result_message += f"\n  - {Path(p).name} ({Path(p).parent})"
+
             if failure_summary_text:
                 result_message += f" (失敗理由: {failure_summary_text})"
             
@@ -156,7 +192,11 @@ class ApplicationService:
 
     def _initialize_components(self, config: AppConfig):
         """コンポーネントを初期化"""
-        self._http_client = HTTPClient(self.logger)
+        # max_requests_per_run は「1回の実行」単位なので、実行開始時に数え直す
+        reset_shared_limiter()
+        self._http_client = HTTPClient(
+            self.logger, network_config=getattr(config, "network", None)
+        )
         self._scraper = Scraper(self._http_client, self.logger)
         self._filter = Filter(config.download_conditions, self.logger)
         self._naming = Naming(
@@ -171,9 +211,9 @@ class ApplicationService:
         config: AppConfig,
         progress_callback: Optional[Callable[[ProgressEvent], None]],
         cancel_flag: Optional[Callable[[], bool]]
-    ):
+    ) -> ExtractResult:
         """ファイルを抽出"""
-        all_files = []
+        result = ExtractResult()
         
         for url in config.target_urls:
             if cancel_flag and cancel_flag():
@@ -207,9 +247,11 @@ class ApplicationService:
                     files = self._scraper.extract_file_links_from_search_results(
                         soup, url, config.download_conditions.file_types, config.search_conditions
                     )
-                    all_files.extend(files)
+                    result.files.extend(files)
                     # 工事件数（スクレイパーから取得）とファイル数を表示
                     koji_count = getattr(self._scraper, 'last_search_total_koji_count', None)
+                    if isinstance(koji_count, int):
+                        result.total_koji_count += koji_count
                     if koji_count is None:
                         # フォールバック: ファイルから取得したユニークな工事名の数
                         koji_names = set()
@@ -217,6 +259,9 @@ class ApplicationService:
                             if f.metadata and f.metadata.get("koji_name"):
                                 koji_names.add(f.metadata["koji_name"])
                         koji_count = len(koji_names) if koji_names else "不明"
+                    result.unavailable_document_count += getattr(
+                        self._scraper, 'last_search_unavailable_document_count', 0
+                    ) or 0
                     self.logger.info(f"検索結果: 工事件数={koji_count}件, ファイル数={len(files)}件")
                     if progress_callback:
                         progress_callback(ProgressEvent(
@@ -226,6 +271,7 @@ class ApplicationService:
                         ))
                 else:
                     self.logger.error(f"検索の実行に失敗しました: {url}")
+                    result.search_failed_urls.append(url)
             else:
                 # 通常のページ解析（Search.aspx 以外で条件なしの場合）
                 soup = self._scraper.fetch_page(url)
@@ -233,12 +279,47 @@ class ApplicationService:
                     files = self._scraper.extract_file_links(
                         soup, url, config.download_conditions.file_types
                     )
-                    all_files.extend(files)
+                    result.files.extend(files)
                     self.logger.info(f"{len(files)}個のファイルリンクを発見")
                 else:
                     self.logger.error(f"ページの取得に失敗しました: {url}")
+                    result.fetch_failed_urls.append(url)
 
-        return all_files
+        return result
+
+    def _build_no_files_message(self, extract_result: ExtractResult) -> str:
+        """ファイル0件時のユーザー向けメッセージを生成"""
+        if extract_result.search_failed_urls:
+            return (
+                "サイトへの接続または検索の実行に失敗しました。"
+                "ネットワーク接続と SSL 証明書設定を確認してください。"
+            )
+        if extract_result.fetch_failed_urls:
+            return (
+                "対象ページの取得に失敗しました。"
+                "ネットワーク接続と SSL 証明書設定を確認してください。"
+            )
+
+        koji_count = extract_result.total_koji_count
+        unavailable = extract_result.unavailable_document_count
+
+        if koji_count and koji_count > 0:
+            # 案件はヒットしている＝検索・接続は成功。添付が無い/公開終了が原因。
+            if unavailable and unavailable > 0:
+                return (
+                    f"検索で{koji_count}件ヒットしましたが、公開文書が{unavailable}件すべて"
+                    "「公開終了」のためダウンロードできるファイルがありませんでした。"
+                    "検索条件（発注機関の細分類・期間など）を見直すか、公開中の案件を対象にしてください。"
+                )
+            return (
+                f"検索で{koji_count}件ヒットしましたが、ダウンロード可能な添付ファイルが"
+                "ありませんでした（添付なし、または公開終了の可能性）。"
+                "検索条件を見直してください。"
+            )
+        return (
+            "検索条件に一致する案件が見つかりませんでした。"
+            "検索条件（発注機関・工事名・期間など）を見直してください。"
+        )
 
     def _has_search_conditions(self, search_conditions) -> bool:
         """検索条件が設定されているかチェック"""

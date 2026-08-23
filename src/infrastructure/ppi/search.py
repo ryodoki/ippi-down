@@ -332,17 +332,18 @@ def extract_file_links_from_search_results(
     logger: "Logger",
     search_conditions: Optional[SearchConditions] = None,
     last_search_result_url: str = "",
-) -> tuple[List[FileInfo], int, str]:
+) -> tuple[List[FileInfo], int, str, int]:
     """検索結果の全ページからファイルリンクを抽出（ページネーション対応）
 
     Returns:
-        (全ファイルリスト, 工事件数, 最終URL)
+        (全ファイルリスト, 工事件数, 最終URL, 公開終了等で取得不能だった文書数)
     """
     all_file_links: List[FileInfo] = []
     current_soup = soup
     page_number = 1
     max_pages = 100
     total_koji_count = 0
+    total_unavailable = 0
     current_url = last_search_result_url or base_url
     detail_saved = False
 
@@ -353,11 +354,12 @@ def extract_file_links_from_search_results(
         total_koji_count += page_koji_count
         logger.info(f"ページ {page_number} の工事件数: {page_koji_count}件 (累計: {total_koji_count}件)")
 
-        page_files, detail_saved = _extract_file_links_from_single_page(
+        page_files, detail_saved, page_unavailable = _extract_file_links_from_single_page(
             http_client, current_soup, base_url, file_types, logger,
             search_conditions, current_url, detail_saved,
         )
         all_file_links.extend(page_files)
+        total_unavailable += page_unavailable
 
         next_soup, next_url = _get_next_page(http_client, current_soup, base_url, current_url, logger)
         if next_soup is None:
@@ -372,7 +374,7 @@ def extract_file_links_from_search_results(
         ensure_agency_metadata(f, search_conditions, base_url)
 
     logger.info(f"検索結果から合計{len(all_file_links)}個のファイルリンクを抽出しました（工事件数: {total_koji_count}件）")
-    return all_file_links, total_koji_count, current_url
+    return all_file_links, total_koji_count, current_url, total_unavailable
 
 
 # ─── 内部ヘルパー ─────────────────────────────────────
@@ -513,9 +515,14 @@ def _extract_file_links_from_single_page(
     search_conditions: Optional[SearchConditions],
     last_search_result_url: str,
     detail_saved: bool,
-) -> tuple[List[FileInfo], bool]:
-    """単一の検索結果ページからファイルリンクを抽出"""
+) -> tuple[List[FileInfo], bool, int]:
+    """単一の検索結果ページからファイルリンクを抽出
+
+    Returns:
+        (ファイルリスト, detail_saved 更新値, 公開終了等で取得不能だった文書数)
+    """
     file_links: List[FileInfo] = []
+    unavailable_count = 0
     result_table = soup.find("table", id="dgrSearchList")
 
     if result_table:
@@ -544,12 +551,13 @@ def _extract_file_links_from_single_page(
                     continue
 
             href = detail_link.get("href", "")
-            detail_files, detail_saved = extract_files_from_detail_via_postback(
+            detail_files, detail_saved, detail_unavailable = extract_files_from_detail_via_postback(
                 http_client, base_url, href, file_types, soup, logger,
                 last_search_result_url, koji_name=koji_name,
                 detail_page_saved_flag=detail_saved,
             )
             file_links.extend(detail_files)
+            unavailable_count += detail_unavailable
 
         if filtered_count > 0:
             logger.info(f"工事名フィルタリング: {filtered_count}件の工事を除外しました")
@@ -570,4 +578,4 @@ def _extract_file_links_from_single_page(
     file_links.extend(direct_files)
 
     logger.info(f"このページから{len(file_links)}個のファイルリンクを抽出しました")
-    return file_links, detail_saved
+    return file_links, detail_saved, unavailable_count

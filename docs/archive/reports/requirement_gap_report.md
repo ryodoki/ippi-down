@@ -8,16 +8,16 @@ docs/requirements.md に基づく機能要件と実装・テストの突合結�
 | FR-002 | ファイルリンク検出 | scraper (_extract_files_from_tables, extract_file_links) | 統合 | OK | PDF/Excel/Word/PostBack対応 |
 | FR-003 | メタデータ抽出 | scraper.extract_metadata, metadata_extractor | 統合 | OK | 発注機関・工事名・日付 |
 | FR-004 | 条件指定・YAML保存 | config_manager, settings_dialog | test_config_model, test_settings | OK | GUI/設定ファイル対応 |
-| FR-005 | 自動ダウンロード・失敗記録・サマリー | downloader, service, download_result.summarize_failures | test_application_service | OK | 失敗理由別件数出力 |
+| FR-005 | 自動ダウンロード・失敗記録・サマリー | downloader, service, download_result.summarize_failures/summarize_skips | test_application_service, test_download_result | OK | 失敗・スキップ理由別件数、新規保存パス一覧 |
 | FR-006 | 進捗表示 | gui/main_window, event_handler, ProgressEvent | GUI | OK | 進捗バー・成功/失敗/スキップ |
 | FR-006-1 | キャンセル・.part扱い | downloader (keep_part_on_cancel) | 手動 | OK | 設定で keep/delete |
 | FR-007 | リトライ（回数・指数バックオフ・429） | utils/http_client (tenacity, Retry-After) | test_http_client | OK | 3回・対象外4xx |
 | FR-008 | 重複スキップ（URL/同名+サイズ/ハッシュ） | downloader.check_duplicate, download_history | test_downloader | OK | スキップ理由をタスクに記録するよう整備済み |
-| FR-009 | テンプレート文字列でファイル名生成 | core/naming.py (generate_filename, format_map) | test_naming | OK | 欠損値は "unknown"、ext 対応 |
-| FR-010 | 命名規則カスタマイズ・保存 | settings_dialog, config_manager, naming_rule | test_settings | OK | YAML に保存 |
+| FR-009 | テンプレート文字列でファイル名生成 | core/naming.py (generate_filename, _resolve_date_for_naming) | test_naming | OK | 欠損値は "unknown"、メタデータ日付優先 |
+| FR-010 | 命名規則カスタマイズ・保存 | settings_dialog, config_manager, naming_rule | test_settings | OK | デフォルト `{category}_{title}_{date}_{index}` |
 | FR-011 | ファイル名重複回避（連番） | file_utils.ensure_unique, naming.ensure_unique | test_file_utils | OK | _1, _2 付与 |
-| FR-012 | 指定フォルダに保存 | downloader (save_dir, folder_name), service | test_downloader | OK | folder_name をベース下に反映 |
-| FR-013 | サブフォルダ自動生成 | downloader (use_subfolders), naming.generate_folder_name | test_downloader | OK | メタデータに基づくフォルダ名 |
+| FR-012 | 指定フォルダに保存 | downloader (save_dir, folder_name), service, path_builder | test_downloader, test_path_builder | OK | 発注機関フォルダはデフォルト OFF |
+| FR-013 | サブフォルダ自動生成 | path_builder (koji_name), naming.generate_folder_name | test_path_builder, test_save_layout_integration | OK | 発注機関 ON 時も工事名フォルダを維持 |
 | FR-016 | 定期実行（間隔/時刻/cron） | scheduler/, ScheduleConfig, croniter | test_config_model, test_schedule_cron | OK | 起動中のみ・croniter で cron 対応 |
 | FR-017 | 実行ログ記録 | utils/logger.py, LoggingConfig | - | OK | 開始/終了/件数 |
 | FR-018 | 実行結果通知（ログ・GUI） | logger, event_handler, Notifier | - | OK | ログ＋GUI表示 |
@@ -32,8 +32,10 @@ docs/requirements.md に基づく機能要件と実装・テストの突合結�
 
 ## 修正済み・対応方針
 
-- **FR-009/FR-010**: テンプレートの欠損キーを空文字ではなく "unknown" に統一。プレースホルダ {ext} をコンテキストに追加。
-- **FR-008**: check_duplicate の戻り値を (bool, Optional[str]) とし、スキップ時に "url" / "filename_size" / "hash" を DownloadTask に記録。
+- **FR-009/FR-010**: テンプレートの欠損キーを空文字ではなく "unknown" に統一。`{date}` は HTML メタデータを優先。デフォルト命名規則を `{category}_{title}_{date}_{index}` に復元。
+- **FR-008**: check_duplicate の戻り値を (bool, Optional[str]) とし、スキップ時に "url" / "filename_size" / "hash" を DownloadTask に記録。フォルダ単位の index 採番で衝突を軽減。
+- **FR-013**: 発注機関フォルダ ON 時に `path_builder` で工事名（koji_name）サブフォルダを追加。細分類未指定時は unknown フォルダを省略。
+- **FR-012/設定**: `enable_agency_root_folders` のコード・GUI・YAML デフォルトを OFF に統一。
 - **FR-016**: cron は croniter で実装済み。次回実行時刻の算出と不正 cron 検出のテストを追加。
 
 ## Partial の扱い

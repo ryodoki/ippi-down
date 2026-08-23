@@ -154,7 +154,7 @@ class Naming:
             "ext": ext_raw if ext_raw else "." + DEFAULT_PLACEHOLDER,
             "category": merged_metadata.get("category") or DEFAULT_PLACEHOLDER,
             "title": merged_metadata.get("title") or DEFAULT_PLACEHOLDER,
-            "date": datetime.now().strftime("%Y%m%d"),
+            "date": self._resolve_date_for_naming(merged_metadata),
             "index": str(index),
             "koji_name": merged_metadata.get("koji_name") or DEFAULT_PLACEHOLDER,
         }
@@ -192,6 +192,29 @@ class Naming:
                 safe_context[key] = str(value)
         
         return safe_context
+
+    def _resolve_date_for_naming(self, metadata: Dict[str, Any]) -> str:
+        """命名用日付: HTML メタデータを優先し、無い場合のみ実行日（FR-009）"""
+        for key in ("date", "koukoku_date", "kaisatsu_date", "keiyaku_date", "update_date"):
+            raw = metadata.get(key)
+            if raw is None or not str(raw).strip():
+                continue
+            s = str(raw).strip()
+            for sep in ("-", "/", "."):
+                if sep in s:
+                    parts = s.split(sep)
+                    if len(parts) >= 3:
+                        try:
+                            y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+                            return f"{y:04d}{m:02d}{d:02d}"
+                        except ValueError:
+                            pass
+            digits = "".join(c for c in s if c.isdigit())
+            if len(digits) >= 8:
+                return digits[:8]
+            if len(digits) >= 6:
+                return digits[:6]
+        return datetime.now().strftime("%Y%m%d")
 
     def generate_folder_name(self, file_info: FileInfo) -> str:
         """フォルダ名を生成: 大分類_中分類_小分類_細分類_工事名

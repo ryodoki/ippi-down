@@ -6,31 +6,67 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import time
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional, Callable, Any, Tuple
 from pathlib import Path
+from urllib.parse import urlparse
 from .logger import Logger
-from ..app.exceptions import NetworkError, RateLimitError
+from .ssl_config import configure_ssl, ssl_error_hint
+from .network_audit import (
+    EVENT_ALLOW,
+    EVENT_BLOCKED,
+    EVENT_RATE_LIMITED,
+    EVENT_ROBOTS_DENIED,
+    NetworkAuditLog,
+)
+from .rate_limiter import RateLimiter, get_shared_limiter
+from .robots import RobotsPolicy
+from ..models.config_model import NetworkConfig
+from ..app.exceptions import BlockedRequestError, NetworkError, RateLimitError
+
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
 
 
 class HTTPClient:
     """HTTP通信を行うクラス（セッション管理含む）"""
 
-    def __init__(self, logger: Optional[Logger] = None, timeout: int = 30, download_timeout: int = 300):
+    def __init__(
+        self,
+        logger: Optional[Logger] = None,
+        timeout: int = 30,
+        download_timeout: int = 300,
+        network_config: Optional[NetworkConfig] = None,
+        rate_limiter: Optional[RateLimiter] = None,
+    ):
         """初期化
         
         Args:
             logger: ロガーインスタンス
             timeout: 通常のリクエストのタイムアウト（秒、デフォルト30秒）
             download_timeout: ダウンロードの読み取りタイムアウト（秒、デフォルト300秒=5分）
+            network_config: 通信ポリシー（許可先・レート制限・robots・監査ログ）
+            rate_limiter: レート制限。省略時はプロセス共有のものを使う
         """
         self.logger = logger or Logger()
         self.timeout = timeout
         self.download_timeout = download_timeout
+        self.network_config = network_config or NetworkConfig()
+        self.audit = NetworkAuditLog(self.network_config.audit_log, logger=self.logger)
+        # 共有インスタンスにすることで、GUI のスレッドと本処理が同一ホストへ同時に出ない
+        self.rate_limiter = rate_limiter or get_shared_limiter(
+            self.network_config, logger=self.logger
+        )
+        self.robots = RobotsPolicy.from_config(
+            self.network_config, fetcher=self._fetch_robots, logger=self.logger
+        )
+        configure_ssl()
         self.session = requests.Session()
-        # デフォルトヘッダーを設定（ブラウザを模倣）
+        # デフォルトヘッダーを設定（身元を明示したUAを使用）
         self.session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "User-Agent": self._build_user_agent(),
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
                 "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
                 "Accept-Encoding": "gzip, deflate",  # brを削除（brotli解凍の問題回避）
@@ -56,122 +92,216 @@ class HTTPClient:
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
 
-    def get(self, url: str, max_retries: int = 3, **kwargs) -> requests.Response:
-        """GETリクエストを送信
-        
-        Args:
-            url: リクエストURL
-            max_retries: 最大リトライ回数
-            **kwargs: requests.get()に渡す追加引数
+    # ------------------------------------------------------------ 通信の作法
+
+    def _build_user_agent(self) -> str:
+        """身元を明示したUAを組み立てる
+
+        既定は現行UAへ識別子を付加する形。完全に置き換えたい場合は
+        network.user_agent を指定する。
         """
-        retry_delay = 1
-        
-        for attempt in range(max_retries):
-            try:
-                response = self.session.get(url, timeout=self.timeout, **kwargs)
-                
-                # HTTPステータス429（レート制限）の処理
-                if response.status_code == 429:
-                    retry_after = int(response.headers.get('Retry-After', retry_delay * (attempt + 1)))
-                    if attempt < max_retries - 1:
-                        self.logger.warning(f"レート制限に達しました。{retry_after}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
-                        time.sleep(retry_after)
-                        continue
-                    else:
-                        raise RateLimitError(
-                            f"レート制限に達しました: {url}",
-                            retry_after=retry_after
-                        )
-                else:
-                    response.raise_for_status()
-                
-                return response
-            except RateLimitError:
-                raise
-            except requests.exceptions.Timeout as e:
-                if attempt == max_retries - 1:
-                    self.logger.error(f"GETリクエストタイムアウト: {url} - {str(e)}")
-                    raise NetworkError(f"リクエストタイムアウト: {url} - {str(e)}")
-                wait_time = retry_delay * (attempt + 1)
-                self.logger.warning(f"リクエストタイムアウト。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
-                time.sleep(wait_time)
-            except requests.exceptions.ConnectionError as e:
-                if attempt == max_retries - 1:
-                    self.logger.error(f"GETリクエスト接続エラー: {url} - {str(e)}")
-                    raise NetworkError(f"接続エラー: {url} - {str(e)}")
-                wait_time = retry_delay * (attempt + 1)
-                self.logger.warning(f"リクエスト接続エラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
-                time.sleep(wait_time)
-            except requests.exceptions.RequestException as e:
-                if attempt == max_retries - 1:
-                    self.logger.error(f"GETリクエストエラー: {url} - {str(e)}")
-                    raise NetworkError(f"リクエストエラー: {url} - {str(e)}")
-                # リトライ前に待機
-                wait_time = retry_delay * (attempt + 1)
-                self.logger.warning(f"リクエストエラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
-                time.sleep(wait_time)
-        
-        # ここには到達しないはずだが、念のため
-        raise requests.exceptions.RequestException("最大リトライ回数に達しました")
+        if self.network_config.user_agent:
+            return self.network_config.user_agent
+        suffix = (self.network_config.user_agent_suffix or "").strip()
+        return f"{BROWSER_USER_AGENT} {suffix}".strip()
+
+    @property
+    def user_agent(self) -> str:
+        return self.session.headers.get("User-Agent", "")
+
+    @property
+    def robots_user_agent(self) -> str:
+        """robots.txt の照合に使う製品トークン
+
+        UA 全体は互換性のためブラウザ表記を含むため、robots.txt の
+        User-agent 行とは自分の名前（例 ippi-down）で照合する。
+        """
+        source = self.network_config.user_agent or self.network_config.user_agent_suffix or ""
+        token = source.strip().split(" ")[0].split("/")[0].strip()
+        return token or self.user_agent
+
+    def _check_url(self, url: str, method: str = "GET") -> str:
+        """スキームとホストを許可リストと照合し、違反なら送信前に中止する"""
+        parsed = urlparse(url or "")
+        scheme = (parsed.scheme or "").casefold()
+        host = (parsed.hostname or "").casefold()
+        allowed_schemes = {str(s).casefold() for s in self.network_config.allowed_schemes}
+
+        reason = ""
+        if not scheme or not host:
+            reason = "URLの形式が不正です"
+        elif scheme not in allowed_schemes:
+            reason = f"許可されていないスキームです（許可: {', '.join(sorted(allowed_schemes))}）"
+        elif not self._host_allowed(host):
+            reason = (
+                "許可リストにないホストです"
+                f"（許可: {', '.join(self.network_config.allowed_hosts)}）"
+            )
+        if reason:
+            self.logger.warning(f"通信を中止しました: {url} - {reason}")
+            self.audit.write(EVENT_BLOCKED, url, method=method, detail=reason)
+            raise BlockedRequestError(f"通信ポリシー違反: {url} - {reason}", reason=reason)
+        return host
+
+    def _host_allowed(self, host: str) -> bool:
+        for pattern in self.network_config.allowed_hosts:
+            allowed = str(pattern).strip().rstrip(".").casefold()
+            if not allowed:
+                continue
+            if allowed.startswith("*."):
+                if host == allowed[2:] or host.endswith(allowed[1:]):
+                    return True
+            elif host == allowed:
+                return True
+        return False
+
+    def _fetch_robots(self, robots_url: str) -> Tuple[Optional[int], str]:
+        """robots.txt を取得する（robots 判定自体は行わない）"""
+        self._check_url(robots_url, method="GET")
+        response = self.session.get(robots_url, timeout=self.timeout)
+        return response.status_code, response.text
+
+    def _check_robots(self, url: str, method: str) -> None:
+        """robots.txt の Disallow を確認し、Crawl-delay を最小間隔へ反映する"""
+        if not self.network_config.robots.enabled:
+            return
+        host = urlparse(url).hostname or ""
+        agent = self.robots_user_agent
+        delay = self.robots.crawl_delay(agent, url)
+        if delay:
+            self.rate_limiter.set_min_interval(host, delay)
+        if self.robots.can_fetch(agent, url):
+            return
+        reason = "robots.txt により取得が禁止されています"
+        self.logger.warning(f"{reason}: {url}")
+        self.audit.write(EVENT_ROBOTS_DENIED, url, method=method, detail=reason)
+        raise BlockedRequestError(f"{reason}: {url}", reason="robots_denied")
+
+    def _before_request(self, method: str, url: str) -> str:
+        """URL検査 → robots 判定 → レート制限。戻り値はホスト名。"""
+        host = self._check_url(url, method=method)
+        self._check_robots(url, method)
+        self.rate_limiter.acquire(host)
+        return host
+
+    def _after_response(
+        self,
+        method: str,
+        url: str,
+        host: str,
+        response: Optional[requests.Response],
+        started: float,
+    ) -> None:
+        """送信結果を監査ログへ記録し、429 なら以後の間隔を延ばす"""
+        elapsed_ms = (time.time() - started) * 1000
+        status = response.status_code if response is not None else None
+        size = None
+        if response is not None:
+            length = response.headers.get("Content-Length")
+            if length and str(length).isdigit():
+                size = int(length)
+        event = EVENT_RATE_LIMITED if status == 429 else EVENT_ALLOW
+        if status == 429:
+            self.rate_limiter.note_rate_limited(host)
+        self.audit.write(
+            event, url, method=method, status=status, size=size, elapsed_ms=elapsed_ms
+        )
+
+    def get(self, url: str, max_retries: int = 3, **kwargs) -> requests.Response:
+        """GETリクエストを送信"""
+        return self._request_with_retry(
+            "GET", url, max_retries=max_retries, **kwargs
+        )
 
     def post(self, url: str, data: Optional[Dict] = None, max_retries: int = 3, **kwargs) -> requests.Response:
-        """POSTリクエストを送信
-        
-        Args:
-            url: リクエストURL
-            data: POSTデータ
-            max_retries: 最大リトライ回数
-            **kwargs: requests.post()に渡す追加引数
-        """
+        """POSTリクエストを送信"""
+        return self._request_with_retry(
+            "POST", url, max_retries=max_retries, data=data, **kwargs
+        )
+
+    def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        max_retries: int = 3,
+        **kwargs: Any,
+    ) -> requests.Response:
+        """GET/POST 共通のリトライ付きリクエスト"""
         retry_delay = 1
-        
+
         for attempt in range(max_retries):
+            host = self._before_request(method, url)
+            started = time.time()
             try:
-                response = self.session.post(url, data=data, timeout=self.timeout, **kwargs)
-                
-                # HTTPステータス429（レート制限）の処理
+                if method == "GET":
+                    response = self.session.get(url, timeout=self.timeout, **kwargs)
+                else:
+                    response = self.session.post(url, timeout=self.timeout, **kwargs)
+                self._after_response(method, url, host, response, started)
+
                 if response.status_code == 429:
-                    retry_after = int(response.headers.get('Retry-After', retry_delay * (attempt + 1)))
+                    retry_after = int(
+                        response.headers.get("Retry-After", retry_delay * (attempt + 1))
+                    )
                     if attempt < max_retries - 1:
-                        self.logger.warning(f"レート制限に達しました。{retry_after}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                        self.logger.warning(
+                            f"レート制限に達しました。{retry_after}秒後にリトライします... "
+                            f"(試行 {attempt + 1}/{max_retries})"
+                        )
                         time.sleep(retry_after)
                         continue
-                    else:
-                        raise RateLimitError(
-                            f"レート制限に達しました: {url}",
-                            retry_after=retry_after
-                        )
-                else:
-                    response.raise_for_status()
-                
+                    raise RateLimitError(
+                        f"レート制限に達しました: {url}",
+                        retry_after=retry_after,
+                    )
+
+                response.raise_for_status()
                 return response
+
             except RateLimitError:
                 raise
             except requests.exceptions.Timeout as e:
                 if attempt == max_retries - 1:
-                    self.logger.error(f"POSTリクエストタイムアウト: {url} - {str(e)}")
+                    self.logger.error(f"{method}リクエストタイムアウト: {url} - {str(e)}")
                     raise NetworkError(f"リクエストタイムアウト: {url} - {str(e)}")
                 wait_time = retry_delay * (attempt + 1)
-                self.logger.warning(f"リクエストタイムアウト。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                self.logger.warning(
+                    f"リクエストタイムアウト。{wait_time}秒後にリトライします... "
+                    f"(試行 {attempt + 1}/{max_retries})"
+                )
                 time.sleep(wait_time)
             except requests.exceptions.ConnectionError as e:
                 if attempt == max_retries - 1:
-                    self.logger.error(f"POSTリクエスト接続エラー: {url} - {str(e)}")
-                    raise NetworkError(f"接続エラー: {url} - {str(e)}")
+                    self.logger.error(f"{method}リクエスト接続エラー: {url} - {str(e)}")
+                    raise NetworkError(self._format_network_error(url, e))
                 wait_time = retry_delay * (attempt + 1)
-                self.logger.warning(f"リクエスト接続エラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                self.logger.warning(
+                    f"リクエスト接続エラー。{wait_time}秒後にリトライします... "
+                    f"(試行 {attempt + 1}/{max_retries})"
+                )
                 time.sleep(wait_time)
             except requests.exceptions.RequestException as e:
                 if attempt == max_retries - 1:
-                    self.logger.error(f"POSTリクエストエラー: {url} - {str(e)}")
-                    raise NetworkError(f"リクエストエラー: {url} - {str(e)}")
-                # リトライ前に待機
+                    self.logger.error(f"{method}リクエストエラー: {url} - {str(e)}")
+                    raise NetworkError(self._format_network_error(url, e))
                 wait_time = retry_delay * (attempt + 1)
-                self.logger.warning(f"リクエストエラー。{wait_time}秒後にリトライします... (試行 {attempt + 1}/{max_retries})")
+                self.logger.warning(
+                    f"リクエストエラー。{wait_time}秒後にリトライします... "
+                    f"(試行 {attempt + 1}/{max_retries})"
+                )
                 time.sleep(wait_time)
-        
-        # ここには到達しないはずだが、念のため
+            finally:
+                self.rate_limiter.release(host)
+
         raise requests.exceptions.RequestException("最大リトライ回数に達しました")
+
+    def _format_network_error(self, url: str, error: Exception) -> str:
+        """接続エラーメッセージを整形（SSL ヒント付き）"""
+        message = f"接続エラー: {url} - {str(error)}"
+        hint = ssl_error_hint(str(error))
+        if hint:
+            message = f"{message} {hint}"
+        return message
 
     def download_file(
         self,
@@ -228,6 +358,9 @@ class HTTPClient:
             download_headers["Sec-Fetch-User"] = "?1"
         
         for attempt in range(max_retries):
+            # 通信ポリシー（許可先・robots・レート制限）を通す
+            host = self._before_request("GET", url)
+            started = time.time()
             try:
                 # DEBUG: ダウンロード開始情報をログ出力
                 self.logger.debug(
@@ -248,7 +381,8 @@ class HTTPClient:
                     headers=download_headers,
                     allow_redirects=True  # リダイレクトを確実に追従
                 )
-                
+                self._after_response("GET", url, host, response, started)
+
                 # DEBUG: レスポンス情報をログ出力
                 self.logger.debug(
                     f"ダウンロードレスポンス: status={response.status_code}, "
@@ -525,7 +659,9 @@ class HTTPClient:
                     "exception_type": type(e).__name__,
                     "retry_attempts": attempt + 1,
                 })
-        
+            finally:
+                self.rate_limiter.release(host)
+
         return (False, {
             "http_status": None,
             "error_type": "other",

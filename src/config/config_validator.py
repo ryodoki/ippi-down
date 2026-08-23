@@ -73,7 +73,78 @@ class ConfigValidator:
             elif config.schedule.interval != "custom" and not config.schedule.time:
                 errors.append("スケジュール時間が指定されていません")
 
+        # 通信ポリシーの検証
+        errors.extend(self.validate_network(config))
+
         return len(errors) == 0, errors
+
+    def validate_network(self, config: AppConfig) -> List[str]:
+        """通信ポリシーと対象URLの整合を検証する
+
+        許可リスト外のURLを設定したまま起動できてしまうと、意図しない宛先へ
+        アクセスしうるため、ここで確実に弾く。
+        """
+        errors: List[str] = []
+        network = getattr(config, "network", None)
+        if network is None:
+            return errors
+
+        if not network.allowed_hosts:
+            errors.append("network.allowed_hosts を1つ以上指定してください")
+        if not network.allowed_schemes:
+            errors.append("network.allowed_schemes を1つ以上指定してください")
+        for scheme in network.allowed_schemes:
+            if scheme not in ("https", "http"):
+                errors.append(f"network.allowed_schemes に未対応のスキームがあります: {scheme}")
+        if "http" in network.allowed_schemes:
+            self.logger.warning(
+                "network.allowed_schemes に http が含まれています。通信内容が保護されません"
+            )
+        if network.min_interval_seconds < 0:
+            errors.append("network.min_interval_seconds は0以上にしてください")
+        if network.max_concurrency < 1:
+            errors.append("network.max_concurrency は1以上にしてください")
+        if network.max_requests_per_run < 1:
+            errors.append("network.max_requests_per_run は1以上にしてください")
+        if network.robots.on_error not in ("block", "allow"):
+            errors.append(
+                f"network.robots.on_error は block / allow のいずれかにしてください: {network.robots.on_error}"
+            )
+        if network.allowed_hours and not re.match(
+            r"^([0-1][0-9]|2[0-3]):[0-5][0-9]-([0-1][0-9]|2[0-3]):[0-5][0-9]$",
+            network.allowed_hours,
+        ):
+            errors.append(
+                f"network.allowed_hours は HH:MM-HH:MM 形式で指定してください: {network.allowed_hours}"
+            )
+
+        allowed_hosts = {str(host).strip().casefold() for host in network.allowed_hosts}
+        allowed_schemes = {str(scheme).strip().casefold() for scheme in network.allowed_schemes}
+        for url in config.target_urls or []:
+            parsed = urlparse(url)
+            scheme = (parsed.scheme or "").casefold()
+            host = (parsed.hostname or "").casefold()
+            if scheme and scheme not in allowed_schemes:
+                errors.append(
+                    f"対象URLのスキームが許可されていません: {url}"
+                    f"（許可: {', '.join(sorted(allowed_schemes))}）"
+                )
+            if host and not self._host_is_allowed(host, allowed_hosts):
+                errors.append(
+                    f"対象URLのホストが network.allowed_hosts にありません: {url}"
+                    f"（許可: {', '.join(sorted(allowed_hosts))}）"
+                )
+        return errors
+
+    @staticmethod
+    def _host_is_allowed(host: str, allowed_hosts: set) -> bool:
+        for allowed in allowed_hosts:
+            if allowed.startswith("*."):
+                if host == allowed[2:] or host.endswith(allowed[1:]):
+                    return True
+            elif host == allowed:
+                return True
+        return False
 
     def validate_naming_rule(self, naming_rule: str) -> List[str]:
         """命名規則テンプレートを検証する。未知キーがあればエラーメッセージ（候補付き）を返す。"""

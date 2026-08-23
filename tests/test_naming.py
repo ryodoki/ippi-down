@@ -184,3 +184,21 @@ class TestNaming:
         assert filename.endswith(".pdf")
         # 空のメタデータは unknown に置換される
         assert DEFAULT_PLACEHOLDER in filename
+
+    def test_date_from_metadata_preferred(self):
+        """{date} は HTML メタデータの公告日を優先すること（GAP-006）"""
+        logger = Logger(LoggingConfig(level="WARNING"))
+        naming = Naming(
+            naming_rule="{date}_{index}",
+            logger=logger,
+            search_conditions=None,
+        )
+        file_info = FileInfo(
+            url="https://example.com/a.pdf",
+            filename="a.pdf",
+            file_type=".pdf",
+            metadata={"date": "2026-02-01", "category": "入札公告"},
+        )
+        filename = naming.generate_filename(file_info, index=0)
+        assert "20260201" in filename
+        assert filename.endswith(".pdf")

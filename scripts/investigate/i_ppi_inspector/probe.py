@@ -114,6 +114,15 @@ def run_probe(
     output_dir: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
     """複数 tab を probe し、結果を返す。output_dir があれば JSON で保存する。"""
+    import sys
+    from pathlib import Path as _Path
+
+    _root = _Path(__file__).resolve().parents[3]
+    if str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
+    from src.utils.ssl_config import configure_ssl
+    configure_ssl()
+
     results = []
     for tab in tabs:
         r = probe_tab(tab, base_url, timeout=timeout, do_postback=do_postback)

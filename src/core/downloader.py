@@ -284,6 +284,8 @@ class Downloader:
                 base_dir = save_dir_path / safe_folder_name
         base_dir.mkdir(parents=True, exist_ok=True)
 
+        dir_indexes: dict[str, int] = {}
+
         for index, file_info in enumerate(file_list):
             # キャンセルチェック（progress_callbackがFalseを返した場合）
             if progress_callback:
@@ -299,10 +301,7 @@ class Downloader:
                     pass
             
             try:
-                # ファイル名を生成（元の意図したファイル名、FR-008）
-                filename = naming.generate_filename(file_info, file_info.metadata, index)
-                
-                # 保存ディレクトリ: 発注機関フォルダON時は path_builder、それ以外は従来の use_subfolders/generate_folder_name
+                # 保存ディレクトリを先に決定（フォルダ単位の index 採番のため）
                 if build_save_dir_fn:
                     file_save_dir = Path(build_save_dir_fn(Path(base_dir), file_info))
                 elif use_subfolders:
@@ -311,6 +310,11 @@ class Downloader:
                 else:
                     file_save_dir = base_dir
                 file_save_dir.mkdir(parents=True, exist_ok=True)
+
+                dir_key = str(file_save_dir)
+                file_index = dir_indexes.get(dir_key, 0)
+                filename = naming.generate_filename(file_info, file_info.metadata, file_index)
+                dir_indexes[dir_key] = file_index + 1
                 
                 # 元の意図した保存パス（重複チェック用、FR-008）
                 intended_save_path = str(file_save_dir / filename)
@@ -322,7 +326,9 @@ class Downloader:
                 )
                 if is_duplicate:
                     reason = skip_reason or "duplicate"
-                    self.logger.info(f"スキップ（重複: {reason}）: {intended_save_path}")
+                    self.logger.info(
+                        f"スキップ（重複: {reason}）: {intended_save_path}"
+                    )
                     task = DownloadTask(
                         file_info=file_info,
                         local_path=intended_save_path,
