@@ -1,7 +1,12 @@
+<<<<<<< HEAD
+"""エントリーポイント（GUI版 - CustomTkinter）"""
+=======
 # -*- coding: utf-8 -*-
 
 """エントリーポイント（GUI版）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
+import customtkinter as ctk
 import tkinter as tk
 import sys
 import os
@@ -167,8 +172,8 @@ def main():
             run_scheduled_download(config, logger)
         return
 
-    # GUIモード
-    root = tk.Tk()
+    # GUIモード（CustomTkinter）
+    root = ctk.CTk()
     config_manager = ConfigManager()
     main_window = MainWindow(root, config, config_manager, logger)
     # ダウンロードコールバックを設定（_download_threadからselfが渡される）

@@ -1,6 +1,10 @@
+<<<<<<< HEAD
+﻿"""GUIイベントハンドラー（スレッドセーフ）"""
+=======
 # -*- coding: utf-8 -*-
 
 """GUIイベントハンドラー（スレッドセーフ）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import queue
 import tkinter as tk

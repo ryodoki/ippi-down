@@ -48,7 +48,12 @@ ENV/
 env/
 
 # PyInstaller生成物
+<<<<<<< HEAD
+build/
+dist/
+=======
 *.spec
+>>>>>>> 44d78a093e6bf3e7a6997a5b9c4c1d188ad04c11
 *.exe
 *.dll
 *.dylib

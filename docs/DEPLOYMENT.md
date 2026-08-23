@@ -12,7 +12,7 @@
 
 ```bash
 # プロジェクトルートに移動
-cd C:\Users\ryout\Workspaces\ippi-down
+cd C:\Users\ryout\Workspaces\ippi-down2
 
 # 仮想環境を作成（まだの場合）
 python -m venv .venv
@@ -46,8 +46,13 @@ scripts\build\build_exe.bat
 # 仮想環境を有効化
 .venv\Scripts\activate
 
+<<<<<<< HEAD
 # PyInstallerでビルド（spec は scripts/build/ 配下）
 pyinstaller scripts\build\build.spec
+=======
+# PyInstallerでビルド（プロジェクトルートから実行）
+pyinstaller scripts\build.spec
+>>>>>>> 347f4a37b322b22867c26b731ac07b60317621b0
 ```
 
 ### ビルド結果
@@ -119,7 +124,7 @@ pyinstaller scripts\build\build.spec
    # build と dist フォルダを削除してから再ビルド
    rmdir /s /q build
    rmdir /s /q dist
-   pyinstaller build.spec
+   pyinstaller scripts\build.spec
    ```
 
 #### 実行時にエラーが発生する場合
@@ -148,5 +153,4 @@ pyinstaller scripts\build\build.spec
 
 ---
 
-**最終更新**: 2025年12月17日
-
+**最終更新**: 2026年1月19日

@@ -1,10 +1,15 @@
+<<<<<<< HEAD
+"""設定ダイアログクラス（CustomTkinter版）"""
+=======
 # -*- coding: utf-8 -*-
 
 """設定ダイアログクラス"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
+import customtkinter as ctk
 import tkinter as tk
 import tkinter.font
-from tkinter import ttk, filedialog, messagebox
+from tkinter import filedialog, messagebox
 from typing import Optional, Tuple, List, Dict, Any
 from datetime import datetime
 from ..models.config_model import (
@@ -47,27 +52,26 @@ class SettingsDialog:
             else "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"
         )
 
-        # ダイアログを作成
-        self.dialog = tk.Toplevel(parent)
-        self.dialog.title("設定")
-        self.dialog.geometry("800x700")
+        # ダイアログを作成（CTkToplevel）
+        self.dialog = ctk.CTkToplevel(parent)
+        self.dialog.title("⚙️ 設定")
+        self.dialog.geometry("900x750")
         self.dialog.transient(parent)
         self.dialog.grab_set()
 
-        # 日本語フォントの設定
-        self.setup_font()
-
         # 中央に配置
         self.dialog.update_idletasks()
-        x = (self.dialog.winfo_screenwidth() // 2) - (800 // 2)
-        y = (self.dialog.winfo_screenheight() // 2) - (700 // 2)
-        self.dialog.geometry(f"800x700+{x}+{y}")
+        x = (self.dialog.winfo_screenwidth() // 2) - (900 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (750 // 2)
+        self.dialog.geometry(f"900x750+{x}+{y}")
 
         self.setup_ui()
         self.load_config_to_ui()
         # 発注機関・工事場所のオプションを動的ロード（遅延実行）
         self.dialog.after(100, self.search_tab.load_daibunrui_options)
 
+<<<<<<< HEAD
+=======
     def setup_font(self):
         """日本語フォントを設定（Windows専用）"""
         # Windowsで利用可能な日本語フォントを試す
@@ -97,92 +101,112 @@ class SettingsDialog:
                 if self.logger:
                     self.logger.warning(f"フォント設定エラー: {str(e)}")
 
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
     def setup_ui(self):
         """UIをセットアップ"""
         # メインフレーム
-        main_frame = ttk.Frame(self.dialog, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = ctk.CTkFrame(self.dialog, corner_radius=0)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
-        # タブを作成
-        notebook = ttk.Notebook(main_frame)
-        notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        # タブビュー（CustomTkinter）
+        self.tabview = ctk.CTkTabview(main_frame, corner_radius=10, segmented_button_fg_color="#3b3b3b", segmented_button_selected_color="#1f6aa5")
+        self.tabview._segmented_button.configure(font=ctk.CTkFont(size=14, weight="bold"))
+        self.tabview.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
 
         # 基本設定タブ
-        basic_tab = ttk.Frame(notebook, padding="10")
-        notebook.add(basic_tab, text="基本設定")
-        self.setup_basic_tab(basic_tab)
+        self.tabview.add("📁 基本設定")
+        self.setup_basic_tab(self.tabview.tab("📁 基本設定"))
 
+<<<<<<< HEAD
+        # 検索条件タブ
+        self.tabview.add("🔍 検索条件")
+        self.setup_search_tab(self.tabview.tab("🔍 検索条件"))
+=======
         # 検索条件タブ（ppi.jpの検索条件を網羅）
         search_tab = ttk.Frame(notebook, padding="10")
         notebook.add(search_tab, text="検索条件")
+<<<<<<< HEAD
         self.search_tab = SettingsSearchTab(
             search_tab, self.dialog, self._get_lookup_service, self.logger,
             on_hachu_multi_select=self.on_hachu_multi_select,
         )
+=======
+        self.setup_search_tab(search_tab)
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
+>>>>>>> 347f4a37b322b22867c26b731ac07b60317621b0
 
         # 詳細設定タブ
-        advanced_tab = ttk.Frame(notebook, padding="10")
-        notebook.add(advanced_tab, text="詳細設定")
-        self.setup_advanced_tab(advanced_tab)
+        self.tabview.add("⚙️ 詳細設定")
+        self.setup_advanced_tab(self.tabview.tab("⚙️ 詳細設定"))
 
         # ボタンフレーム
-        button_frame = ttk.Frame(main_frame)
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(fill=tk.X)
 
-        ttk.Button(button_frame, text="デフォルトに戻す", command=self.on_reset).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        ttk.Button(button_frame, text="キャンセル", command=self.on_cancel).pack(
-            side=tk.RIGHT, padx=(5, 0)
-        )
-        ttk.Button(button_frame, text="保存", command=self.on_save).pack(side=tk.RIGHT)
+        ctk.CTkButton(
+            button_frame, text="🔄 デフォルトに戻す", command=self.on_reset,
+            width=160, height=36, corner_radius=4,
+            fg_color="#e53e3e", hover_color="#fc8181",
+            font=ctk.CTkFont(size=14)
+        ).pack(side=tk.LEFT, padx=(0, 10))
 
-    def setup_basic_tab(self, parent: ttk.Frame):
+        ctk.CTkButton(
+            button_frame, text="❌ キャンセル", command=self.on_cancel,
+            width=110, height=36, corner_radius=4,
+            fg_color="#4a5568", hover_color="#718096",
+            font=ctk.CTkFont(size=14)
+        ).pack(side=tk.RIGHT, padx=(10, 0))
+
+        ctk.CTkButton(
+            button_frame, text="💾 保存", command=self.on_save,
+            width=110, height=36, corner_radius=4,
+            fg_color="#38a169", hover_color="#48bb78",
+            font=ctk.CTkFont(size=14)
+        ).pack(side=tk.RIGHT)
+
+    def setup_basic_tab(self, parent):
         """基本設定タブをセットアップ"""
         # スクロール可能なフレーム
-        canvas = tk.Canvas(parent)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollable_frame = ctk.CTkScrollableFrame(parent, corner_radius=5)
+        scrollable_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # 対象URL
-        url_frame = ttk.LabelFrame(scrollable_frame, text="対象URL", padding="5")
-        url_frame.pack(fill=tk.X, pady=(0, 10))
+        url_frame = ctk.CTkFrame(scrollable_frame, corner_radius=3, border_width=1, border_color="#555555")
+        url_frame.pack(fill=tk.X, pady=(0, 4))
 
-        url_input_frame = ttk.Frame(url_frame)
-        url_input_frame.pack(fill=tk.X, pady=(0, 5))
+        ctk.CTkLabel(url_frame, text="🌐 対象URL", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor=tk.W, padx=10, pady=(6, 4))
 
-        self.url_entry = ttk.Entry(url_input_frame)
-        self.url_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
-        ttk.Button(url_input_frame, text="追加", command=self.on_add_url).pack(side=tk.LEFT)
+        url_input_frame = ctk.CTkFrame(url_frame, fg_color="transparent")
+        url_input_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+
+        self.url_entry = ctk.CTkEntry(url_input_frame, width=400, height=36, corner_radius=4, placeholder_text="URLを入力...")
+        self.url_entry.pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(url_input_frame, text="➕ 追加", command=self.on_add_url, width=80, height=36, corner_radius=4).pack(side=tk.LEFT)
 
         # URLリスト
-        list_frame = ttk.Frame(url_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True)
+        list_frame = ctk.CTkFrame(url_frame, fg_color="transparent")
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=10)
 
-        self.url_listbox = tk.Listbox(list_frame, height=4)
+        self.url_listbox = tk.Listbox(list_frame, height=4, bg="#2b2b2b", fg="white", selectbackground="#3182ce", font=("", 10))
         self.url_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        url_scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.url_listbox.yview)
+        url_scrollbar = ctk.CTkScrollbar(list_frame, command=self.url_listbox.yview)
         url_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.url_listbox.configure(yscrollcommand=url_scrollbar.set)
 
-        ttk.Button(url_frame, text="削除", command=self.on_remove_url).pack(pady=(5, 0))
+        ctk.CTkButton(url_frame, text="🗑️ 削除", command=self.on_remove_url, width=80, height=36, corner_radius=4, fg_color="#e53e3e", hover_color="#fc8181").pack(padx=10, pady=(2, 4))
 
         # 保存先
-        save_frame = ttk.LabelFrame(scrollable_frame, text="保存先", padding="5")
-        save_frame.pack(fill=tk.X, pady=(0, 10))
+        save_frame = ctk.CTkFrame(scrollable_frame, corner_radius=3, border_width=1, border_color="#555555")
+        save_frame.pack(fill=tk.X, pady=(0, 4))
+
+        ctk.CTkLabel(save_frame, text="📂 保存先", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor=tk.W, padx=10, pady=(4, 2))
+
+        save_input_frame = ctk.CTkFrame(save_frame, fg_color="transparent")
+        save_input_frame.pack(fill=tk.X, padx=10, pady=(0, 4))
 
         self.save_path_var = tk.StringVar()
-        save_entry = ttk.Entry(save_frame, textvariable=self.save_path_var, width=60)
-        save_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
-        ttk.Button(save_frame, text="参照", command=self.on_browse_path).pack(side=tk.LEFT)
+        ctk.CTkEntry(save_input_frame, textvariable=self.save_path_var, width=500, height=36, corner_radius=4).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(save_input_frame, text="📁 参照", command=self.on_browse_path, width=80, height=36, corner_radius=4).pack(side=tk.LEFT)
 
         run_folder_frame = ttk.Frame(save_frame)
         run_folder_frame.pack(fill=tk.X, pady=(5, 0))
@@ -232,51 +256,324 @@ class SettingsDialog:
         ttk.Label(date_partition_frame, text="(なし/年/年_月/年_月_日)", font=("", 8)).pack(side=tk.LEFT, padx=(5, 0))
 
         # ファイル命名規則
-        naming_frame = ttk.LabelFrame(scrollable_frame, text="ファイル命名規則", padding="5")
-        naming_frame.pack(fill=tk.X, pady=(0, 10))
+        naming_frame = ctk.CTkFrame(scrollable_frame, corner_radius=3, border_width=1, border_color="#555555")
+        naming_frame.pack(fill=tk.X, pady=(0, 4))
+
+        ctk.CTkLabel(naming_frame, text="📝 ファイル命名規則", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor=tk.W, padx=10, pady=(4, 2))
 
         self.naming_rule_var = tk.StringVar()
-        ttk.Entry(naming_frame, textvariable=self.naming_rule_var, width=60).pack(
-            fill=tk.X, pady=(0, 5)
-        )
-        ttk.Label(
+        ctk.CTkEntry(naming_frame, textvariable=self.naming_rule_var, width=500, height=36, corner_radius=4).pack(padx=10, fill=tk.X)
+        ctk.CTkLabel(
             naming_frame,
+<<<<<<< HEAD
+            text="使用可能変数: {category}, {title}, {date}, {index}, {filename}, {file_type}",
+            font=ctk.CTkFont(size=13),
+            text_color="gray",
+        ).pack(anchor=tk.W, padx=10, pady=(2, 4))
+=======
             text="使用可能変数: {category}, {title}, {date}, {index}, {filename}, {file_type}, {ext}, {koji_name}, {daibunrui}, {chubunrui}, {shoubunrui}, {saibunrui}",
             font=("", 8),
         ).pack(anchor=tk.W)
+>>>>>>> 44d78a093e6bf3e7a6997a5b9c4c1d188ad04c11
 
         # スケジュール設定
-        schedule_frame = ttk.LabelFrame(scrollable_frame, text="スケジュール設定", padding="5")
-        schedule_frame.pack(fill=tk.X, pady=(0, 10))
+        schedule_frame = ctk.CTkFrame(scrollable_frame, corner_radius=3, border_width=1, border_color="#555555")
+        schedule_frame.pack(fill=tk.X, pady=(0, 4))
+
+        ctk.CTkLabel(schedule_frame, text="⏰ スケジュール設定", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor=tk.W, padx=10, pady=(4, 2))
 
         self.schedule_enabled_var = tk.BooleanVar()
-        ttk.Checkbutton(
+        ctk.CTkCheckBox(
             schedule_frame,
             text="スケジュールを有効にする",
             variable=self.schedule_enabled_var,
-        ).pack(anchor=tk.W, pady=(0, 5))
+            font=ctk.CTkFont(size=14),
+            corner_radius=4
+        ).pack(anchor=tk.W, padx=10, pady=(0, 8))
 
-        schedule_input_frame = ttk.Frame(schedule_frame)
-        schedule_input_frame.pack(fill=tk.X)
+        schedule_input_frame = ctk.CTkFrame(schedule_frame, fg_color="transparent")
+        schedule_input_frame.pack(fill=tk.X, padx=10, pady=(0, 4))
 
-        ttk.Label(schedule_input_frame, text="実行間隔:").pack(side=tk.LEFT, padx=(0, 5))
+        ctk.CTkLabel(schedule_input_frame, text="実行間隔:", font=ctk.CTkFont(size=14)).pack(side=tk.LEFT, padx=(0, 5))
         self.schedule_interval_var = tk.StringVar()
-        interval_combo = ttk.Combobox(
+        ctk.CTkComboBox(
             schedule_input_frame,
-            textvariable=self.schedule_interval_var,
+            variable=self.schedule_interval_var,
             values=["1日", "1週間", "1か月"],
+            width=120,
+            height=36,
+            corner_radius=4,
+        ).pack(side=tk.LEFT, padx=(0, 20))
+
+        ctk.CTkLabel(schedule_input_frame, text="実行時間:", font=ctk.CTkFont(size=14)).pack(side=tk.LEFT, padx=(0, 5))
+        self.schedule_time_var = tk.StringVar()
+        ctk.CTkEntry(schedule_input_frame, textvariable=self.schedule_time_var, width=80, height=36, corner_radius=4, placeholder_text="HH:MM").pack(side=tk.LEFT)
+
+<<<<<<< HEAD
+=======
+    def setup_search_tab(self, parent):
+        """検索条件タブをセットアップ（メイン画面に表示する項目を選択）"""
+        # スクロール可能なフレーム
+        scrollable_frame = ctk.CTkScrollableFrame(parent, corner_radius=5)
+        scrollable_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # タイトル
+        title_frame = ctk.CTkFrame(scrollable_frame, corner_radius=5, fg_color="#2b5797")
+        title_frame.pack(fill=tk.X, pady=(0, 10))
+        ctk.CTkLabel(
+            title_frame, 
+            text="📋 メイン画面に表示する検索条件項目を選択", 
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color="white"
+        ).pack(anchor=tk.W, padx=15, pady=10)
+
+        # 説明
+        ctk.CTkLabel(
+            scrollable_frame,
+            text="チェックを入れた項目のみがメイン画面の検索条件エリアに表示されます。",
+            font=ctk.CTkFont(size=13),
+            text_color="#aaaaaa"
+        ).pack(anchor=tk.W, padx=5, pady=(0, 10))
+
+        # 表示項目の選択変数を初期化
+        self.visible_items = {}
+
+        # 項目定義（キー, ラベル, デフォルト表示）
+        items = [
+            ("hachu_kikan", "🏢 発注機関（大分類/中分類/小分類/細分類）", True),
+            ("koji_name", "🔨 工事名（文字列検索）", True),
+            ("koji_place", "📍 工事場所（地方/県/市/文字列）", True),
+            ("contract_type", "📋 入札契約方式", True),
+            ("shubetsu_gyoushu", "🔧 工事種別・業種", True),
+            ("date_update", "📅 最終更新日", False),
+            ("date_koukoku", "📅 公告日", False),
+            ("date_kaisatsu", "📅 開札日", False),
+            ("date_keiyaku", "📅 契約日", False),
+            ("price_yotei", "💰 予定価格（範囲）", False),
+            ("price_rakusatsu", "💰 落札価格（範囲）", False),
+            ("rakusatsu_name", "👤 落札者名", False),
+            ("options", "⚙️ オプション（電子入札/公開中）", True),
+            ("display_count", "📊 表示件数", True),
+        ]
+
+        # 一括選択ボタン
+        button_frame = ctk.CTkFrame(scrollable_frame, fg_color="transparent")
+        button_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ctk.CTkButton(
+            button_frame, text="✓ すべて選択", 
+            command=lambda: self._select_all_items(True),
+            width=120, height=32, corner_radius=4,
+            fg_color="#4a9f4a", hover_color="#5cb85c",
+            font=ctk.CTkFont(size=13)
+        ).pack(side=tk.LEFT, padx=(0, 10))
+<<<<<<< HEAD
+        
+        ctk.CTkButton(
+            button_frame, text="✗ すべて解除", 
+            command=lambda: self._select_all_items(False),
+            width=120, height=32, corner_radius=4,
+            fg_color="#666666", hover_color="#888888",
+            font=ctk.CTkFont(size=13)
+=======
+
+        ttk.Label(koukoku_date_input_frame, text="から").pack(side=tk.LEFT, padx=(0, 5))
+        self.koukoku_date_start_var = tk.StringVar()
+        ttk.Entry(
+            koukoku_date_input_frame, textvariable=self.koukoku_date_start_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(koukoku_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(koukoku_date_input_frame, text="まで").pack(side=tk.LEFT, padx=(0, 5))
+        self.koukoku_date_end_var = tk.StringVar()
+        ttk.Entry(
+            koukoku_date_input_frame, textvariable=self.koukoku_date_end_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(koukoku_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT)
+
+        # 開札日
+        kaisatsu_date_frame = ttk.LabelFrame(scrollable_frame, text="開札日", padding="5")
+        kaisatsu_date_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.kaisatsu_date_radio_var = tk.StringVar(value="none")
+        ttk.Radiobutton(
+            kaisatsu_date_frame,
+            text="指定なし",
+            variable=self.kaisatsu_date_radio_var,
+            value="none",
+        ).pack(anchor=tk.W)
+
+        kaisatsu_date_input_frame = ttk.Frame(kaisatsu_date_frame)
+        kaisatsu_date_input_frame.pack(fill=tk.X, pady=(5, 0))
+
+        ttk.Radiobutton(
+            kaisatsu_date_input_frame,
+            text="期間指定",
+            variable=self.kaisatsu_date_radio_var,
+            value="range",
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(kaisatsu_date_input_frame, text="から").pack(side=tk.LEFT, padx=(0, 5))
+        self.kaisatsu_date_start_var = tk.StringVar()
+        ttk.Entry(
+            kaisatsu_date_input_frame, textvariable=self.kaisatsu_date_start_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(kaisatsu_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(kaisatsu_date_input_frame, text="まで").pack(side=tk.LEFT, padx=(0, 5))
+        self.kaisatsu_date_end_var = tk.StringVar()
+        ttk.Entry(
+            kaisatsu_date_input_frame, textvariable=self.kaisatsu_date_end_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(kaisatsu_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT)
+
+        # 契約日
+        keiyaku_date_frame = ttk.LabelFrame(scrollable_frame, text="契約日", padding="5")
+        keiyaku_date_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.keiyaku_date_radio_var = tk.StringVar(value="none")
+        ttk.Radiobutton(
+            keiyaku_date_frame,
+            text="指定なし",
+            variable=self.keiyaku_date_radio_var,
+            value="none",
+        ).pack(anchor=tk.W)
+
+        keiyaku_date_input_frame = ttk.Frame(keiyaku_date_frame)
+        keiyaku_date_input_frame.pack(fill=tk.X, pady=(5, 0))
+
+        ttk.Radiobutton(
+            keiyaku_date_input_frame,
+            text="期間指定",
+            variable=self.keiyaku_date_radio_var,
+            value="range",
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(keiyaku_date_input_frame, text="から").pack(side=tk.LEFT, padx=(0, 5))
+        self.keiyaku_date_start_var = tk.StringVar()
+        ttk.Entry(
+            keiyaku_date_input_frame, textvariable=self.keiyaku_date_start_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(keiyaku_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Label(keiyaku_date_input_frame, text="まで").pack(side=tk.LEFT, padx=(0, 5))
+        self.keiyaku_date_end_var = tk.StringVar()
+        ttk.Entry(
+            keiyaku_date_input_frame, textvariable=self.keiyaku_date_end_var, width=12
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(keiyaku_date_input_frame, text="(YYYY-MM-DD)").pack(side=tk.LEFT)
+
+        # 工事種別
+        koji_shubetsu_frame = ttk.LabelFrame(scrollable_frame, text="工事種別", padding="5")
+        koji_shubetsu_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.koji_shubetsu_var = tk.StringVar()
+        # 工事種別のオプションを一元管理された定義から取得
+        koji_shubetsu_combo = ttk.Combobox(
+            koji_shubetsu_frame,
+            textvariable=self.koji_shubetsu_var,
+            values=get_labels("koji_shubetsu"),
+            state="readonly",
+            width=40,
+        )
+        koji_shubetsu_combo.pack(fill=tk.X)
+
+        # 工事の業種
+        koji_gyoushu_frame = ttk.LabelFrame(scrollable_frame, text="工事の業種", padding="5")
+        koji_gyoushu_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.koji_gyoushu_var = tk.StringVar()
+        # 工事の業種のオプションを一元管理された定義から取得
+        koji_gyoushu_combo = ttk.Combobox(
+            koji_gyoushu_frame,
+            textvariable=self.koji_gyoushu_var,
+            values=get_labels("koji_gyoushu"),
+            state="readonly",
+            width=40,
+        )
+        koji_gyoushu_combo.pack(fill=tk.X)
+
+        # 予定価格（範囲指定）
+        yotei_price_frame = ttk.LabelFrame(scrollable_frame, text="予定価格（範囲指定）", padding="5")
+        yotei_price_frame.pack(fill=tk.X, pady=(0, 10))
+
+        price_input_frame = ttk.Frame(yotei_price_frame)
+        price_input_frame.pack(fill=tk.X)
+
+        self.yotei_price_min_var = tk.StringVar()
+        ttk.Entry(price_input_frame, textvariable=self.yotei_price_min_var, width=15).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        ttk.Label(price_input_frame, text="（円）～").pack(side=tk.LEFT, padx=(0, 5))
+        self.yotei_price_max_var = tk.StringVar()
+        ttk.Entry(price_input_frame, textvariable=self.yotei_price_max_var, width=15).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        ttk.Label(price_input_frame, text="（円）").pack(side=tk.LEFT)
+
+        # 落札価格／契約価格（範囲指定）
+        rakusatsu_price_frame = ttk.LabelFrame(
+            scrollable_frame, text="落札価格／契約価格（範囲指定）", padding="5"
+        )
+        rakusatsu_price_frame.pack(fill=tk.X, pady=(0, 10))
+
+        rakusatsu_price_input_frame = ttk.Frame(rakusatsu_price_frame)
+        rakusatsu_price_input_frame.pack(fill=tk.X)
+
+        self.rakusatsu_price_min_var = tk.StringVar()
+        ttk.Entry(
+            rakusatsu_price_input_frame, textvariable=self.rakusatsu_price_min_var, width=15
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(rakusatsu_price_input_frame, text="（円）～").pack(side=tk.LEFT, padx=(0, 5))
+        self.rakusatsu_price_max_var = tk.StringVar()
+        ttk.Entry(
+            rakusatsu_price_input_frame, textvariable=self.rakusatsu_price_max_var, width=15
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(rakusatsu_price_input_frame, text="（円）").pack(side=tk.LEFT)
+
+        # 落札者名／契約者名（文字列検索）
+        rakusatsu_name_frame = ttk.LabelFrame(
+            scrollable_frame, text="落札者名／契約者名（文字列検索）", padding="5"
+        )
+        rakusatsu_name_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.rakusatsu_name_var = tk.StringVar()
+        ttk.Entry(rakusatsu_name_frame, textvariable=self.rakusatsu_name_var, width=60).pack(fill=tk.X)
+        ttk.Label(
+            rakusatsu_name_frame,
+            text="※条件の複数指定はできません。",
+            font=("", 8),
+            foreground="gray",
+        ).pack(anchor=tk.W, pady=(5, 0))
+
+        # 電子入札
+        denshi_frame = ttk.LabelFrame(scrollable_frame, text="電子入札", padding="5")
+        denshi_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.denshi_var = tk.BooleanVar()
+        ttk.Checkbutton(denshi_frame, text="対象案件のみ", variable=self.denshi_var).pack(anchor=tk.W)
+
+        # 公開文書
+        koukai_frame = ttk.LabelFrame(scrollable_frame, text="公開文書", padding="5")
+        koukai_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.koukai_var = tk.BooleanVar()
+        ttk.Checkbutton(koukai_frame, text="公開中のみ", variable=self.koukai_var).pack(anchor=tk.W)
+
+        # 一覧画面の表示件数
+        display_count_frame = ttk.LabelFrame(scrollable_frame, text="一覧画面の表示件数", padding="5")
+        display_count_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.display_count_var = tk.StringVar(value="20")
+        ttk.Combobox(
+            display_count_frame,
+            textvariable=self.display_count_var,
+            values=["20", "30", "50", "100"],
             state="readonly",
             width=10,
-        )
-        interval_combo.pack(side=tk.LEFT, padx=(0, 10))
+        ).pack(anchor=tk.W)
 
-        ttk.Label(schedule_input_frame, text="実行時間:").pack(side=tk.LEFT, padx=(0, 5))
-        self.schedule_time_var = tk.StringVar()
-        ttk.Entry(schedule_input_frame, textvariable=self.schedule_time_var, width=8).pack(
-            side=tk.LEFT
-        )
-        ttk.Label(schedule_input_frame, text="(HH:MM形式)").pack(side=tk.LEFT, padx=(5, 0))
-
+>>>>>>> 347f4a37b322b22867c26b731ac07b60317621b0
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
@@ -297,31 +594,93 @@ class SettingsDialog:
             values=["DEBUG", "INFO", "WARNING", "ERROR"],
             state="readonly",
             width=15,
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
         ).pack(side=tk.LEFT)
 
-        ttk.Label(log_frame, text="ログファイル:").pack(anchor=tk.W, pady=(0, 5))
-        log_file_frame = ttk.Frame(log_frame)
-        log_file_frame.pack(fill=tk.X, pady=(0, 10))
+        # チェックボックスリスト
+        list_frame = ctk.CTkFrame(scrollable_frame, corner_radius=5, border_width=1, border_color="#555555")
+        list_frame.pack(fill=tk.X, pady=(0, 10))
+
+        for key, label, default in items:
+            var = tk.BooleanVar(value=default)
+            self.visible_items[key] = var
+            
+            item_frame = ctk.CTkFrame(list_frame, fg_color="transparent")
+            item_frame.pack(fill=tk.X, padx=10, pady=5)
+            
+            ctk.CTkCheckBox(
+                item_frame, 
+                text=label, 
+                variable=var, 
+                font=ctk.CTkFont(size=14),
+                corner_radius=4,
+                checkbox_width=24,
+                checkbox_height=24
+            ).pack(side=tk.LEFT)
+
+        # 注意事項
+        note_frame = ctk.CTkFrame(scrollable_frame, corner_radius=5, fg_color="#3a3a3a")
+        note_frame.pack(fill=tk.X, pady=(10, 0))
+        ctk.CTkLabel(
+            note_frame,
+            text="💡 ヒント: 必要な項目だけを表示すると画面がスッキリします。\n"
+                 "設定を保存後、メイン画面を再起動すると反映されます。",
+            font=ctk.CTkFont(size=12),
+            text_color="#aaaaaa",
+            justify=tk.LEFT
+        ).pack(anchor=tk.W, padx=15, pady=10)
+
+    def _select_all_items(self, select: bool):
+        """すべての表示項目を選択/解除"""
+        for var in self.visible_items.values():
+            var.set(select)
+
+    def setup_advanced_tab(self, parent):
+        """詳細設定タブをセットアップ"""
+        # スクロール可能なフレーム
+        scrollable_frame = ctk.CTkScrollableFrame(parent, corner_radius=5)
+        scrollable_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # ログ設定
+        log_frame = ctk.CTkFrame(scrollable_frame, corner_radius=3, border_width=1, border_color="#555555")
+        log_frame.pack(fill=tk.X, pady=(0, 4))
+
+        ctk.CTkLabel(log_frame, text="📋 ログ設定", font=ctk.CTkFont(size=16, weight="bold")).pack(anchor=tk.W, padx=10, pady=(4, 2))
+
+        log_input_frame = ctk.CTkFrame(log_frame, fg_color="transparent")
+        log_input_frame.pack(fill=tk.X, padx=10, pady=(0, 4))
+
+        ctk.CTkLabel(log_input_frame, text="ログレベル:", font=ctk.CTkFont(size=14)).pack(side=tk.LEFT, padx=(0, 10))
+        self.log_level_var = tk.StringVar()
+        ctk.CTkComboBox(
+            log_input_frame,
+            variable=self.log_level_var,
+            values=["DEBUG", "INFO", "WARNING", "ERROR"],
+            width=150,
+            height=36,
+            corner_radius=4,
+        ).pack(side=tk.LEFT)
+
+        ctk.CTkLabel(log_frame, text="ログファイル:", font=ctk.CTkFont(size=14)).pack(anchor=tk.W, padx=10, pady=(0, 5))
+
+        log_file_frame = ctk.CTkFrame(log_frame, fg_color="transparent")
+        log_file_frame.pack(fill=tk.X, padx=10, pady=(0, 4))
 
         self.log_file_var = tk.StringVar()
-        ttk.Entry(log_file_frame, textvariable=self.log_file_var, width=50).pack(
-            side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5)
-        )
-        ttk.Button(log_file_frame, text="参照", command=self.on_browse_log_file).pack(side=tk.LEFT)
+        ctk.CTkEntry(log_file_frame, textvariable=self.log_file_var, width=400, height=36, corner_radius=4).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(log_file_frame, text="📁 参照", command=self.on_browse_log_file, width=80, height=36, corner_radius=4).pack(side=tk.LEFT)
 
-        log_size_frame = ttk.Frame(log_frame)
-        log_size_frame.pack(fill=tk.X, pady=(0, 5))
+        log_size_frame = ctk.CTkFrame(log_frame, fg_color="transparent")
+        log_size_frame.pack(fill=tk.X, padx=10, pady=(0, 4))
 
-        ttk.Label(log_size_frame, text="最大ファイルサイズ:").pack(side=tk.LEFT, padx=(0, 5))
+        ctk.CTkLabel(log_size_frame, text="最大ファイルサイズ:", font=ctk.CTkFont(size=14)).pack(side=tk.LEFT, padx=(0, 5))
         self.log_max_bytes_var = tk.StringVar()
-        ttk.Entry(log_size_frame, textvariable=self.log_max_bytes_var, width=10).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        ttk.Label(log_size_frame, text="MB").pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkEntry(log_size_frame, textvariable=self.log_max_bytes_var, width=80, height=36, corner_radius=4).pack(side=tk.LEFT, padx=(0, 5))
+        ctk.CTkLabel(log_size_frame, text="MB", font=ctk.CTkFont(size=14)).pack(side=tk.LEFT, padx=(0, 20))
 
-        ttk.Label(log_size_frame, text="バックアップファイル数:").pack(side=tk.LEFT, padx=(0, 5))
+        ctk.CTkLabel(log_size_frame, text="バックアップファイル数:", font=ctk.CTkFont(size=14)).pack(side=tk.LEFT, padx=(0, 5))
         self.log_backup_count_var = tk.StringVar()
-        ttk.Entry(log_size_frame, textvariable=self.log_backup_count_var, width=5).pack(side=tk.LEFT)
+        ctk.CTkEntry(log_size_frame, textvariable=self.log_backup_count_var, width=60, height=36, corner_radius=4).pack(side=tk.LEFT)
 
     def load_config_to_ui(self, config: Optional[AppConfig] = None):
         """設定をUIに読み込む"""
@@ -511,12 +870,14 @@ class SettingsDialog:
         if path:
             self.log_file_var.set(path)
 
+<<<<<<< HEAD
+=======
     def on_hachu_multi_select(self):
         """発注機関複数選択ボタンのハンドラ"""
         messagebox.showinfo("情報", "発注機関の複数選択機能は今後実装予定です")
 
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
     def show(self) -> Optional[AppConfig]:
         """ダイアログを表示して結果を返す"""
         self.dialog.wait_window()
         return self.result
-

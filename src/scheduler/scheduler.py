@@ -1,6 +1,10 @@
+<<<<<<< HEAD
+﻿"""定期実行管理を行うクラス"""
+=======
 # -*- coding: utf-8 -*-
 
 """定期実行管理を行うクラス"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import schedule
 import time

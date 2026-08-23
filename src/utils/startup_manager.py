@@ -1,6 +1,10 @@
+<<<<<<< HEAD
+﻿"""PC起動時の自動実行を管理するクラス（Windows専用）"""
+=======
 # -*- coding: utf-8 -*-
 
 """PC起動時の自動実行を管理するクラス（Windows専用）"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import os
 import sys

@@ -1,6 +1,10 @@
+<<<<<<< HEAD
+﻿"""Phase A リファクタリング動作確認テスト"""
+=======
 # -*- coding: utf-8 -*-
 
 """Phase A リファクタリング動作確認テスト"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import pytest
 import sys

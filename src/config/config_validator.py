@@ -1,6 +1,10 @@
+<<<<<<< HEAD
+﻿"""設定検証を行うクラス"""
+=======
 # -*- coding: utf-8 -*-
 
 """設定検証を行うクラス"""
+>>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import re
 import difflib
