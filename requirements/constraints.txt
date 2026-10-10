@@ -15,7 +15,7 @@ pypdf==6.16.2
 reportlab==5.0.1
 win10toast==0.9
 pypiwin32==223
-pywin32==306
+pywin32==312
 pytest==8.3.4
 pytest-cov==6.0.0
 pytest-mock==3.14.0
