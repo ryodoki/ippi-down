@@ -1,15 +1,10 @@
-<<<<<<< HEAD
-﻿"""定期実行管理を行うクラス"""
-=======
 # -*- coding: utf-8 -*-
 
 """定期実行管理を行うクラス"""
->>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import schedule
-import time
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Callable
 from ..utils.logger import Logger
 from ..models.config_model import ScheduleConfig
@@ -25,58 +20,86 @@ class Scheduler:
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.download_callback: Optional[Callable] = None
+        self._scheduler = schedule.Scheduler()
+        self._lock = threading.RLock()
+        self._wake_event = threading.Event()
 
     def set_download_callback(self, callback: Callable):
         """ダウンロードコールバックを設定"""
         self.download_callback = callback
 
-    def start(self):
-        """スケジューラーを開始"""
+    def start(self) -> bool:
+        """スケジューラーを開始。開始できた場合はTrueを返す。"""
         if not self.config.enabled:
             self.logger.info("スケジュール機能は無効です")
-            return
+            return False
+        if not self.config.is_supported:
+            self.logger.warning(
+                f"スケジュール方式 '{self.config.interval}' はサポート対象外です。"
+                "daily/weekly/monthly のいずれかを指定してください"
+            )
+            return False
 
         if self.running:
             self.logger.warning("スケジューラーは既に実行中です")
-            return
+            return False
 
-        # スケジュールを設定
-        self._setup_schedule()
+        with self._lock:
+            self._setup_schedule()
+            if not self._scheduler.jobs:
+                return False
 
-        # バックグラウンドスレッドで実行
         self.running = True
+        self._wake_event.clear()
         self.thread = threading.Thread(target=self._run_scheduler, daemon=True)
         self.thread.start()
         self.logger.info("スケジューラーを開始しました")
+        return True
 
     def stop(self):
         """スケジューラーを停止"""
         self.running = False
-        schedule.clear()
+        self._wake_event.set()
+        current_thread = threading.current_thread()
+        if self.thread and self.thread is not current_thread:
+            self.thread.join(timeout=2)
+        with self._lock:
+            self._scheduler.clear()
+        self.thread = None
         self.logger.info("スケジューラーを停止しました")
+
+    def reconfigure(self, config: ScheduleConfig) -> bool:
+        """設定を置き換え、必要に応じてスケジューラーを再起動する。
+
+        GUIで保存した設定をプロセス再起動なしで反映するためのAPI。
+        新設定が無効または非対応の場合は停止状態にしてFalseを返す。
+        """
+        self.stop()
+        self.config = config
+        if not config.enabled:
+            self.logger.info("更新後の設定ではスケジュール機能は無効です")
+            return False
+        return self.start()
 
     def _setup_schedule(self):
         """スケジュールを設定"""
-        schedule.clear()
+        self._scheduler.clear()
 
         if self.config.interval == "daily":
-            # 毎日実行
             self._schedule_daily()
         elif self.config.interval == "weekly":
-            # 毎週実行
             self._schedule_weekly()
         elif self.config.interval == "monthly":
-            # 毎月実行
             self._schedule_monthly()
-        elif self.config.interval == "custom" and self.config.cron:
-            # カスタム（cron形式）
-            self._schedule_custom()
+        else:
+            self.logger.warning(
+                f"スケジュール方式 '{self.config.interval}' はサポート対象外のため無効です"
+            )
 
     def _schedule_daily(self):
         """毎日のスケジュールを設定"""
         try:
-            hour, minute = map(int, self.config.time.split(":"))
-            schedule.every().day.at(f"{hour:02d}:{minute:02d}").do(self._execute_download)
+            self._scheduler.every().day.at(self.config.time).do(self._execute_download)
             self.logger.info(f"毎日 {self.config.time} に実行するように設定しました")
         except Exception as e:
             self.logger.error(f"スケジュール設定エラー: {str(e)}")
@@ -84,88 +107,62 @@ class Scheduler:
     def _schedule_weekly(self):
         """毎週のスケジュールを設定"""
         try:
-            hour, minute = map(int, self.config.time.split(":"))
-            # 毎週月曜日に実行（必要に応じて変更可能）
-            schedule.every().monday.at(f"{hour:02d}:{minute:02d}").do(self._execute_download)
-            self.logger.info(f"毎週月曜日 {self.config.time} に実行するように設定しました")
+            weekday_job = getattr(self._scheduler.every(), self.config.weekday)
+            weekday_job.at(self.config.time).do(self._execute_download)
+            self.logger.info(
+                f"毎週 {self.config.weekday} {self.config.time} に実行するように設定しました"
+            )
         except Exception as e:
             self.logger.error(f"スケジュール設定エラー: {str(e)}")
 
     def _schedule_monthly(self):
         """毎月のスケジュールを設定"""
         try:
-            hour, minute = map(int, self.config.time.split(":"))
-            # 毎月1日に実行
             def monthly_job():
                 today = datetime.now()
-                if today.day == 1:
+                if today.day == self.config.day_of_month:
                     self._execute_download()
 
-            schedule.every().day.at(f"{hour:02d}:{minute:02d}").do(monthly_job)
-            self.logger.info(f"毎月1日 {self.config.time} に実行するように設定しました")
+            self._scheduler.every().day.at(self.config.time).do(monthly_job)
+            self.logger.info(
+                f"毎月{self.config.day_of_month}日 {self.config.time} に実行するように設定しました"
+            )
         except Exception as e:
             self.logger.error(f"スケジュール設定エラー: {str(e)}")
-
-    def _schedule_custom(self):
-        """カスタム（cron形式）のスケジュールを設定"""
-        try:
-            from croniter import croniter  # pyright: ignore[reportMissingModuleSource]
-            
-            cron_expr = self.config.cron
-            if not croniter.is_valid(cron_expr):
-                raise ValueError(f"無効なcron式: {cron_expr}")
-            
-            # croniterを使用して次の実行時刻を計算
-            base_time = datetime.now()
-            cron = croniter(cron_expr, base_time)
-            next_run = cron.get_next(datetime)
-            
-            self.logger.info(f"カスタムcron形式を設定: {cron_expr}, 次回実行予定: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-            
-            # scheduleライブラリではcron形式を直接サポートしていないため、
-            # 1分ごとにチェックしてcron式に一致するか確認する方式を採用
-            def cron_job():
-                now = datetime.now()
-                cron_check = croniter(cron_expr, now)
-                prev_run = cron_check.get_prev(datetime)
-                # 前回実行時刻から1分以内なら実行（重複実行を防ぐ）
-                if (now - prev_run).total_seconds() < 60:
-                    self._execute_download()
-            
-            # 1分ごとにチェック
-            schedule.every(1).minutes.do(cron_job)
-            
-        except ImportError:
-            self.logger.error("croniter がインストールされていません。pip install croniter を実行してください。")
-            raise
-        except Exception as e:
-            self.logger.error(f"カスタムcron形式の設定エラー: {str(e)}")
-            raise
 
     def _run_scheduler(self):
         """スケジューラーを実行（バックグラウンド）"""
         self.logger.info("スケジューラーをバックグラウンドで実行中...")
         while self.running:
-            schedule.run_pending()
-            time.sleep(60)  # 1分ごとにチェック
+            with self._lock:
+                self._scheduler.run_pending()
+            self._wake_event.wait(1)
+            self._wake_event.clear()
 
     def _execute_download(self):
-        """ダウンロードを実行"""
+        """スケジューラーループを塞がずにダウンロードを開始する。"""
         if self.download_callback:
             self.logger.info("スケジュールに従ってダウンロードを開始します")
-            try:
-                self.download_callback()
-            except Exception as e:
-                self.logger.error(f"スケジュール実行エラー: {str(e)}")
+            threading.Thread(
+                target=self._invoke_download_callback,
+                name="ippi-scheduled-download",
+                daemon=True,
+            ).start()
         else:
             self.logger.warning("ダウンロードコールバックが設定されていません")
 
+    def _invoke_download_callback(self):
+        """ダウンロードコールバック本体。"""
+        try:
+            if self.download_callback:
+                self.download_callback()
+        except Exception as e:
+            self.logger.error(f"スケジュール実行エラー: {str(e)}")
+
     def get_next_run_time(self) -> Optional[datetime]:
         """次の実行時刻を取得"""
-        if not schedule.jobs:
-            return None
-
-        # 最も近い実行時刻を取得
-        next_run = min(job.next_run for job in schedule.jobs if job.next_run)
-        return next_run
-
+        with self._lock:
+            jobs = [job for job in self._scheduler.jobs if job.next_run]
+            if not jobs:
+                return None
+            return min(job.next_run for job in jobs)

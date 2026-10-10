@@ -1,156 +1,115 @@
-# デプロイ手順書
+# デプロイ・配布手順
 
-## 実行ファイルの作成方法
+正式な対象はWindows 10/11 x64、Python 3.11、ローカル保存です。HTML形式の入札調書は同梱フォントを使う内蔵生成器でPDF化し、失敗時だけMicrosoft Edgeを監視付きで使用します。Box、custom cron、複数発注機関、PCログオン時の自動登録はこの手順の対象外です。
 
-### 前提条件
+## 開発環境の準備
 
-1. Python 3.10以上がインストールされていること
-2. 仮想環境（.venv）が作成されていること
-3. 依存関係がインストールされていること
+Conda／Minicondaは使用しません。次のスクリプトは自身の配置場所を基準にプロジェクトルートを解決し、Windows x64版Python 3.11からプロジェクト専用`.venv`を作成します。壊れた既存`.venv`は一時フォルダーへ退避します。
 
-### セットアップ
-
-```bash
-# プロジェクトルートに移動
-cd C:\Users\ryout\Workspaces\ippi-down2
-
-# 仮想環境を作成（まだの場合）
-python -m venv .venv
-
-# 仮想環境を有効化
-.venv\Scripts\activate
-
-# 依存関係をインストール
-pip install -r requirements.txt
+```powershell
+.\scripts\setup.ps1 -WithTest -WithBuild
 ```
 
-### ビルド方法
+親フォルダーから`.\.venv\Scripts\python.exe`を実行すると、別プロジェクトの仮想環境を選ぶ可能性があります。必ずプロジェクト内の`setup.ps1`、`start_gui.ps1`、またはビルドスクリプトを入口にしてください。
 
-#### 方法1: ビルドスクリプトを使用（推奨）
+設定例をコピーする場合は、実値や秘密情報を配布物へ含めないでください。
 
-```bash
-scripts\build\build_exe.bat
-# または
+```powershell
+Copy-Item config\config.example.yaml config\config.yaml
+```
+
+## 受入チェック
+
+構文、静的解析、保存済みfixtureを使う標準テストを実行します。
+
+```powershell
+.\.venv\Scripts\python.exe -m compileall -q src tests scripts
+.\.venv\Scripts\ruff.exe check src tests scripts --select E9,F63,F7,F82
+.\.venv\Scripts\python.exe -m pytest tests -v
+```
+
+Windows CI／正式ビルドの依存導入は、`requirements/windows-ci-py311.lock`を
+`--require-hashes --only-binary=:all:`で使用します。lock更新時はWindows x64の
+CPython 3.11 wheelを取得し、版とSHA-256を同時にレビューしてください。
+CIは`pip check`と`scripts/security/generate_sbom.py`も実行し、
+`artifacts/sbom.cdx.json`を生成します。
+
+GUI、integration、networkテストは標準実行から分離されています。実行方法は[README](../README.md#テスト)を参照してください。
+
+## exeビルド
+
+必要環境、通常ビルドと依存更新時の再ビルド、`build.spec`の内容、成果物の検証、トラブル対処の正本は[PyInstallerビルド・検証手順](pyinstaller_build.md)です。どの作業ディレクトリからでも、スクリプト自身の場所を基準にプロジェクトルートを解決します。
+
+```powershell
+.\scripts\setup.ps1 -WithBuild
 .\scripts\build\build_exe.ps1
 ```
 
-このスクリプトは以下を自動的に実行します：
-- 仮想環境の有効化確認
-- PyInstallerのインストール確認
-- 既存のビルド成果物のクリーンアップ
-- 実行ファイルのビルド
+コマンドプロンプトの場合:
 
-#### 方法2: 手動でビルド
-
-```bash
-# 仮想環境を有効化
-.venv\Scripts\activate
-
-<<<<<<< HEAD
-# PyInstallerでビルド（spec は scripts/build/ 配下）
-pyinstaller scripts\build\build.spec
-=======
-# PyInstallerでビルド（プロジェクトルートから実行）
-pyinstaller scripts\build.spec
->>>>>>> 347f4a37b322b22867c26b731ac07b60317621b0
+```bat
+scripts\build\build_exe.bat
 ```
 
-### ビルド結果
+生成物は`dist/ippi-down.exe`です。ビルド後は自己診断を実行します。この診断は内蔵PDF生成、同梱日本語フォント、生成PDFの再読込検証、Edge用Job Object監視機構、PDF署名・終端・サイズ・SHA-256・A4縦MediaBox、後処理を確認します。変換用の一時HTML、PDF、Edgeプロファイルは後処理で削除し、consoleなしのexeでは診断結果だけをexeと同じ場所の`self-check-result.txt`へ更新します。Windows CIでは`scripts/security/run_offline_self_check.ps1`によりexeとEdgeだけを対象とする一時的な外向き通信拒否ruleを作成し、`finally`でruleを削除してから終了します。
 
-ビルドが成功すると、以下のファイルが生成されます：
+```powershell
+$selfCheck = Start-Process `
+  -FilePath .\dist\ippi-down.exe `
+  -ArgumentList --self-check `
+  -WindowStyle Hidden `
+  -Wait `
+  -PassThru
+if ($selfCheck.ExitCode -ne 0) { throw "exe self-check failed" }
+```
 
-- **実行ファイル**: `dist/ippi-down.exe`
-  - このファイルは単体で動作します
-  - Python環境は不要です
-  - 他のPCにコピーして実行できます
+## 配布zip
 
-### 配布方法
+ソース配布とexe配布は別々に作成します。
 
-1. **単体配布**
-   - `dist/ippi-down.exe` を配布
-   - ユーザーはこのファイルをダブルクリックするだけで実行できます
-   - 設定ファイルがなくてもデフォルト設定で動作します
+```powershell
+.\scripts\tools\make_source_release.ps1
+.\scripts\tools\make_exe_release.ps1
+```
 
-2. **フォルダごと配布（推奨）**
-   - 以下の構成で配布：
-     ```
-     ippi-down-dist/
-     ├── ippi-down.exe          # 実行ファイル（単体で動作）
-     ├── config/
-     │   └── config.example.yaml # 設定テンプレート（参考用）
-     └── README.txt             # 使用方法を記載
-     ```
-   - 初回実行時に自動生成されるフォルダ：
-     ```
-     ippi-down-dist/
-     ├── config/
-     │   └── config.yaml        # ユーザー設定（自動生成）
-     ├── downloads/             # ダウンロードファイル（自動生成）
-     └── logs/
-         └── app.log            # ログファイル（自動生成）
-     ```
+既定の出力:
 
-### パス解決の仕組み
+- `release/ippi-down-source.zip`
+- `release/ippi-down-windows-x64.zip`
 
-- **exe実行時**: exeと同じフォルダを基準にパスを解決
-  - `config/config.yaml` → exeと同じフォルダの `config/` 内
-  - `logs/app.log` → exeと同じフォルダの `logs/` 内
-  - `downloads/` → exeと同じフォルダの `downloads/` 内
-- **開発時（python実行）**: プロジェクトルートを基準にパスを解決
+ソースzipはビルド可能な`README.md`、[PyInstallerビルド・検証手順](pyinstaller_build.md)、[ダウンロードフォルダー仕様](download_folder_spec.md)、`scripts/build/build.spec`、`requirements/`、テストfixtureを含みます。exe zipの内容は次の10ファイルに限定します。
 
-### 初回実行時の注意
+- `ippi-down.exe`
+- exe利用者向け`README.md`
+- 正本と同一内容の`download_folder_spec.md`
+- 正本と同一内容の`memory_resource_management.md`
+- 正本と同一内容の`network_security.md`
+- 正本と同一内容の`pdf_conversion_reliability.md`
+- `THIRD_PARTY_NOTICES.txt`
+- Noto Sans Japaneseの`OFL-1.1.txt`
+- `config/config.example.yaml`
+- `SHA256SUMS.txt`
 
-- 実行ファイルの初回起動時は、数秒かかる場合があります
-- Windows Defenderやウイルス対策ソフトが警告を出す場合があります（正常な動作です）
-- 設定ファイル（`config/config.yaml`）は初回実行時に作成されます
+exe利用者向けREADMEの保存仕様リンクは、同じzip内の`download_folder_spec.md`を参照します。配布スクリプトは`docs/download_folder_spec.md`をそのままコピーし、配布検査では正本とのバイト単位の一致とREADME内のローカルリンク解決を確認します。
 
-### トラブルシューティング
+どちらのzipにも次を含めません。
 
-#### ビルドエラーが発生する場合
+- `config/config.yaml`、`.env`などの実設定・秘密情報
+- `config/install-location.json`、`config/installation-relocation-journal.json`、`config/schedule-instance-id`、定期実行台帳、スナップショットなど配置固有の所有情報
+- `logs/`、`downloads/`、取得文書、`.part`
+- `debug/`、実行時に生成されたデバッグHTML
+- `.venv/`、`build/`、キャッシュ
 
-1. **依存関係の確認**
-   ```bash
-   pip install -r requirements.txt
-   ```
+## 配布先での確認
 
-2. **PyInstallerの再インストール**
-   ```bash
-   pip uninstall pyinstaller
-   pip install pyinstaller
-   ```
+1. zipのSHA-256を配布元の値と照合します。
+2. Windows 10/11 x64のクリーン環境で展開します。
+3. `ippi-down.exe --self-check`の終了コードが0であることを確認します。
+4. GUIを起動し、設定例からローカル保存先を指定します。
+5. 保存済みfixtureとは別に実サイト確認を行う場合は、既定1リクエスト/秒と初回を含む最大3試行を維持します。
 
-3. **キャッシュのクリーンアップ**
-   ```bash
-   # build と dist フォルダを削除してから再ビルド
-   rmdir /s /q build
-   rmdir /s /q dist
-   pyinstaller scripts\build.spec
-   ```
+GUIの受入では、設定画面の定期実行タブで管理対象を選び、実行中・順番待ち・再試行待機中でも編集が押せること、確認画面の案内と「今すぐ実行」の無効状態を確認します。小さい画面では操作ボタンと保存・キャンセルが見え、登録内容と履歴の右側の列へスクロールで到達できることを確認します。配布先のexeが想定版か調べる場合は、配布元と配布先で`Get-FileHash ippi-down.exe -Algorithm SHA256`の値を照合します。
 
-#### 実行時にエラーが発生する場合
+ユーザーの既存`config/config.yaml`、ログ、ダウンロード済み文書は更新時に削除しません。新しいexeまたはソースへ置き換えた後も、これらは利用者側でバックアップ・管理してください。
 
-1. **設定ファイルの確認**
-   - `config/config.yaml` が正しく作成されているか確認
-   - 必要に応じて `config/config.example.yaml` をコピーして編集
-
-2. **ログファイルの確認**
-   - `logs/app.log` を確認してエラーの詳細を確認
-
-3. **権限の確認**
-   - 実行ファイルを管理者権限で実行してみる
-
-### ファイルサイズについて
-
-- 実行ファイルのサイズは約50-100MB程度になることがあります
-- これはPythonインタープリタと必要なライブラリがすべて含まれているためです
-- ファイルサイズを削減したい場合は、不要なライブラリを除外する設定を追加できます
-
-### 更新方法
-
-1. 新しいバージョンをビルド
-2. 既存の `ippi-down.exe` を新しいバージョンで置き換え
-3. 設定ファイル（`config/config.yaml`）はそのままで動作するはずです
-
----
-
-**最終更新**: 2026年1月19日
+自己診断が失敗した場合は`self-check-result.txt`を確認します。`PDF_INTERNAL_RENDER_FAILED`は内蔵生成失敗、`PDF_CONTENT_VALIDATION_FAILED`は内容検証失敗、`EDGE_SUPERVISION_UNAVAILABLE`はEdge用の全プロセス監視不可を示します。Edge本体がないことだけでは自己診断を失敗にしません。実行時の詳細は[入札調書PDF生成・監視仕様](pdf_conversion_reliability.md)を参照してください。

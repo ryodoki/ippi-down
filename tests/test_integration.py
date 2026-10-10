@@ -1,23 +1,14 @@
-<<<<<<< HEAD
-﻿"""統合テスト（既存機能の動作確認）"""
-=======
 # -*- coding: utf-8 -*-
 
 """統合テスト（既存機能の動作確認）"""
->>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import pytest
-import sys
 import requests
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-# プロジェクトルートをパスに追加
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+pytestmark = pytest.mark.integration
 
 
-@pytest.mark.integration
 def test_application_service_with_mocks():
     """ApplicationServiceの統合テスト（モック使用）"""
     from src.app.service import ApplicationService
@@ -27,11 +18,13 @@ def test_application_service_with_mocks():
     from src.utils.logger import Logger
 
     # モックの設定
-    with patch('src.app.service.HTTPClient') as mock_http_client, \
-         patch('src.app.service.Scraper') as mock_scraper, \
-         patch('src.app.service.Filter') as mock_filter, \
-         patch('src.app.service.Naming') as mock_naming, \
-         patch('src.app.service.Downloader') as mock_downloader:
+    with (
+        patch('src.app.service.HTTPClient'),
+        patch('src.app.service.Scraper') as mock_scraper,
+        patch('src.app.service.Filter') as mock_filter,
+        patch('src.app.service.Naming'),
+        patch('src.app.service.Downloader') as mock_downloader,
+    ):
         
         # モックインスタンス
         mock_scraper_instance = MagicMock()
@@ -106,32 +99,94 @@ def test_storage_local_integration():
 
 def test_exception_handling():
     """例外処理の統合テスト"""
-    from src.app.exceptions import NetworkError, RateLimitError, FilesystemError
+    from src.app.exceptions import NetworkError
+    from src.utils.http_client import HTTPClient
+    from src.utils.logger import Logger
+    from unittest.mock import patch
+
+    logger = Logger()
+    http_client = HTTPClient(logger, timeout=1)  # 短いタイムアウトを設定
+
+    # NetworkErrorが発生することを確認（通信と待機はモック）
+    with patch.object(
+        http_client.session,
+        "request",
+        side_effect=requests.exceptions.ConnectionError("Connection error"),
+    ), patch("src.utils.http_client.time.sleep"):
+        with pytest.raises(NetworkError):
+            http_client.get("https://invalid-url-that-will-fail.com")
+
+
+def test_page_fetcher_integration():
+    """PageFetcherの統合テスト（モック使用）"""
+    from src.core.fetcher.page_fetcher import PageFetcher
     from src.utils.http_client import HTTPClient
     from src.utils.logger import Logger
     from unittest.mock import patch, MagicMock
-
-    import pytest
-    from src.models.config_model import NetworkConfig, RobotsConfig
+    from bs4 import BeautifulSoup
 
     logger = Logger()
-    # 許可ホストへのリクエストで接続エラーを起こす（許可外URLだと送信前に弾かれ、
-    # 接続エラーの処理を通らないため）
-    http_client = HTTPClient(
-        logger,
-        timeout=1,  # 短いタイムアウトを設定
-        network_config=NetworkConfig(
-            min_interval_seconds=0.0, robots=RobotsConfig(enabled=False), audit_log=None
-        ),
+    http_client = HTTPClient(logger)
+    fetcher = PageFetcher(http_client, logger)
+
+    # モックレスポンス（適切な属性を設定）
+    mock_response = MagicMock()
+    mock_response.content = b"<html><body>Test</body></html>"
+    mock_response.encoding = "utf-8"
+    mock_response.apparent_encoding = "utf-8"
+
+    with patch.object(http_client, 'get', return_value=mock_response):
+        soup = fetcher.fetch_page("https://example.com")
+        assert soup is not None
+        assert isinstance(soup, BeautifulSoup)
+
+
+def test_parser_integration():
+    """Parserの統合テスト"""
+    from src.core.parser.aspnet_form_parser import AspNetFormParser
+    from src.core.parser.search_result_parser import SearchResultParser
+    from src.core.extractor.metadata_extractor import MetadataExtractor
+    from bs4 import BeautifulSoup
+    from src.utils.logger import Logger
+
+    logger = Logger()
+    
+    # HTMLサンプル
+    html = """
+    <html>
+    <body>
+        <form>
+            <input type="hidden" name="__VIEWSTATE" value="test" />
+        </form>
+        <table id="dgrSearchList">
+            <tr><th>工事名</th></tr>
+            <tr><td><a href="/detail/1">テスト工事</a></td></tr>
+        </table>
+    </body>
+    </html>
+    """
+    
+    soup = BeautifulSoup(html, "lxml")
+    
+    # AspNetFormParser
+    form_parser = AspNetFormParser(logger)
+    hidden_inputs = form_parser.get_all_hidden_inputs(soup)
+    assert "__VIEWSTATE" in hidden_inputs
+    
+    # SearchResultParser
+    search_parser = SearchResultParser(logger)
+    entries = search_parser.extract_project_entries(soup, "https://example.com")
+    assert len(entries) > 0
+    
+    # MetadataExtractor
+    extractor = MetadataExtractor(logger)
+    from src.core.parser.models import FileCandidate
+    
+    candidate = FileCandidate(
+        url="https://example.com/file.pdf",
+        filename="file.pdf",
+        file_type=".pdf"
     )
-
-    # NetworkErrorが発生することを確認（モック）
-    # session.getを直接パッチして、即座に例外を発生させる
-    with patch.object(http_client.session, 'get', side_effect=requests.exceptions.ConnectionError("Connection error")):
-        with pytest.raises(NetworkError):
-            http_client.get("https://www.i-ppi.jp/invalid-path", max_retries=1)
-
-
-def test_page_fetcher_integration_removed():
-    """PageFetcher/Parser/Extractor は scraper.py に統合済みのため削除（Phase 1）"""
-    pass
+    
+    file_info = extractor.to_file_info(candidate, entries[0] if entries else None)
+    assert file_info is not None

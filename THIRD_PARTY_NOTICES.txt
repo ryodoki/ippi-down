@@ -1,0 +1,31 @@
+ippi-down third-party notices
+================================
+
+This distribution includes the following components used by the PDF
+generation and process-monitoring functions.
+
+Noto Sans Japanese
+Copyright 2012 Google Inc.
+License: SIL Open Font License 1.1
+The complete license text is provided in OFL-1.1.txt.
+
+ReportLab
+Copyright ReportLab Inc. and contributors.
+License: BSD-style license.
+Project: https://www.reportlab.com/opensource/
+
+pypdf
+Copyright pypdf contributors.
+License: BSD-3-Clause.
+Project: https://pypdf.readthedocs.io/
+
+Pillow
+Copyright Secret Labs AB and Pillow contributors.
+License: HPND.
+Project: https://python-pillow.github.io/
+
+pywin32
+Copyright Mark Hammond and contributors.
+License: Python Software Foundation License.
+Project: https://github.com/mhammond/pywin32
+

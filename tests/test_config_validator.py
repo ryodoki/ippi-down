@@ -1,64 +1,131 @@
 # -*- coding: utf-8 -*-
 
-"""ConfigValidator のテスト（命名規則検証を含む）"""
+"""設定値間の検証に関する回帰テスト。"""
 
 import pytest
-from pathlib import Path
-import sys
-
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 from src.config.config_validator import ConfigValidator
-from src.models.config_model import AppConfig, SavePaths, SearchConditions
+from src.models.config_model import AppConfig, IPPI_OFFICIAL_SEARCH_URL
+from src.utils import path_utils
 
 
-class TestConfigValidatorNamingRule:
-    """命名規則テンプレートの検証"""
+class StubLogger:
+    def warning(self, message):
+        pass
 
-    def test_valid_naming_rule_passes(self):
-        """使用可能な変数のみのテンプレートはエラーにならない"""
-        v = ConfigValidator()
-        errors = v.validate_naming_rule("{category}_{title}_{date}_{index}")
-        assert errors == []
 
-    def test_unknown_key_returns_error(self):
-        """未知の変数があるとエラーメッセージと使用可能一覧が返る"""
-        v = ConfigValidator()
-        errors = v.validate_naming_rule("{category}_{typo_key}_{index}")
-        assert len(errors) == 1
-        assert "typo_key" in errors[0]
-        assert "使用可能" in errors[0] or "category" in errors[0]
+@pytest.mark.parametrize(
+    ("normal_folder", "scheduled_folder"),
+    [
+        ("Foo", "foo"),
+        ("A B", "A_B"),
+        ("CON", "_CON"),
+    ],
+)
+def test_save_folder_names_must_differ_after_windows_normalization(
+    normal_folder,
+    scheduled_folder,
+):
+    config = AppConfig()
+    config.save_paths.normal_folder = normal_folder
+    config.save_paths.scheduled_folder = scheduled_folder
 
-    def test_typo_key_includes_candidates(self):
-        """typo の未知キーに対して候補（近い有効キー）がメッセージに含まれる"""
-        v = ConfigValidator()
-        errors = v.validate_naming_rule("{titl}_{index}")  # titl → title に近い
-        assert len(errors) == 1
-        assert "titl" in errors[0]
-        assert "候補" in errors[0]
-        # 候補に {title} が含まれること（difflib の結果に依存するが titl は title に近い）
-        assert "title" in errors[0]
+    valid, errors = ConfigValidator(logger=StubLogger()).validate_config(config)
 
-    def test_multiple_unknown_keys_all_listed(self):
-        """複数の未知キーがあるとき、それぞれエラーに列挙される"""
-        v = ConfigValidator()
-        errors = v.validate_naming_rule("{category}_{xxx}_{yyy}_{index}")
-        assert len(errors) >= 2
-        keys_in_errors = " ".join(errors)
-        assert "xxx" in keys_in_errors
-        assert "yyy" in keys_in_errors
-        assert "使用可能" in errors[0]
+    assert valid is False
+    assert "通常ダウンロードと定期実行のフォルダー名は分けてください" in errors
 
-    def test_validate_config_includes_naming_error(self):
-        """validate_config で naming_rule に未知キーがあるとエラーに含まれる"""
-        v = ConfigValidator()
-        config = AppConfig(
-            target_urls=["https://example.com/"],
-            save_paths=SavePaths(local="./out"),
-            naming_rule="{unknown_var}_{index}",
-        )
-        is_valid, errors = v.validate_config(config)
-        assert is_valid is False
-        assert any("unknown_var" in e or "未知" in e for e in errors)
 
+def test_distinct_save_folder_names_are_accepted():
+    config = AppConfig()
+    config.save_paths.normal_folder = "01_通常ダウンロード"
+    config.save_paths.scheduled_folder = "02_定期実行"
+
+    valid, errors = ConfigValidator(logger=StubLogger()).validate_config(config)
+
+    assert valid is True
+    assert errors == []
+
+
+def test_mutated_schedule_notification_policy_is_rejected():
+    config = AppConfig()
+    config.schedule.notification_policy = "unexpected"
+
+    valid, errors = ConfigValidator(logger=StubLogger()).validate_config(config)
+
+    assert valid is False
+    assert "スケジュールの完了通知方針が不正です" in errors
+
+
+def test_target_url_is_limited_to_canonical_official_search_page():
+    config = AppConfig(target_urls=[IPPI_OFFICIAL_SEARCH_URL])
+
+    valid, errors = ConfigValidator(logger=StubLogger()).validate_config(config)
+
+    assert valid is True
+    assert errors == []
+
+    config.target_urls = ["https://www.i-ppi.jp/other"]
+    valid, errors = ConfigValidator(logger=StubLogger()).validate_config(config)
+
+    assert valid is False
+    assert any("公式検索URL" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "attribute",
+    ["save", "log"],
+)
+def test_unc_paths_are_rejected_without_resolving_them(attribute, monkeypatch):
+    config = AppConfig()
+    if attribute == "save":
+        config.save_paths.local = r"\\server\share\downloads"
+    else:
+        config.logging.file = r"\\server\share\logs\app.log"
+    unc_resolve_called = False
+    original_resolve = path_utils.resolve_app_path
+
+    def track_resolve(candidate):
+        nonlocal unc_resolve_called
+        if path_utils._looks_like_unc_or_device_path(candidate):
+            unc_resolve_called = True
+            raise AssertionError("UNCを解決してはいけません")
+        return original_resolve(candidate)
+
+    monkeypatch.setattr(path_utils, "resolve_app_path", track_resolve)
+
+    valid, errors = ConfigValidator(logger=StubLogger()).validate_config(config)
+
+    assert valid is False
+    assert unc_resolve_called is False
+    assert any("UNC" in error for error in errors)
+
+
+def test_remote_drive_is_rejected_before_path_resolution(monkeypatch):
+    resolve_called = False
+
+    def track_resolve(_path):
+        nonlocal resolve_called
+        resolve_called = True
+        raise AssertionError("リモートドライブを解決してはいけません")
+
+    monkeypatch.setattr(path_utils, "_get_windows_drive_type", lambda _path: 4)
+    monkeypatch.setattr(path_utils, "resolve_app_path", track_resolve)
+
+    with pytest.raises(ValueError, match="ネットワークドライブ"):
+        path_utils.resolve_verified_local_path("./downloads")
+
+    assert resolve_called is False
+
+
+@pytest.mark.parametrize("drive_type", [2, 3])
+def test_fixed_and_removable_drives_are_allowed(monkeypatch, drive_type):
+    monkeypatch.setattr(
+        path_utils,
+        "_get_windows_drive_type",
+        lambda _path: drive_type,
+    )
+
+    resolved = path_utils.resolve_verified_local_path("./downloads")
+
+    assert resolved.is_absolute()

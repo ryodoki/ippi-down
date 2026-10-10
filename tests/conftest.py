@@ -1,146 +1,107 @@
-<<<<<<< HEAD
-﻿"""pytest設定とフィクスチャ"""
-=======
 # -*- coding: utf-8 -*-
 
 """pytest設定とフィクスチャ"""
->>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import pytest
-import ipaddress
+import logging
 import os
 import socket
 import sys
+import tempfile
 from pathlib import Path
 
 # プロジェクトルートをパスに追加
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.utils import netguard  # noqa: E402  （sys.path 追加後に import する）
-from src.utils.rate_limiter import reset_shared_limiter  # noqa: E402
-
-# 素のソケット関数（テスト実行中はここへ必ず戻す）
-_REAL_GETADDRINFO = socket.getaddrinfo
-_REAL_CONNECT = socket.socket.connect
-_REAL_CONNECT_EX = socket.socket.connect_ex
-_REAL_SENDTO = socket.socket.sendto
-_REAL_CREATE_CONNECTION = socket.create_connection
-
-LOOPBACK_NAMES = {"localhost", "localhost.localdomain", "ip6-localhost", ""}
-
 # 環境変数でテストを制御
 RUN_GUI_TESTS = os.getenv("RUN_GUI_TESTS", "0").lower() in ("1", "true", "yes")
 RUN_NETWORK_TESTS = os.getenv("RUN_NETWORK_TESTS", "0").lower() in ("1", "true", "yes")
 RUN_INTEGRATION_TESTS = os.getenv("RUN_INTEGRATION_TESTS", "0").lower() in ("1", "true", "yes")
+_TEST_LOG_TEMP = tempfile.TemporaryDirectory(prefix="ippi-down-pytest-logs-")
+_TEST_LOG_DIR = Path(_TEST_LOG_TEMP.name)
 
 
 def pytest_configure(config):
     """pytest設定"""
-    # GUIテストのスキップ設定
+    # Logger()の既定出力をテスト専用一時フォルダーへ向け、本番の
+    # logs/app.logへ疑似エラーやexample.testの記録を混入させない。
+    import src.utils.logger as logger_module
+
+    logger_module.get_logs_path = lambda name="app.log": _TEST_LOG_DIR / name
+    # LoggingConfig.fileが明示されていても、Loggerが作る全ファイルを
+    # pytest専用一時領域へ隔離する。アプリ本体のresolve_app_pathは
+    # 変更しないため、保存先などのパステストには影響しない。
+    def test_log_resolver(path):
+        return _TEST_LOG_DIR / Path(path).name
+    logger_module.resolve_app_path = test_log_resolver
+    import src.utils.logger_factory as logger_factory_module
+
+    logger_factory_module.resolve_app_path = test_log_resolver
+    import src.utils.network_audit as network_audit_module
+
+    network_audit_module.get_logs_path = (
+        lambda name="network-audit.jsonl": _TEST_LOG_DIR / name
+    )
+    config.addinivalue_line(
+        "markers", "gui: GUI依存テスト（RUN_GUI_TESTS=1で有効化）"
+    )
+    config.addinivalue_line(
+        "markers", "network: ネットワーク依存テスト（RUN_NETWORK_TESTS=1で有効化）"
+    )
+    config.addinivalue_line(
+        "markers", "integration: 統合テスト（RUN_INTEGRATION_TESTS=1で有効化）"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """環境変数が有効なカテゴリだけを収集対象として実行する。"""
+    del config
+    disabled = []
     if not RUN_GUI_TESTS:
-        config.addinivalue_line(
-            "markers", "gui: GUI依存テスト（RUN_GUI_TESTS=1で有効化）"
-        )
-    
-    # ネットワークテストのスキップ設定
+        disabled.append(("gui", "RUN_GUI_TESTS=1で有効化"))
     if not RUN_NETWORK_TESTS:
-        config.addinivalue_line(
-            "markers", "network: ネットワーク依存テスト（RUN_NETWORK_TESTS=1で有効化）"
-        )
-    
-    # 統合テストのスキップ設定
+        disabled.append(("network", "RUN_NETWORK_TESTS=1で有効化"))
     if not RUN_INTEGRATION_TESTS:
-        config.addinivalue_line(
-            "markers", "integration: 統合テスト（RUN_INTEGRATION_TESTS=1で有効化）"
-        )
+        disabled.append(("integration", "RUN_INTEGRATION_TESTS=1で有効化"))
+
+    for marker_name, reason in disabled:
+        skip_marker = pytest.mark.skip(reason=reason)
+        for item in items:
+            if marker_name in item.keywords:
+                item.add_marker(skip_marker)
 
 
-class SocketUseInTestError(RuntimeError):
-    """network マーカーなしのテストが通信しようとした"""
-
-
-def _is_loopback_host(host) -> bool:
-    if host is None:
-        return True
-    text = str(host).strip().rstrip(".").casefold()
-    if text in LOOPBACK_NAMES:
-        return True
-    try:
-        return ipaddress.ip_address(text.split("%", 1)[0]).is_loopback
-    except ValueError:
-        return False
-
-
-def _is_loopback_address(address) -> bool:
-    if isinstance(address, tuple) and address:
-        return _is_loopback_host(address[0])
-    return True
-
-
-def _install_socket_blocker():
-    def blocked_getaddrinfo(host, port=None, family=0, type=0, proto=0, flags=0):
-        if not _is_loopback_host(host):
-            raise SocketUseInTestError(
-                f"テスト中の名前解決は禁止です: {host}"
-                "（実通信が必要なら @pytest.mark.network を付けてください）"
-            )
-        return _REAL_GETADDRINFO(host, port, family, type, proto, flags)
-
-    def blocked_connect(self, address):
-        if not _is_loopback_address(address):
-            raise SocketUseInTestError(f"テスト中の接続は禁止です: {address}")
-        return _REAL_CONNECT(self, address)
-
-    def blocked_connect_ex(self, address):
-        if not _is_loopback_address(address):
-            raise SocketUseInTestError(f"テスト中の接続は禁止です: {address}")
-        return _REAL_CONNECT_EX(self, address)
-
-    def blocked_sendto(self, data, *args):
-        address = args[-1] if args else None
-        if address is not None and not _is_loopback_address(address):
-            raise SocketUseInTestError(f"テスト中の送信は禁止です: {address}")
-        return _REAL_SENDTO(self, data, *args)
-
-    def blocked_create_connection(address, *args, **kwargs):
-        if not _is_loopback_address(address):
-            raise SocketUseInTestError(f"テスト中の接続は禁止です: {address}")
-        return _REAL_CREATE_CONNECTION(address, *args, **kwargs)
-
-    socket.getaddrinfo = blocked_getaddrinfo
-    socket.socket.connect = blocked_connect
-    socket.socket.connect_ex = blocked_connect_ex
-    socket.socket.sendto = blocked_sendto
-    socket.create_connection = blocked_create_connection
-
-
-def _restore_real_socket():
-    socket.getaddrinfo = _REAL_GETADDRINFO
-    socket.socket.connect = _REAL_CONNECT
-    socket.socket.connect_ex = _REAL_CONNECT_EX
-    socket.socket.sendto = _REAL_SENDTO
-    socket.create_connection = _REAL_CREATE_CONNECTION
+def pytest_unconfigure(config):
+    """テストログのハンドラーを閉じて一時フォルダーを削除する。"""
+    del config
+    logging.shutdown()
+    _TEST_LOG_TEMP.cleanup()
 
 
 @pytest.fixture(autouse=True)
-def block_network(request):
-    """通信を遮断し、エグレスガードの状態をテストごとに初期化する"""
-    if "network" not in request.keywords:
-        _install_socket_blocker()
-    try:
-        yield
-    finally:
-        # ガードを外してから素の関数に戻す（順序が逆だとガードのパッチが残る）
-        netguard.uninstall_guard()
-        _restore_real_socket()
-        reset_shared_limiter()
+def block_unexpected_network(request, monkeypatch):
+    """標準テストからの実socket・DNS通信をfail-closedで禁止する。
 
+    実サイトを使うテストは ``network`` markerと
+    ``RUN_NETWORK_TESTS=1`` の両方が明示された場合だけ解除する。
+    HTTPの正常系・異常系はrecording transportまたはmockで検証する。
+    """
 
-@pytest.fixture
-def real_create_connection():
-    """素の socket.create_connection（ガード自体を検証するテスト用）"""
-    return _REAL_CREATE_CONNECTION
+    if request.node.get_closest_marker("network") is not None:
+        if RUN_NETWORK_TESTS:
+            return
+
+    def blocked(*_args, **_kwargs):
+        raise AssertionError(
+            "標準pytest中の実ネットワーク通信は禁止されています。"
+            "実通信テストにはnetwork markerを付け、専用jobで実行してください"
+        )
+
+    monkeypatch.setattr(socket, "create_connection", blocked)
+    monkeypatch.setattr(socket, "getaddrinfo", blocked)
+    monkeypatch.setattr(socket.socket, "connect", blocked)
+    monkeypatch.setattr(socket.socket, "connect_ex", blocked)
 
 
 @pytest.fixture

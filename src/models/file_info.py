@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-﻿"""ファイル情報を保持するデータモデル"""
-=======
 # -*- coding: utf-8 -*-
 
 """ファイル情報を保持するデータモデル"""
->>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
@@ -20,6 +16,7 @@ class FileInfo:
     size: int = 0  # ファイルサイズ（バイト）
     metadata: Optional[Dict[str, Any]] = None  # メタデータ（タイトル、カテゴリ、日付等）
     page_url: str = ""  # 元のページURL
+    allow_html_to_pdf: bool = False  # 許可済みHTML入札調書をPDFへ変換するか
 
     def __post_init__(self):
         """初期化後の処理"""
@@ -38,4 +35,3 @@ class FileInfo:
     def is_valid(self) -> bool:
         """ファイル情報が有効かどうかをチェック"""
         return bool(self.url and self.filename)
-

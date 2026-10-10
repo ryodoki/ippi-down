@@ -4,6 +4,7 @@
 
 import sys
 import io
+import re
 from pathlib import Path
 
 # Windows環境でのコンソール出力の文字化けを防ぐ
@@ -12,10 +13,18 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from docx import Document
-from docx.shared import Pt, Inches, Cm, RGBColor
+from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.style import WD_STYLE_TYPE
-from docx.enum.table import WD_TABLE_ALIGNMENT
+
+
+def get_project_version() -> str:
+    """src/__init__.pyを唯一のバージョン情報源として読む。"""
+    project_root = Path(__file__).resolve().parents[2]
+    source = (project_root / "src" / "__init__.py").read_text(encoding="utf-8")
+    match = re.search(r'^__version__\s*=\s*"([^"]+)"', source, re.MULTILINE)
+    if not match:
+        raise RuntimeError("src/__init__.pyからバージョンを取得できません")
+    return match.group(1)
 
 
 def create_readme_docx(output_path: Path):
@@ -279,7 +288,7 @@ def create_readme_docx(output_path: Path):
     
     version_data = [
         ('ソフトウェア名', 'ippi-down（入札情報ファイルダウンローダー）'),
-        ('バージョン', '2.1'),
+        ('バージョン', get_project_version()),
         ('対応OS', 'Windows 10/11（64ビット）'),
         ('作成日', '2026年1月'),
     ]

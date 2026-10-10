@@ -1,40 +1,24 @@
 # バックグラウンドモードでアプリケーションを起動（PowerShell版）
+$ErrorActionPreference = "Stop"
+$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$PythonExe = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "ippi-down バックグラウンド起動スクリプト" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
-
-# 仮想環境の有効化
-if (Test-Path ".venv\Scripts\Activate.ps1") {
-    Write-Host "仮想環境を有効化しています..." -ForegroundColor Yellow
-    & .venv\Scripts\Activate.ps1
-} elseif (Test-Path ".venv\Scripts\activate.bat") {
-    Write-Host "仮想環境を有効化しています..." -ForegroundColor Yellow
-    & .venv\Scripts\activate.bat
-} else {
-    Write-Host "警告: 仮想環境が見つかりません" -ForegroundColor Red
-    Write-Host "仮想環境を作成してください: python -m venv .venv" -ForegroundColor Yellow
-    Read-Host "Enterキーを押して終了"
-    exit 1
+if (-not (Test-Path -LiteralPath $PythonExe -PathType Leaf)) {
+    throw "仮想環境が見つかりません: $PythonExe`n先に scripts\setup.ps1 を実行してください。"
 }
 
-# バックグラウンドモードで起動
-Write-Host ""
-Write-Host "バックグラウンドモードでアプリケーションを起動しています..." -ForegroundColor Yellow
-Write-Host ""
-
-$env:PPI_BACKGROUND_MODE = "true"
-python src\main.py --background
-
+& $PythonExe -c "import struct, sys; valid = sys.version_info[:2] == (3, 11) and struct.calcsize('P') * 8 == 64 and all('conda' not in str(value).lower() for value in (sys.executable, sys.base_prefix)); raise SystemExit(0 if valid else 1)" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "エラー: アプリケーションの起動に失敗しました" -ForegroundColor Red
-    Read-Host "Enterキーを押して終了"
-    exit 1
+    throw "プロジェクトの.venvが壊れているか、Python 3.11 x64以外またはCondaを参照しています。`nscripts\setup.ps1 を実行して再作成してください。"
 }
 
-Write-Host ""
-Write-Host "アプリケーションがバックグラウンドで実行されています" -ForegroundColor Green
-Write-Host ""
+Push-Location $ProjectRoot
+try {
+    $env:PPI_BACKGROUND_MODE = "true"
+    & $PythonExe (Join-Path $ProjectRoot "src\main.py") --background
+    exit $LASTEXITCODE
+}
+finally {
+    Pop-Location
+}
 

@@ -1,0 +1,3 @@
+-r runtime.txt
+# The application falls back gracefully when this package is absent.
+win10toast>=0.9; platform_system == "Windows"

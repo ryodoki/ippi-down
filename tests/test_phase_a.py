@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-﻿"""Phase A リファクタリング動作確認テスト"""
-=======
 # -*- coding: utf-8 -*-
 
 """Phase A リファクタリング動作確認テスト"""
->>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import pytest
 import sys
@@ -17,7 +13,7 @@ sys.path.insert(0, str(project_root))
 
 def test_progress_event():
     """ProgressEventの動作確認"""
-    from src.app.events import ProgressEvent, EventType  # pyright: ignore[reportMissingImports]
+    from src.app.events import ProgressEvent, EventType
     
     # イベント作成
     event = ProgressEvent(
@@ -34,8 +30,8 @@ def test_progress_event():
 
 def test_logger_factory():
     """LoggerFactoryの動作確認"""
-    from src.utils.logger_factory import LoggerFactory  # pyright: ignore[reportMissingImports]
-    from src.models.config_model import LoggingConfig  # pyright: ignore[reportMissingImports]
+    from src.utils.logger_factory import LoggerFactory
+    from src.models.config_model import LoggingConfig
     
     factory = LoggerFactory()
     
@@ -71,7 +67,7 @@ def test_logger_factory():
 def test_secret_provider():
     """SecretProviderの動作確認"""
     import os
-    from src.utils.secret_provider import EnvSecretProvider, ConfigSecretProvider  # pyright: ignore[reportMissingImports]
+    from src.utils.secret_provider import EnvSecretProvider, ConfigSecretProvider
     
     # EnvSecretProvider
     provider = EnvSecretProvider(prefix="PPI_TEST_")
@@ -103,10 +99,9 @@ def test_secret_provider():
 def test_event_handler_creation():
     """EventHandlerの作成確認（GUIなし）"""
     import tkinter as tk
-    from src.gui.event_handler import EventHandler  # pyright: ignore[reportMissingImports]
-    from src.gui.main_window import MainWindow  # pyright: ignore[reportMissingImports]
-    from src.models.config_model import AppConfig  # pyright: ignore[reportMissingImports]
-    from src.config.config_manager import ConfigManager  # pyright: ignore[reportMissingImports]
+    from src.gui.main_window import MainWindow
+    from src.models.config_model import AppConfig
+    from src.config.config_manager import ConfigManager
     
     # 最小限のGUIを作成
     root = tk.Tk()
@@ -122,7 +117,7 @@ def test_event_handler_creation():
         assert main_window.event_handler is not None
         
         # イベントを発行
-        from src.app.events import ProgressEvent, EventType  # pyright: ignore[reportMissingImports]
+        from src.app.events import ProgressEvent, EventType
         event = ProgressEvent(
             type=EventType.MESSAGE,
             message="テストメッセージ"
@@ -137,11 +132,10 @@ def test_event_handler_creation():
 def test_gui_event_handler():
     """GUI EventHandlerの動作確認（GUIテスト）"""
     import tkinter as tk
-    from src.gui.event_handler import EventHandler  # pyright: ignore[reportMissingImports]
-    from src.gui.main_window import MainWindow  # pyright: ignore[reportMissingImports]
-    from src.models.config_model import AppConfig  # pyright: ignore[reportMissingImports]
-    from src.app.events import ProgressEvent, EventType  # pyright: ignore[reportMissingImports]
-    from src.config.config_manager import ConfigManager  # pyright: ignore[reportMissingImports]
+    from src.gui.main_window import MainWindow
+    from src.models.config_model import AppConfig
+    from src.app.events import ProgressEvent, EventType
+    from src.config.config_manager import ConfigManager
     
     root = tk.Tk()
     root.withdraw()

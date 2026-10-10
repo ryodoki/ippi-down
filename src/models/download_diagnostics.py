@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+
+"""ダウンロード処理の構造化診断モデル。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Mapping, Union
+
+
+DiagnosticValue = Union[str, int, float, bool]
+
+
+class DownloadMode(str, Enum):
+    """ファイルを保存する処理方式。"""
+
+    DIRECT = "DIRECT"
+    HTML_TO_PDF = "HTML_TO_PDF"
+
+
+class RedownloadPolicy(str, Enum):
+    """検証済みの保存済みファイルを再利用するか。"""
+
+    REUSE_VERIFIED = "REUSE_VERIFIED"
+    FORCE_REFRESH = "FORCE_REFRESH"
+
+
+class IssueSeverity(str, Enum):
+    """診断情報の重要度。"""
+
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
+class DownloadStage(str, Enum):
+    """問題が発生したダウンロード処理段階。"""
+
+    FETCH = "FETCH"
+    CLASSIFY = "CLASSIFY"
+    CONVERT = "CONVERT"
+    VALIDATE = "VALIDATE"
+    COMMIT = "COMMIT"
+    CLEANUP = "CLEANUP"
+
+
+class DownloadIssueCode(str, Enum):
+    """ログおよびGUIで使用する安定した失敗理由コード。"""
+
+    RATE_LIMIT = "RATE_LIMIT"
+    HTTP_STATUS = "HTTP_STATUS"
+    HTTP_4XX = "HTTP_4XX"
+    HTTP_5XX = "HTTP_5XX"
+    NETWORK_TIMEOUT = "NETWORK_TIMEOUT"
+    NETWORK_ERROR = "NETWORK_ERROR"
+    OUTBOUND_POLICY_BLOCKED = "OUTBOUND_POLICY_BLOCKED"
+    REDIRECT_POLICY_BLOCKED = "REDIRECT_POLICY_BLOCKED"
+    CONTENT_LENGTH_MISSING = "CONTENT_LENGTH_MISSING"
+    CONTENT_LENGTH_INVALID = "CONTENT_LENGTH_INVALID"
+    CONTENT_LENGTH_MISMATCH = "CONTENT_LENGTH_MISMATCH"
+    CONTENT_TYPE_MISMATCH = "CONTENT_TYPE_MISMATCH"
+    UNEXPECTED_HTML = "UNEXPECTED_HTML"
+    HTML_PARSE_FAILED = "HTML_PARSE_FAILED"
+    HTML_STRUCTURE_INVALID = "HTML_STRUCTURE_INVALID"
+    PROJECT_NAME_MISMATCH = "PROJECT_NAME_MISMATCH"
+    EXTERNAL_RESOURCE_BLOCKED = "EXTERNAL_RESOURCE_BLOCKED"
+    PAYLOAD_SIGNATURE_MISMATCH = "PAYLOAD_SIGNATURE_MISMATCH"
+    OOXML_INVALID = "OOXML_INVALID"
+    EDGE_NOT_FOUND = "EDGE_NOT_FOUND"
+    EDGE_START_FAILED = "EDGE_START_FAILED"
+    EDGE_SUPERVISION_UNAVAILABLE = "EDGE_SUPERVISION_UNAVAILABLE"
+    EDGE_PROCESS_CRASH = "EDGE_PROCESS_CRASH"
+    EDGE_GPU_PROCESS_CRASH = "EDGE_GPU_PROCESS_CRASH"
+    EDGE_OUTPUT_NOT_PRODUCED = "EDGE_OUTPUT_NOT_PRODUCED"
+    CONVERSION_TIMEOUT = "CONVERSION_TIMEOUT"
+    CONVERSION_EXIT_ERROR = "CONVERSION_EXIT_ERROR"
+    PDF_INTERNAL_RENDER_FAILED = "PDF_INTERNAL_RENDER_FAILED"
+    PDF_CONTENT_VALIDATION_FAILED = "PDF_CONTENT_VALIDATION_FAILED"
+    PDF_ALL_RENDERERS_FAILED = "PDF_ALL_RENDERERS_FAILED"
+    PDF_RECOVERY_ARTIFACT_STORED = "PDF_RECOVERY_ARTIFACT_STORED"
+    OUTPUT_MISSING = "OUTPUT_MISSING"
+    OUTPUT_EMPTY = "OUTPUT_EMPTY"
+    OUTPUT_INVALID_PDF = "OUTPUT_INVALID_PDF"
+    SAVE_FAILED = "SAVE_FAILED"
+    TEMP_CLEANUP_FAILED = "TEMP_CLEANUP_FAILED"
+    HISTORY_INVALID = "HISTORY_INVALID"
+    LEGACY_PATH_REDOWNLOAD = "LEGACY_PATH_REDOWNLOAD"
+    CANCELLED = "CANCELLED"
+    UNKNOWN = "UNKNOWN"
+
+
+@dataclass(frozen=True)
+class DownloadIssue:
+    """ファイル単位の診断情報。
+
+    ``details`` はログへ出す前に呼び出し側で許可項目だけを選べるよう、
+    単純な値だけに制限する。HTML本文やHTTPヘッダー全体は格納しない。
+    """
+
+    code: DownloadIssueCode
+    stage: DownloadStage
+    message: str
+    severity: IssueSeverity = IssueSeverity.ERROR
+    details: Mapping[str, DiagnosticValue] = field(default_factory=dict)

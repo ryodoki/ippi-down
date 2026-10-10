@@ -2,6 +2,8 @@
 
 """設定ファイルの読み込み・保存を行うクラス"""
 
+import os
+import tempfile
 import yaml
 from pathlib import Path
 from typing import Tuple, List, Optional
@@ -12,11 +14,15 @@ from ..models.config_model import (
     SavePaths,
     ScheduleConfig,
     LoggingConfig,
-    NetworkConfig,
-    RobotsConfig,
 )
+from ..models.search_target import SearchTarget
+from ..core.search_profiles import get_search_profile
 from ..utils.logger import Logger
 from ..utils.path_utils import get_config_path, get_logs_path, get_downloads_path
+from ..utils.naming_template import (
+    DEFAULT_NAMING_RULE,
+    LEGACY_DEFAULT_NAMING_RULE,
+)
 from .config_validator import ConfigValidator
 from ..app.exceptions import ConfigError, FilesystemError
 
@@ -52,33 +58,25 @@ class ConfigManager:
                 config_dict = yaml.safe_load(f) or {}
 
             config = self._dict_to_config(config_dict)
-
-            # 通信ポリシー違反はデフォルトへのフォールバックで隠さず、起動を止める
-            network_errors = self.validator.validate_network(config)
-            if network_errors:
-                message = "通信ポリシー設定が不正です: " + ", ".join(network_errors)
-                self.logger.error(message)
-                raise ConfigError(message)
-
             is_valid, errors = self.validator.validate_config(config)
 
             if not is_valid:
-                self.logger.warning(f"設定ファイルに問題があります: {', '.join(errors)}")
-                self.logger.info("デフォルト設定を使用します")
-                return self.get_default_config()
+                message = "、".join(errors)
+                self.logger.error(f"設定ファイルが不正です: {message}")
+                raise ConfigError(
+                    f"設定ファイルが不正です: {self.config_path}: {message}"
+                )
 
             self.logger.info(f"設定ファイルを読み込みました: {self.config_path}")
             return config
 
-        except ConfigError:
-            raise
         except (IOError, OSError) as e:
             self.logger.error(f"設定ファイルの読み込みエラー: {str(e)}")
-            self.logger.info("デフォルト設定を使用します")
             raise FilesystemError(f"設定ファイルの読み込みに失敗しました: {self.config_path} - {str(e)}")
+        except ConfigError:
+            raise
         except Exception as e:
             self.logger.error(f"設定ファイルの読み込みエラー: {str(e)}")
-            self.logger.info("デフォルト設定を使用します")
             raise ConfigError(f"設定ファイルの解析に失敗しました: {str(e)}")
 
     def save_config(self, config: AppConfig) -> bool:
@@ -96,9 +94,36 @@ class ConfigManager:
             # 辞書に変換
             config_dict = self._config_to_dict(config)
 
-            # YAMLファイルに保存
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                yaml.dump(config_dict, f, allow_unicode=True, default_flow_style=False)
+            # 同一フォルダーの一時ファイルをfsyncしてから置換し、保存中断で
+            # 既存設定を破損させない。
+            temporary_path = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    newline="\n",
+                    suffix=".tmp",
+                    prefix=".config-",
+                    dir=self.config_path.parent,
+                    delete=False,
+                ) as stream:
+                    yaml.dump(
+                        config_dict,
+                        stream,
+                        allow_unicode=True,
+                        default_flow_style=False,
+                    )
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                    temporary_path = Path(stream.name)
+                os.replace(temporary_path, self.config_path)
+                temporary_path = None
+            finally:
+                if temporary_path is not None:
+                    try:
+                        temporary_path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
 
             self.logger.info(f"設定ファイルを保存しました: {self.config_path}")
             return True
@@ -126,6 +151,11 @@ class ConfigManager:
 
     def _dict_to_config(self, config_dict: dict) -> AppConfig:
         """辞書をAppConfigに変換"""
+        if config_dict.get("box") or config_dict.get("save_paths", {}).get("box"):
+            self.logger.warning(
+                "Box設定は現在サポート対象外です。値は実行に使用されず、"
+                "次回の設定保存時にローカル専用スキーマへ移行されます"
+            )
         # ネストされた設定を処理
         download_conditions = DownloadConditions(
             file_types=config_dict.get("download_conditions", {}).get("file_types", [".pdf", ".xlsx", ".docx"]),
@@ -135,27 +165,57 @@ class ConfigManager:
 
         # デフォルトのダウンロードパスはexeの場所を基準にする
         default_downloads = str(get_downloads_path())
-        save_paths_dict = config_dict.get("save_paths", {})
-        sp = save_paths_dict
+        save_dict = config_dict.get("save_paths", {}) or {}
         save_paths = SavePaths(
-            local=sp.get("local", default_downloads),
-            use_subfolders=sp.get("use_subfolders", True),
-            run_subfolder_mode=sp.get("run_subfolder_mode", "none"),
-            enable_hash_check=sp.get("enable_hash_check", False),
-            keep_part_on_cancel=sp.get("keep_part_on_cancel", True),
-            enable_agency_root_folders=sp.get("enable_agency_root_folders", False),
-            agency_root_label=(sp.get("agency_root_label") or "発注機関").strip() or "発注機関",
-            agency_folder_levels=sp.get("agency_folder_levels") or ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"],
-            include_search_tab_folder=sp.get("include_search_tab_folder", True),
-            search_tab_labels=sp.get("search_tab_labels") or {"works": "工事_入札公告等", "services": "業務_入札公告等"},
-            date_partition=sp.get("date_partition") or "none",
+            local=save_dict.get("local", default_downloads),
+            # layout_versionを持たない設定・snapshotは、保存場所を変えない。
+            layout_version=save_dict.get("layout_version", 2),
+            normal_folder=save_dict.get(
+                "normal_folder", "01_通常ダウンロード"
+            ),
+            scheduled_folder=save_dict.get(
+                "scheduled_folder", "02_定期実行"
+            ),
+            schedule_storage_key=save_dict.get("schedule_storage_key", ""),
+            schedule_storage_folder=save_dict.get(
+                "schedule_storage_folder", ""
+            ),
         )
 
+        schedule_dict = config_dict.get("schedule", {})
+        schedule_interval = schedule_dict.get("interval", "daily")
+        schedule_enabled = schedule_dict.get("enabled", False)
+        schedule_backend = schedule_dict.get("backend")
+        if schedule_enabled and schedule_backend is None:
+            self.logger.warning(
+                "旧プロセス内スケジュール設定を検出しました。自動ではWindowsタスクへ"
+                "登録せず無効化します。設定画面から『Windowsタスクへ移行』を実行してください"
+            )
+            schedule_enabled = False
+            schedule_backend = "legacy_process"
+        elif schedule_backend is None:
+            schedule_backend = "windows_task_scheduler"
+        if schedule_interval == "custom":
+            self.logger.warning(
+                "schedule.interval=custom はサポート対象外です。"
+                "スケジュールは無効として扱われます。daily/weekly/monthly のいずれかを指定してください"
+            )
+            schedule_enabled = False
         schedule = ScheduleConfig(
-            enabled=config_dict.get("schedule", {}).get("enabled", False),
-            interval=config_dict.get("schedule", {}).get("interval", "daily"),
-            time=config_dict.get("schedule", {}).get("time", "09:00"),
-            cron=config_dict.get("schedule", {}).get("cron"),
+            enabled=schedule_enabled,
+            backend=schedule_backend,
+            timezone=schedule_dict.get("timezone", "Asia/Tokyo"),
+            interval=schedule_interval,
+            time=schedule_dict.get("time", "09:00"),
+            weekday=schedule_dict.get("weekday", "monday"),
+            day_of_month=schedule_dict.get("day_of_month", 1),
+            start_when_available=schedule_dict.get("start_when_available", True),
+            wake_to_run=schedule_dict.get("wake_to_run", False),
+            retry_count=schedule_dict.get("retry_count", 2),
+            retry_interval_minutes=schedule_dict.get("retry_interval_minutes", 15),
+            notification_policy=schedule_dict.get("notification_policy", "off"),
+            active_profile_id=schedule_dict.get("active_profile_id"),
+            cron=schedule_dict.get("cron"),
         )
 
         # デフォルトのログパスはexeの場所を基準にする
@@ -169,19 +229,41 @@ class ConfigManager:
 
         # 検索条件
         search_dict = config_dict.get("search_conditions", {})
+        raw_target = search_dict.get(
+            "search_target", SearchTarget.KOJI_KEIKA.value
+        )
+        try:
+            search_profile = get_search_profile(raw_target)
+            default_contract_types = list(
+                search_profile.default_contract_types
+            )
+        except ValueError:
+            # 不正な対象はValidatorで利用者向けエラーにする。
+            default_contract_types = list(
+                get_search_profile(
+                    SearchTarget.KOJI_KEIKA
+                ).default_contract_types
+            )
+        legacy_koji_name = search_dict.get("koji_name", "")
+        project_name = search_dict.get("project_name")
+        if project_name is None:
+            project_name = legacy_koji_name
         search_conditions = SearchConditions(
             hachu_daibunrui=search_dict.get("hachu_daibunrui", ""),
             hachu_chubunrui=search_dict.get("hachu_chubunrui", ""),
             hachu_shoubunrui=search_dict.get("hachu_shoubunrui", ""),
             hachu_saibunrui=search_dict.get("hachu_saibunrui", ""),
             hachu_multi=search_dict.get("hachu_multi", []),
-            koji_name=search_dict.get("koji_name", ""),
+            koji_name=legacy_koji_name,
             place_search_type=search_dict.get("place_search_type", "list"),
             place_chihou=search_dict.get("place_chihou", ""),
             place_todofuken=search_dict.get("place_todofuken", ""),
             place_shichouson=search_dict.get("place_shichouson", ""),
             place_text=search_dict.get("place_text", ""),
-            contract_types=search_dict.get("contract_types", []),
+            contract_types=search_dict.get(
+                "contract_types",
+                default_contract_types,
+            ),
             update_date_type=search_dict.get("update_date_type", "none"),
             update_date_days=search_dict.get("update_date_days"),
             koukoku_date_type=search_dict.get("koukoku_date_type", "none"),
@@ -203,57 +285,32 @@ class ConfigManager:
             denshi=search_dict.get("denshi", False),
             koukai=search_dict.get("koukai", False),
             display_count=search_dict.get("display_count", 20),
+            search_target=raw_target,
+            project_name=project_name,
+            gyomu_kubun=search_dict.get("gyomu_kubun", ""),
         )
+        if search_conditions.hachu_multi:
+            self.logger.warning(
+                "search_conditions.hachu_multi は現在サポート対象外です。"
+                "値は移行用に保持しますが、実行時には使用できません"
+            )
 
-        network = self._dict_to_network(config_dict.get("network") or {})
+        naming_rule = config_dict.get("naming_rule", DEFAULT_NAMING_RULE)
+        if naming_rule == LEGACY_DEFAULT_NAMING_RULE:
+            self.logger.warning(
+                "旧既定の命名規則を文書名・最終更新日時を使う新しい既定値へ"
+                "移行します。独自の命名規則は変更しません"
+            )
+            naming_rule = DEFAULT_NAMING_RULE
 
-        # target_urls が欠落または空リストのときは既定URLでフォールバック（起動不能にしない）
-        raw_urls = config_dict.get("target_urls")
-        if not raw_urls or (isinstance(raw_urls, list) and len(raw_urls) == 0):
-            target_urls = list(AppConfig().target_urls)
-        else:
-            target_urls = raw_urls
         return AppConfig(
-            target_urls=target_urls,
+            target_urls=config_dict.get("target_urls", []),
             download_conditions=download_conditions,
             search_conditions=search_conditions,
             save_paths=save_paths,
-            naming_rule=config_dict.get("naming_rule", "{category}_{title}_{date}_{index}"),
+            naming_rule=naming_rule,
             schedule=schedule,
             logging=logging_config,
-            network=network,
-        )
-
-    def _dict_to_network(self, network_dict: dict) -> NetworkConfig:
-        """通信ポリシーを辞書から組み立てる（未指定は既定値のまま）"""
-        defaults = NetworkConfig()
-        robots_dict = network_dict.get("robots") or {}
-        robots_defaults = RobotsConfig()
-        return NetworkConfig(
-            allowed_hosts=network_dict.get("allowed_hosts") or list(defaults.allowed_hosts),
-            allowed_schemes=network_dict.get("allowed_schemes") or list(defaults.allowed_schemes),
-            allowed_ports=network_dict.get("allowed_ports") or list(defaults.allowed_ports),
-            block_private_ips=network_dict.get("block_private_ips", defaults.block_private_ips),
-            min_interval_seconds=float(
-                network_dict.get("min_interval_seconds", defaults.min_interval_seconds)
-            ),
-            max_concurrency=int(network_dict.get("max_concurrency", defaults.max_concurrency)),
-            max_requests_per_run=int(
-                network_dict.get("max_requests_per_run", defaults.max_requests_per_run)
-            ),
-            allowed_hours=network_dict.get("allowed_hours", defaults.allowed_hours),
-            user_agent=network_dict.get("user_agent", defaults.user_agent),
-            user_agent_suffix=network_dict.get(
-                "user_agent_suffix", defaults.user_agent_suffix
-            ),
-            robots=RobotsConfig(
-                enabled=robots_dict.get("enabled", robots_defaults.enabled),
-                on_error=robots_dict.get("on_error", robots_defaults.on_error),
-                cache_ttl_seconds=int(
-                    robots_dict.get("cache_ttl_seconds", robots_defaults.cache_ttl_seconds)
-                ),
-            ),
-            audit_log=network_dict.get("audit_log", defaults.audit_log),
         )
 
     def _config_to_dict(self, config: AppConfig) -> dict:
@@ -267,6 +324,8 @@ class ConfigManager:
                 "date_range": config.download_conditions.date_range,
             },
             "search_conditions": {
+                "search_target": sc.search_target,
+                "project_name": sc.project_name,
                 "hachu_daibunrui": sc.hachu_daibunrui,
                 "hachu_chubunrui": sc.hachu_chubunrui,
                 "hachu_shoubunrui": sc.hachu_shoubunrui,
@@ -292,6 +351,7 @@ class ConfigManager:
                 "keiyaku_date_end": sc.keiyaku_date_end,
                 "koji_shubetsu": sc.koji_shubetsu,
                 "koji_gyoushu": sc.koji_gyoushu,
+                "gyomu_kubun": sc.gyomu_kubun,
                 "yotei_price_min": sc.yotei_price_min,
                 "yotei_price_max": sc.yotei_price_max,
                 "rakusatsu_price_min": sc.rakusatsu_price_min,
@@ -303,22 +363,29 @@ class ConfigManager:
             },
             "save_paths": {
                 "local": config.save_paths.local,
-                "use_subfolders": config.save_paths.use_subfolders,
-                "run_subfolder_mode": config.save_paths.run_subfolder_mode,
-                "enable_hash_check": config.save_paths.enable_hash_check,
-                "keep_part_on_cancel": config.save_paths.keep_part_on_cancel,
-                "enable_agency_root_folders": getattr(config.save_paths, "enable_agency_root_folders", False),
-                "agency_root_label": getattr(config.save_paths, "agency_root_label", "発注機関"),
-                "agency_folder_levels": getattr(config.save_paths, "agency_folder_levels", ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]),
-                "include_search_tab_folder": getattr(config.save_paths, "include_search_tab_folder", True),
-                "search_tab_labels": getattr(config.save_paths, "search_tab_labels", {"works": "工事_入札公告等", "services": "業務_入札公告等"}),
-                "date_partition": getattr(config.save_paths, "date_partition", "none"),
+                "layout_version": config.save_paths.layout_version,
+                "normal_folder": config.save_paths.normal_folder,
+                "scheduled_folder": config.save_paths.scheduled_folder,
+                "schedule_storage_key": config.save_paths.schedule_storage_key,
+                "schedule_storage_folder": (
+                    config.save_paths.schedule_storage_folder
+                ),
             },
             "naming_rule": config.naming_rule,
             "schedule": {
                 "enabled": config.schedule.enabled,
+                "backend": config.schedule.backend,
+                "timezone": config.schedule.timezone,
                 "interval": config.schedule.interval,
                 "time": config.schedule.time,
+                "weekday": config.schedule.weekday,
+                "day_of_month": config.schedule.day_of_month,
+                "start_when_available": config.schedule.start_when_available,
+                "wake_to_run": config.schedule.wake_to_run,
+                "retry_count": config.schedule.retry_count,
+                "retry_interval_minutes": config.schedule.retry_interval_minutes,
+                "notification_policy": config.schedule.notification_policy,
+                "active_profile_id": config.schedule.active_profile_id,
                 "cron": config.schedule.cron,
             },
             "logging": {
@@ -327,23 +394,4 @@ class ConfigManager:
                 "max_bytes": config.logging.max_bytes,
                 "backup_count": config.logging.backup_count,
             },
-            "network": {
-                "allowed_hosts": config.network.allowed_hosts,
-                "allowed_schemes": config.network.allowed_schemes,
-                "allowed_ports": config.network.allowed_ports,
-                "block_private_ips": config.network.block_private_ips,
-                "min_interval_seconds": config.network.min_interval_seconds,
-                "max_concurrency": config.network.max_concurrency,
-                "max_requests_per_run": config.network.max_requests_per_run,
-                "allowed_hours": config.network.allowed_hours,
-                "user_agent": config.network.user_agent,
-                "user_agent_suffix": config.network.user_agent_suffix,
-                "robots": {
-                    "enabled": config.network.robots.enabled,
-                    "on_error": config.network.robots.on_error,
-                    "cache_ttl_seconds": config.network.robots.cache_ttl_seconds,
-                },
-                "audit_log": config.network.audit_log,
-            },
         }
-

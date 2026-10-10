@@ -123,7 +123,7 @@ def process_directory(root_dir: Path, dry_run: bool = False) -> dict:
             if not dry_run:
                 if convert_to_utf8(file_path, encoding or 'cp932'):
                     stats['converted'] += 1
-                    print(f"  ✓ UTF-8に変換しました")
+                    print("  ✓ UTF-8に変換しました")
                 else:
                     stats['errors'] += 1
             else:

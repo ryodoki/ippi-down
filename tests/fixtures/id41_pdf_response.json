@@ -1,0 +1,10 @@
+{
+  "source_url": "https://e2ppiw01.e-bisc.go.jp/CALS/Publish/KokaiBunshoServlet?AnkenKanriNo=021020002025412000000502&BunshoKanriId=41",
+  "captured_date": "2026-07-31",
+  "http_status": 200,
+  "content_type": "application/pdf",
+  "content_length": 254397,
+  "sha256": "b4df98449722c1223710756b59689c127fba66c949286d98e26c5cfcea01d1a0",
+  "sample_layout": "first 128 bytes followed by final 128 bytes",
+  "sample_base64": "JVBERi0xLjcNCiW1tbW1DQoxIDAgb2JqDQo8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFIvTGFuZyhqYS1KUCkgL1N0cnVjdFRyZWVSb290IDE3IDAgUi9NYXJrSW5mbzw8L01hcmtlZCB0cnVlPj4vTWV0YWRhdGEgOTYxIDAgMyAwIFIvUm9vdCAxIDAgUi9QcmV2IDIwNDk1NC9JRFs8NGUzMDFmOGJlMjBlMzM0Mzk5NDZlZjdiNjkwZDBiNWQ+PGNlZTkyZGJkY2RmNjAwOWUzODJhZjI5OTdhZmI1MWRhPl0+Pg1zdGFydHhyZWYNMjUzODE2DSUlRU9GDQ=="
+}

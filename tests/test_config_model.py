@@ -1,25 +1,12 @@
-<<<<<<< HEAD
-﻿"""ConfigModelのテスト"""
-=======
 # -*- coding: utf-8 -*-
 
 """ConfigModelのテスト"""
->>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 import pytest
-from pathlib import Path
-import sys
-
-# プロジェクトルートをパスに追加
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 from src.models.config_model import (
     AppConfig,
     ScheduleConfig,
-    LoggingConfig,
-    DownloadConditions,
-    SearchConditions,
 )
 
 
@@ -33,16 +20,17 @@ class TestScheduleConfig:
         assert config.interval == "daily"
         assert config.time == "09:00"
 
-    def test_schedule_config_custom_without_cron(self):
-        """custom intervalでcronが指定されていない場合のエラーテスト"""
-        with pytest.raises(ValueError, match="cron形式を指定してください"):
-            ScheduleConfig(enabled=True, interval="custom", cron=None)
+    def test_schedule_config_custom_is_legacy_unsupported(self):
+        """旧custom設定は読込可能だが実行対象外であること"""
+        config = ScheduleConfig(enabled=True, interval="custom", cron=None)
+        assert config.is_supported is False
 
     def test_schedule_config_custom_with_cron(self):
-        """custom intervalでcronが指定されている場合のテスト"""
+        """cronは旧設定との互換性のため保持されること"""
         config = ScheduleConfig(enabled=True, interval="custom", cron="0 9 * * *")
         assert config.interval == "custom"
         assert config.cron == "0 9 * * *"
+        assert config.is_supported is False
 
     def test_schedule_config_daily_without_time(self):
         """daily intervalでtimeが指定されていない場合のエラーテスト"""
@@ -59,6 +47,25 @@ class TestScheduleConfig:
         config = ScheduleConfig(enabled=True, interval="daily", time="09:00")
         assert config.time == "09:00"
 
+    def test_schedule_config_weekday(self):
+        config = ScheduleConfig(
+            enabled=True, interval="weekly", time="09:00", weekday="friday"
+        )
+        assert config.weekday == "friday"
+
+    def test_schedule_config_invalid_weekday(self):
+        with pytest.raises(ValueError, match="weekday"):
+            ScheduleConfig(
+                enabled=True, interval="weekly", time="09:00", weekday="holiday"
+            )
+
+    @pytest.mark.parametrize("day", [0, 29])
+    def test_schedule_config_invalid_day_of_month(self, day):
+        with pytest.raises(ValueError, match="day_of_month"):
+            ScheduleConfig(
+                enabled=True, interval="monthly", time="09:00", day_of_month=day
+            )
+
 
 class TestAppConfig:
     """AppConfigのテストクラス"""
@@ -72,45 +79,3 @@ class TestAppConfig:
         assert config.save_paths is not None
         assert config.schedule is not None
         assert config.logging is not None
-
-
-class TestSearchConditions:
-    """SearchConditions のデフォルト（起動時に検索条件が勝手に入らない）"""
-
-    def test_contract_types_default_empty(self):
-        """contract_types のデフォルトは空リスト（全選択にしない）"""
-        sc = SearchConditions()
-        assert sc.contract_types == []
-
-    def test_is_effectively_empty_default(self):
-        """デフォルト状態は空と判定される"""
-        sc = SearchConditions()
-        assert sc.is_effectively_empty() is True
-
-    def test_is_effectively_empty_with_daibunrui(self):
-        """大分類が設定されていれば空でない"""
-        sc = SearchConditions(hachu_daibunrui="国の機関")
-        assert sc.is_effectively_empty() is False
-
-    def test_is_effectively_empty_with_koji_name(self):
-        """工事名が設定されていれば空でない"""
-        sc = SearchConditions(koji_name="テスト工事")
-        assert sc.is_effectively_empty() is False
-
-    def test_is_effectively_empty_with_full_contract_types(self):
-        """入札方式5つ全選択はデフォルト扱い（空と判定）"""
-        sc = SearchConditions(contract_types=[
-            "一般競争入札", "公募型指名競争入札", "指名競争入札", "随意契約", "その他方式"
-        ])
-        assert sc.is_effectively_empty() is True
-
-    def test_is_effectively_empty_with_partial_contract_types(self):
-        """入札方式が一部選択なら空でない"""
-        sc = SearchConditions(contract_types=["一般競争入札"])
-        assert sc.is_effectively_empty() is False
-
-    def test_is_effectively_empty_with_price(self):
-        """予定価格が設定されていれば空でない"""
-        sc = SearchConditions(yotei_price_min=1000000)
-        assert sc.is_effectively_empty() is False
-

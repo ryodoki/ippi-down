@@ -1,18 +1,26 @@
-<<<<<<< HEAD
-﻿"""設定データモデル"""
-=======
 # -*- coding: utf-8 -*-
 
 """設定データモデル"""
->>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
+from enum import Enum
+from typing import List, Optional
 
+from .search_target import SearchTarget
+
+
+IPPI_OFFICIAL_SEARCH_URL = (
+    "https://www.i-ppi.jp/"
+    "IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"
+)
+IPPI_OFFICIAL_GYOMU_SEARCH_URL = (
+    "https://www.i-ppi.jp/"
+    "IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=7"
+)
 
 @dataclass
 class SearchConditions:
-    """ppi.jp検索条件"""
+    """i-ppi.jp検索条件"""
 
     # 発注機関（リスト検索）
     hachu_daibunrui: str = ""  # 大分類
@@ -32,8 +40,16 @@ class SearchConditions:
     place_shichouson: str = ""  # 市町村
     place_text: str = ""  # 文字列検索
 
-    # 入札契約方式（デフォルトは未指定=空リスト。config に無い場合も勝手に全選択にしない）
-    contract_types: List[str] = field(default_factory=list)
+    # 入札契約方式
+    contract_types: List[str] = field(
+        default_factory=lambda: [
+            "一般競争入札",
+            "公募型指名競争入札",
+            "指名競争入札",
+            "随意契約",
+            "その他方式",
+        ]
+    )
 
     # 最終更新日
     update_date_type: str = "none"  # "none" or "past"
@@ -80,36 +96,36 @@ class SearchConditions:
     # 表示件数
     display_count: int = 20  # 20, 30, 50, 100
 
-    def is_effectively_empty(self) -> bool:
-        """検索条件が実質的に空かどうか（全デフォルト状態なら True）"""
-        has_contract_types = bool(
-            self.contract_types
-            and 0 < len(self.contract_types) < 5
+    # 検索対象。末尾追加により既存の位置引数との互換性を維持する。
+    search_target: str = SearchTarget.KOJI_KEIKA.value
+
+    # 工事・業務に共通する正規化済み案件名。旧設定はkoji_nameへfallbackする。
+    project_name: str = ""
+
+    # 業務区分（単一選択）
+    gyomu_kubun: str = ""
+
+    @property
+    def effective_project_name(self) -> str:
+        """工事用旧フィールドを含めた実効案件名を返す。"""
+
+        return str(self.project_name or self.koji_name or "").strip()
+
+    @property
+    def target(self) -> SearchTarget:
+        return SearchTarget.coerce(self.search_target)
+
+    @classmethod
+    def for_target(cls, target: object) -> "SearchConditions":
+        """対象に合う契約方式を持つ既定条件を生成する。"""
+
+        from ..core.search_profiles import get_search_profile
+
+        profile = get_search_profile(target)
+        return cls(
+            search_target=profile.target.value,
+            contract_types=list(profile.default_contract_types),
         )
-        return not any((
-            (self.hachu_daibunrui or "").strip(),
-            (self.hachu_chubunrui or "").strip(),
-            (self.hachu_shoubunrui or "").strip(),
-            (self.hachu_saibunrui or "").strip(),
-            self.hachu_multi,
-            (self.koji_name or "").strip(),
-            self.place_search_type == "list" and (self.place_chihou or self.place_todofuken or self.place_shichouson),
-            self.place_search_type == "text" and (self.place_text or "").strip(),
-            has_contract_types,
-            self.update_date_type == "past",
-            self.koukoku_date_type == "range",
-            self.kaisatsu_date_type == "range",
-            self.keiyaku_date_type == "range",
-            (self.koji_shubetsu or "").strip(),
-            (self.koji_gyoushu or "").strip(),
-            self.yotei_price_min is not None,
-            self.yotei_price_max is not None,
-            self.rakusatsu_price_min is not None,
-            self.rakusatsu_price_max is not None,
-            (self.rakusatsu_name or "").strip(),
-            self.denshi,
-            self.koukai,
-        ))
 
 
 @dataclass
@@ -123,25 +139,28 @@ class DownloadConditions:
 
 @dataclass
 class SavePaths:
-    """保存先パス"""
+    """ダウンロードデータのルートと保存レイアウト。
+
+    ``layout_version=2`` は ``local`` 自体を保存先として扱う旧形式、v3は
+    通常実行と定期実行を分離する形式、v4はその上位で工事と業務を
+    分離する形式である。旧YAMLのv2判定はConfigManagerが行う。
+    """
 
     local: str = "./downloads"
-    use_subfolders: bool = True  # サブフォルダ自動生成（FR-013）
-    run_subfolder_mode: str = "none"  # 実行単位のルートフォルダ: "none" | "datetime" | "search"
-    enable_hash_check: bool = False
-    keep_part_on_cancel: bool = True
+    layout_version: int = 4
+    normal_folder: str = "01_通常ダウンロード"
+    scheduled_folder: str = "02_定期実行"
+    schedule_storage_key: str = ""
+    schedule_storage_folder: str = ""
 
-    # 発注機関ごとのルートフォルダ（デフォルトOFF。ONで大→中→小→細＋工事名の階層を作成）
-    enable_agency_root_folders: bool = False
-    agency_root_label: str = "発注機関"
-    agency_folder_levels: List[str] = field(
-        default_factory=lambda: ["daibunrui", "chubunrui", "shoubunrui", "saibunrui"]
-    )
-    include_search_tab_folder: bool = True  # 工事/業務で分ける
-    search_tab_labels: Dict[str, str] = field(
-        default_factory=lambda: {"works": "工事_入札公告等", "services": "業務_入札公告等"}
-    )
-    date_partition: str = "none"  # "none" | "yyyy" | "yyyy_mm" | "yyyy_mm_dd"
+
+class ScheduleNotificationPolicy(str, Enum):
+    """定期実行の完了通知方針。"""
+
+    OFF = "off"
+    IMPORTANT_ONLY = "important_only"
+    ALL_RESULTS = "all_results"
+    FAILURES_ONLY = "failures_only"
 
 
 @dataclass
@@ -149,32 +168,110 @@ class ScheduleConfig:
     """スケジュール設定"""
 
     enabled: bool = False
-    interval: str = "daily"  # daily, weekly, monthly, custom
+    # 新規設定はWindowsタスクスケジューラを使用する。``process`` は旧設定の
+    # 移行判定専用で、バックグラウンド実行には使用しない。
+    backend: str = "windows_task_scheduler"
+    timezone: str = "Asia/Tokyo"
+    interval: str = "daily"  # daily, weekly, monthly（customは旧設定の読込専用）
     time: str = "09:00"  # HH:MM形式
-    cron: Optional[str] = None  # cron形式（intervalがcustomの場合）
+    weekday: str = "monday"  # weekly: monday ... sunday
+    day_of_month: int = 1  # monthly: 1 ... 28
+    start_when_available: bool = True
+    wake_to_run: bool = False
+    retry_count: int = 2
+    retry_interval_minutes: int = 15
+    # 旧設定とv1/v2スナップショットは通知なしとして読み込む。
+    # 新規作成時のIMPORTANT_ONLY選択はGUI側が明示的に設定する。
+    notification_policy: str = ScheduleNotificationPolicy.OFF.value
+    active_profile_id: Optional[str] = None
+    cron: Optional[str] = None  # 非推奨。旧custom設定との互換性のために保持
 
     def __post_init__(self):
         """初期化後の検証"""
-        if self.enabled:
-            # intervalの値チェック
-            valid_intervals = ["daily", "weekly", "monthly", "custom"]
-            if self.interval not in valid_intervals:
-                raise ValueError(f"intervalは{valid_intervals}のいずれかである必要があります: {self.interval}")
-            
-            # intervalがcustomの場合、cronが必須
-            if self.interval == "custom":
-                if not self.cron:
-                    raise ValueError("intervalがcustomの場合、cron形式を指定してください")
-            else:
-                # intervalがcustom以外の場合、timeが必須
-                if not self.time:
-                    raise ValueError(f"intervalが{self.interval}の場合、timeを指定してください")
-                
-                # timeの形式チェック（HH:MM形式）
-                time_pattern = r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
-                import re
-                if not re.match(time_pattern, self.time):
-                    raise ValueError(f"timeはHH:MM形式で指定してください: {self.time}")
+        # customは旧設定を読み込んで明示警告するためだけに許容する。
+        valid_intervals = ["daily", "weekly", "monthly", "custom"]
+        if self.interval not in valid_intervals:
+            raise ValueError(f"intervalは{valid_intervals}のいずれかである必要があります: {self.interval}")
+
+        valid_backends = {"windows_task_scheduler", "process", "legacy_process"}
+        if self.backend not in valid_backends:
+            raise ValueError(
+                f"backendは{sorted(valid_backends)}のいずれかである必要があります: "
+                f"{self.backend}"
+            )
+        if self.timezone != "Asia/Tokyo":
+            raise ValueError("timezoneはAsia/Tokyoを指定してください")
+        if not isinstance(self.start_when_available, bool):
+            raise ValueError("start_when_availableは真偽値で指定してください")
+        if not isinstance(self.wake_to_run, bool):
+            raise ValueError("wake_to_runは真偽値で指定してください")
+        if isinstance(self.retry_count, bool) or not isinstance(self.retry_count, int):
+            raise ValueError("retry_countは0以上の整数で指定してください")
+        if not 0 <= self.retry_count <= 10:
+            raise ValueError("retry_countは0から10の範囲で指定してください")
+        if (
+            isinstance(self.retry_interval_minutes, bool)
+            or not isinstance(self.retry_interval_minutes, int)
+            or not 1 <= self.retry_interval_minutes <= 1440
+        ):
+            raise ValueError(
+                "retry_interval_minutesは1から1440の整数で指定してください"
+            )
+        raw_notification_policy = self.notification_policy
+        if isinstance(raw_notification_policy, ScheduleNotificationPolicy):
+            raw_notification_policy = raw_notification_policy.value
+        try:
+            self.notification_policy = ScheduleNotificationPolicy(
+                str(raw_notification_policy).strip().lower()
+            ).value
+        except ValueError as exc:
+            valid_policies = [policy.value for policy in ScheduleNotificationPolicy]
+            raise ValueError(
+                "notification_policyは"
+                f"{valid_policies}のいずれかで指定してください: "
+                f"{raw_notification_policy}"
+            ) from exc
+
+        if not self.enabled or self.interval == "custom":
+            return
+
+        if not self.time:
+            raise ValueError(f"intervalが{self.interval}の場合、timeを指定してください")
+
+        import re
+
+        time_pattern = r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+        if not re.match(time_pattern, self.time):
+            raise ValueError(f"timeはHH:MM形式で指定してください: {self.time}")
+
+        valid_weekdays = [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+        if self.weekday not in valid_weekdays:
+            raise ValueError(f"weekdayは{valid_weekdays}のいずれかである必要があります: {self.weekday}")
+        if not 1 <= self.day_of_month <= 28:
+            raise ValueError(f"day_of_monthは1から28の範囲で指定してください: {self.day_of_month}")
+
+    @property
+    def is_supported(self) -> bool:
+        """現在実行可能なスケジュール方式かどうか。"""
+        return self.interval in {"daily", "weekly", "monthly"}
+
+    @property
+    def uses_windows_task_scheduler(self) -> bool:
+        """Windowsタスクスケジューラへ登録可能な設定かどうか。"""
+        return self.backend == "windows_task_scheduler" and self.is_supported
+
+    @property
+    def requires_migration(self) -> bool:
+        """旧プロセス内設定から明示移行が必要かどうか。"""
+        return self.backend in {"process", "legacy_process"}
 
 
 @dataclass
@@ -188,51 +285,15 @@ class LoggingConfig:
 
 
 @dataclass
-class RobotsConfig:
-    """robots.txt の取り扱い"""
-
-    enabled: bool = True
-    on_error: str = "block"  # block | allow（取得失敗時の既定動作）
-    cache_ttl_seconds: int = 86400
-
-
-@dataclass
-class NetworkConfig:
-    """通信ポリシー（許可先・作法・監査）"""
-
-    allowed_hosts: List[str] = field(default_factory=lambda: ["www.i-ppi.jp"])
-    allowed_schemes: List[str] = field(default_factory=lambda: ["https"])
-    allowed_ports: List[int] = field(default_factory=lambda: [443])
-    block_private_ips: bool = True
-
-    # 負荷抑制
-    min_interval_seconds: float = 1.0
-    max_concurrency: int = 1
-    max_requests_per_run: int = 500
-    allowed_hours: Optional[str] = None  # 例 "08:00-22:00"
-
-    # 身元の明示
-    user_agent: Optional[str] = None  # 完全上書きする場合のみ指定
-    user_agent_suffix: str = "ippi-down/1.0 (+社内利用)"
-
-    robots: RobotsConfig = field(default_factory=RobotsConfig)
-    audit_log: Optional[str] = "./logs/network.log"
-
-
-@dataclass
 class AppConfig:
     """アプリケーション設定のデータモデル"""
 
     target_urls: List[str] = field(
-        default_factory=lambda: [
-            "https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4"
-        ]
+        default_factory=lambda: [IPPI_OFFICIAL_SEARCH_URL]
     )
     download_conditions: DownloadConditions = field(default_factory=DownloadConditions)
-    search_conditions: SearchConditions = field(default_factory=SearchConditions)  # ppi.jp検索条件
+    search_conditions: SearchConditions = field(default_factory=SearchConditions)  # i-ppi.jp検索条件
     save_paths: SavePaths = field(default_factory=SavePaths)
-    naming_rule: str = "{category}_{title}_{date}_{index}"
+    naming_rule: str = "{document_name}_{document_updated_at}"
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
-    network: NetworkConfig = field(default_factory=NetworkConfig)
-

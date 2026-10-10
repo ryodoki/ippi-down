@@ -1,0 +1,10 @@
+# Python 3.11 / Windows 10 and 11 x64
+beautifulsoup4>=4.12,<5
+lxml>=4.9,<6
+requests>=2.31,<3
+schedule>=1.2,<2
+PyYAML>=6.0,<7
+Pillow>=12.3,<13
+pypdf>=6.16,<7
+reportlab>=5.0,<6
+pywin32>=306,<307; platform_system == "Windows"

@@ -1,636 +1,388 @@
 # ippi-down
 
-建設情報サービス「ppi.jp」から条件に基づいてファイルを自動ダウンロードするツール
+i-ppi.jpの公開検索画面から条件に一致する文書を取得し、Windows PCのローカルフォルダへ保存するGUIツールです。
 
-## 概要
+現在のバージョンは`0.1.0`です。正式な対象環境はWindows 10/11 x64、Python 3.11、ローカル保存です。
 
-ppi.jpのWebサイトを解析し、ユーザーが指定した条件に一致するファイルを自動的にダウンロードして、指定したフォルダ（ローカル）に整理して保存します。
+## 機能ステータス
 
-**注意**: Box保存機能は将来対応予定です。現在はローカル保存のみサポートしています。
+### 実装済み
 
-## 主な機能
+- i-ppi.jpの検索結果・詳細ページの解析
+- 全検索結果ページを先に解析し、案件数、公開中データ件数、公開終了のみの案件数、今回の対象件数を表示してから保存を開始
+- 「案件・文書内訳」で、発注機関の分類状態・理由・保存予定フォルダーと、案件ごとの公開文書・今回の取得判定を確認
+- 発注機関の大・中・小分類を起動時にメモリ展開し、階層プルダウンを追加通信なしで切替
+- 発注機関や工事種別などの候補と送信条件を検証し、検索結果との不一致や再選択が必要な条件をエラーとして検出
+- PDF、Excel、Wordなど、拡張子とキーワードによる取得対象の絞り込み
+- `.pdf`を取得対象にした場合、HTML形式で配信される正常な「入札調書」を同梱フォントと内蔵生成器でPDF化し、失敗時だけ監視下のMicrosoft Edgeへフォールバック
+- ローカルフォルダへの保存と、文書名称・文書最終更新日時を使うファイル名テンプレート
+- `.part`を利用したダウンロードと、完了後の正式ファイルへの置換
+- URL、保存先、文書最終更新日時、形式、サイズ、SHA-256を利用した取得履歴
+- 通信中のキャンセルと、成功・一部失敗・失敗・キャンセル・該当なしの結果判定
+- 初回を含め最大3回のHTTP試行、既定1リクエスト/秒の制御、再試行対象応答の`Retry-After`優先
+- Windowsタスクスケジューラによるdaily、weekly、monthlyの定期実行（GUI終了後も実行）
+- 名前付き定期実行設定の複数保存、一覧管理、設定ごとの有効化・履歴確認
+- 定期実行設定ごとのWindows完了通知（重要時のみ／すべて／失敗時のみ／OFF）
+- 確認付きプレビューによる、検証済み`99_分類未解決`ファイルの手動再分類
+- メイン画面での全保存設定の登録状態、実行予定、次回／前回実行、結果、件数、直近20回の履歴表示
+- ローテーション付きログ
 
-- HTML構造の解析
-- 条件に基づくファイルの自動ダウンロード
-- HTML構造に基づく自動ファイル命名（テンプレート文字列対応）
-- ローカルフォルダへの保存
-- 定期実行（スケジューリング、cron形式対応）
-- HTTPレート制限（429エラー）の自動処理
-- Windowsパス長制限（260文字）の自動対応
-- ダウンロード中のキャンセル機能
-- 詳細なメタデータ抽出（発注機関、工事名、日付など）
-- 日付範囲フィルタリング
-- PostBackリンク対応（javascript:__doPostBack形式）
+### 制限付き
 
-## プロジェクト構成
+- 対象サイトのHTMLやフォーム仕様が変更された場合はparserの更新が必要です。
+- 完全性を検証できないため、ダウンロード応答に正の`Content-Length`がないファイルは保存しません。
+- Windowsの一般的なパス長を考慮してファイル名を短縮しますが、保存先自体が非常に深い場合は短い保存先を指定してください。
+- 標準テストは保存済みHTML fixtureを使用します。実サイトへのnetworkテストは標準実行に含めません。
+- 検索結果が多い場合、保存開始まで時間がかかります。画面の「検索中」表示でページ、案件、ファイル候補の進行状況を確認でき、この段階でもキャンセルできます。
+- 定期実行の通知はWindows標準APIを使い、`win10toast`を必要としません。集中モード、通知設定、企業ポリシーなどで表示されない場合があります。通知は補助手段であり、結果の正本は実行履歴とログです。
+- weeklyの曜日とmonthlyの日付は設定画面またはYAMLで指定できます。monthlyは全月で存在する1～28日に限定しています。
+- 定期実行はパスワードを保存せず、登録したWindowsユーザーがログオン中の場合だけ開始します。未ログオン状態での実行には対応しません。
 
-**正として固定するもの**: ソース（`src/`）、テスト（`tests/`）、ドキュメント（`docs/`）、設定テンプレ（`config/config.example.yaml`）、スクリプト（`scripts/`）。
+### 将来機能
 
-文書の索引は [docs/README.md](docs/README.md) を参照（歴史文書は `docs/archive/` に隔離）。
+以下は現バージョンでは提供しません。
 
-```
-ippi-down/
-├── src/
-│   ├── main.py            # GUI エントリーポイント
-│   ├── cli/               # CLI（--once / --dry-run / --report）
-│   ├── app/               # ApplicationService などアプリ層
-│   ├── gui/               # GUI（設定ダイアログ・検索条件タブ含む）
-│   ├── core/              # scraper / downloader / naming 等
-│   ├── infrastructure/    # ppi.jp 向け HTML・検索・詳細・ドロップダウン
-│   ├── storage/           # ローカル保存（Box は将来対応予定）
-│   ├── config/            # 設定の読込・検証
-│   ├── models/            # AppConfig / SearchConditions 等
-│   ├── scheduler/         # GUI/--background 用の常駐スケジューラ
-│   └── utils/
-│       ├── http_client.py     # 通信の唯一の出口（URL検査・robots・レート制限・監査）
-│       ├── netguard.py        # 許可リスト方式のエグレスガード
-│       ├── robots.py          # robots.txt の取得・キャッシュ・判定
-│       ├── rate_limiter.py    # ホスト単位の間隔・同時接続・総量制限
-│       └── network_audit.py   # 監査ログ
-├── docs/
-│   ├── README.md                 # 文書索引（現行 / アーカイブ）
-│   ├── network-policy.md
-│   ├── batch-operation.md
-│   └── archive/                  # 歴史文書（実装と一致しない可能性あり）
-├── config/
-│   └── config.example.yaml
-├── scripts/
-│   ├── schedule/          # タスクスケジューラ用（register / run / status / unregister）
-│   ├── build/             # PyInstaller（build_exe.ps1, build.spec 等）
-│   ├── tools/             # 梱包・リリース
-│   ├── investigate/       # サイト調査ツール
-│   ├── check_guardrails.ps1
-│   ├── start_background.bat
-│   └── start_background.ps1
-├── tests/
-├── requirements.txt
-├── pytest.ini
-└── README.md
-```
+- Boxへの保存・認証
+- 並列ダウンロード
+- custom cron
+- 複数発注機関の一括選択
 
-### 生成物の場所（Git 管理外・再生成可能）
-
-| 場所 | 説明 |
-|------|------|
-| `.venv/` | 仮想環境（`python -m venv .venv` で再作成） |
-| `build/`, `dist/` | PyInstaller ビルド成果物 |
-| `logs/` | アプリログ |
-| `downloads/` | ダウンロード保存先 |
-| `scripts/snapshots/` | サイト変更監視のスナップショット |
-| `release/`, `*.zip`, `_review_pack/` | 配布ZIP・レビュー用パック |
-| `artifacts/`, `debug/*.html` | デバッグ出力 |
-
-`.gitignore` で上記を除外しています。**`config/config.yaml` は同梱せず、`config.example.yaml` からローカルでコピーして編集してください。**
+旧設定に`interval: custom`または旧プロセス内スケジュールの`enabled: true`がある場合、Windowsタスクへ自動登録しません。GUIに移行案内を表示するため、検索条件を確認して「定期実行」タブから明示的に登録してください。
 
 ## セットアップ
 
-### 必要な環境
+### 必要環境
 
-- Python 3.10以上（推奨: 3.11+）
-- pip（パッケージマネージャー）
+- Windows 10またはWindows 11（x64）
+- Python 3.11.x
+- Microsoft Edge（内蔵PDF生成に失敗した場合のフォールバック。未導入でも通常の内蔵生成は利用可能）
+- i-ppi.jpへ接続できるネットワーク
 
-**Windows PowerShell を使用する場合:**
-- PowerShellスクリプト（.ps1）を実行するには、実行ポリシーの設定が必要な場合があります
-- 実行ポリシーを確認:
-  ```powershell
-  Get-ExecutionPolicy
-  ```
-- 実行ポリシーを変更（現在のセッションのみ）:
-  ```powershell
-  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-  ```
-- または、スクリプトを直接実行:
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File .\scripts\build\build_exe.ps1
-  ```
+Conda／Minicondaは使用しません。`scripts/setup.ps1`がスクリプト自身の配置場所からプロジェクトルートを解決し、Windows x64版Python 3.11を検出してプロジェクト専用`.venv`を作成します。Conda系Pythonや、移動前のPythonを参照して壊れた`.venv`は使用せず、一時フォルダーへ退避して再作成します。
 
-### インストール手順
+HTML形式の入札調書は、取得内容を検証・安全化してから、同梱Noto Sans JapaneseとReportLabでA4縦・余白10mmのPDFへ変換します。pypdfでPDFを再読込し、用紙、ページ数、案件名、帳票全文字列を確認したものだけを保存します。内蔵生成に失敗した場合だけMicrosoft EdgeをWindows Job Objectの監視下でオフライン実行し、GPU等の全子プロセス終了後に出力を検証します。一時障害は独立profileで最大2回試します。完全な仕様は[入札調書PDF生成・監視仕様](docs/pdf_conversion_reliability.md)を参照してください。
 
-1. リポジトリをクローンまたはダウンロード
-
-2. 仮想環境を作成（推奨）
-```bash
-python -m venv .venv
-```
-
-3. 仮想環境を有効化
-```bash
-# Windows (コマンドプロンプト)
-.venv\Scripts\activate.bat
-
-# Windows (PowerShell)
-.venv\Scripts\Activate.ps1
-# または
-.venv\Scripts\activate.bat
-```
-
-4. 依存関係をインストール
-```bash
-pip install -r requirements.txt
-```
-
-5. 開発環境のセットアップ（開発・テストを行う場合）
-
-開発・テストを行う場合は、追加の依存関係をインストールしてください:
+プロジェクトルートから実行する場合:
 
 ```powershell
-# 開発用依存関係をインストール
-pip install -r requirements-dev.txt
+.\scripts\setup.ps1
+Copy-Item config\config.example.yaml config\config.yaml
 ```
 
-これにより、pytest-timeout などの開発ツールがインストールされます。
-
-**重要**: テストを実行する場合は、必ず `requirements-dev.txt` をインストールしてください。  
-`pytest.ini` の `addopts` に `--timeout` オプションが含まれているため、`pytest-timeout` が必要です。
-
-6. 設定ファイルをコピーして作成
-
-   **重要**: Gitで管理されるのは `config/config.example.yaml` のみです。  
-   実際に使用する設定ファイル `config/config.yaml` はローカルで作成してください。
-
-   ```bash
-   # Windows (コマンドプロンプト)
-   copy config\config.example.yaml config\config.yaml
-
-   # Windows (PowerShell)
-   Copy-Item config\config.example.yaml config\config.yaml
-   ```
-
-6. 設定ファイルを編集（必要に応じて）
-
-   `config/config.yaml` を開いて、必要に応じて設定を変更してください。  
-   このファイルは Git で追跡されません（ローカル専用設定）。
-
-### 実行手順（PowerShell・コピペ可）
-
-第三者でもそのままコピペして実行できる手順です。**まずプロジェクトルート（ippi-down フォルダ）に移動してから**以下を実行してください。
+親フォルダーから実行する場合も、親の`.\.venv`を直接実行せず、対象プロジェクトへ移動してから同梱スクリプトを実行してください。配置フォルダー名は任意です。
 
 ```powershell
-# プロジェクトルートに移動（例: ダウンロードした ippi-down のパスに置き換え）
-cd <プロジェクトのパス>
-
-# 仮想環境が無い場合のみ作成
-if (-not (Test-Path .venv)) { python -m venv .venv }
-
-# 有効化（PowerShell）
-.\.venv\Scripts\Activate.ps1
-
-# 依存関係インストール
-pip install -r requirements.txt
-
-# 設定ファイルが無い場合のみコピー（config.yaml は同梱せず example のみ配布）
-if (-not (Test-Path config\config.yaml)) { Copy-Item config\config.example.yaml config\config.yaml }
-
-# GUI 起動
-python src/main.py
+Set-Location '<プロジェクトフォルダー>'
+.\scripts\setup.ps1
+.\scripts\start_gui.ps1
 ```
 
-**CLI で1回だけ実行する場合:**
+プロジェクトルートからGUIを起動する場合:
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
-python src/cli/main.py --config config/config.yaml --once
+.\scripts\start_gui.ps1
 ```
 
-**設定例（config/config.yaml）:**  
-`config.example.yaml` をコピーしたあと、`target_urls`・`download_conditions`・`save_paths.local`・**`naming_rule`**・**`save_paths.run_subfolder_mode`** を編集してください。
+コマンドプロンプトでは次を使用できます。
 
-- **命名規則**: 使用可能な変数は `{category}`, `{title}`, `{date}`, `{index}`, `{filename}`, `{file_type}`, `{ext}`, `{koji_name}`, `{daibunrui}`, `{chubunrui}`, `{shoubunrui}`, `{saibunrui}`。`{ext}` はドット付き（例: `.pdf`）。未知の変数は設定保存時にエラーになります。
-- **保存先**: 相対パス（例: `./downloads`）の場合は exe/プロジェクトルート基準で絶対パスに解決されます。
-- **実行単位フォルダ**: `run_subfolder_mode: datetime` で保存先の下に `YYYYMMDD_HHMMSS` フォルダを自動作成。`search` で検索条件からフォルダ名を生成。
-- **発注機関フォルダ**: `save_paths.enable_agency_root_folders: true` にすると、保存先が発注機関の階層（大分類/中分類/小分類/細分類）＋工事/業務＋日付で枝分かれします。設定例は `config/config.example.yaml` の `save_paths` を参照。GUI の「発注機関ごとにルートフォルダを作成」で ON/OFF 可能。
+```bat
+scripts\setup.bat
+scripts\start_gui.bat
+```
 
-**回帰テスト（pytest）:**
+`--background`と次のバックグラウンド起動スクリプトは互換用であり、非推奨です。継続運用にはGUIの「定期実行」タブからWindowsタスクを登録してください。
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
-python -m pytest tests/ -v --tb=short
+.\scripts\start_background.ps1
 ```
 
-**動作確認（命名規則・保存先フォルダ）:**
-
-1. 上記の手順で venv 作成 → `pip install -r requirements.txt` → `config\config.yaml` を example からコピー
-2. `config\config.yaml` を編集: `naming_rule`（例: `"{index}{ext}"` や `"{category}_{title}_{date}_{index}"`）、`save_paths.local`、必要なら `run_subfolder_mode: datetime` を設定
-3. GUI 起動: `python src/main.py`
-4. 設定画面で「ファイル命名規則」と「実行単位のルートフォルダ」を確認・保存（未知の変数があると保存時にエラーで止まる）
-5. ダウンロードを1回実行
-6. 確認: 保存先に意図したファイル名・フォルダができていること。ログ（`logs/app.log` またはコンソール）に「テンプレート文字列を使用」および「保存先:」が出ていること
-
-### 実行方法（要約）
-
-```bash
-python src/main.py
+```bat
+scripts\start_background.bat
 ```
 
-## 使用方法
+これらのスクリプトはWindowsタスクへの登録を行いません。ソース版の定期実行は、Conda／Minicondaではなく、このプロジェクトの`.venv\Scripts\pythonw.exe`を使用します。
 
-### 通常の使用（GUIモード）
+## 設定
 
-1. アプリケーションを起動
-2. 検索条件を設定（発注機関、工事名、日付範囲など）
-3. ダウンロードするファイルタイプを選択
-4. 保存先フォルダを指定
-5. 「ダウンロード開始」ボタンをクリック
-6. ダウンロード中は「キャンセル」ボタンで中断可能
+ローカル設定は`config/config.yaml`です。このファイルはGitと配布パッケージの対象外です。初回は`config/config.example.yaml`をコピーしてください。
 
-### スケジュール機能
+`save_paths.local`は個々の文書を直接置くフォルダーではなく、通常実行と定期実行をまとめるデータルートです。`save_paths.local`と`logging.file`に相対パスを指定した場合、PowerShellの現在位置ではなく、ソース実行時はプロジェクトルート、exe実行時はexeの配置場所を基準に解決します。
 
-1. **スケジュール設定**
-   - 「スケジュールを有効にする」にチェック
-   - 実行間隔を選択（1日、1週間、1か月）
-   - 実行時間を指定（HH:MM形式、例: 09:00）
+主要な設定例です。
 
-2. **PC起動時の自動実行**
-   - `start_background.bat`または`start_background.ps1`をスタートアップフォルダに登録
-   - または、`StartupManager`を使用してプログラムから登録
+```yaml
+target_urls:
+  - https://www.i-ppi.jp/IPPI/SearchServices/Web/Search/Search/Search.aspx?tab=4
 
-3. **バックグラウンド実行**
-   - バックグラウンドモードで実行する場合:
-     ```bash
-     python src/main.py --background
-     ```
-   - または環境変数を設定:
-     ```cmd
-     # コマンドプロンプト
-     set PPI_BACKGROUND_MODE=true
-     python src/main.py
-     ```
-     ```powershell
-     # PowerShell
-     $env:PPI_BACKGROUND_MODE = "true"
-     python src/main.py
-     ```
-   - またはスクリプトを使用:
-     ```cmd
-     # コマンドプロンプト
-     scripts\start_background.bat
-     ```
-     ```powershell
-     # PowerShell
-     .\scripts\start_background.ps1
-     ```
+search_conditions:
+  search_target: koji_keika  # 業務は gyomu_keika
+  project_name: ""           # 工事名または業務名
 
-4. **通知**
-   - ダウンロード完了時にWindows通知が表示されます
-   - GUIが表示されていない場合でも通知で結果を確認できます
+download_conditions:
+  file_types: [".pdf", ".xlsx", ".docx"]
+  keywords: []
+  date_range:
+    start: null
+    end: null
 
-## 実行ファイル化
+save_paths:
+  local: ./downloads
+  layout_version: 4
+  normal_folder: 01_通常ダウンロード
+  scheduled_folder: 02_定期実行
+  # 次の2項目は定期設定の登録時に自動設定されます。
+  schedule_storage_key: ""
+  schedule_storage_folder: ""
 
-PyInstallerを使用して実行ファイル（.exe）を作成できます。
+naming_rule: "{document_name}_{document_updated_at}"
 
-### ビルド方法
+schedule:
+  enabled: false
+  backend: windows_task_scheduler
+  timezone: Asia/Tokyo
+  interval: daily       # daily / weekly / monthly
+  time: "09:00"
+  weekday: monday       # weeklyのみ
+  day_of_month: 1       # monthlyのみ、1～28
+  start_when_available: true
+  wake_to_run: false
+  retry_count: 2
+  retry_interval_minutes: 15
+```
 
-1. **ビルドスクリプトを使用（推奨）**
-   
-   **Windows (コマンドプロンプト):**
-   ```cmd
-   scripts\build\build_exe.bat
-   ```
-   
-   **Windows (PowerShell):**
-   ```powershell
-   .\scripts\build\build_exe.ps1
-   ```
-   
-   **再ビルド（依存関係を再インストール）:**
-   ```cmd
-   # コマンドプロンプト
-   scripts\build\rebuild_exe.bat
-   
-   # PowerShell
-   .\scripts\build\rebuild_exe.ps1
-   ```
+### 発注機関候補の読み込み
 
-2. **手動でビルド**
-   ```bash
-   # 仮想環境を有効化
-   # Windows (コマンドプロンプト)
-   .venv\Scripts\activate.bat
-   
-   # Windows (PowerShell)
-   .venv\Scripts\Activate.ps1
+起動時と検索対象を初めて選んだ時に、工事または業務に対応する公式「発注機関複数選択」画面を1回GETし、`tv_Hachu`ツリーから大分類、中分類、小分類のコード、表示名、親子関係を取得します。候補数・名称・並び順はコードに固定しません。取得した候補はアプリ内のメモリだけに保持し、候補のHTML、Cookie、VIEWSTATEや解析済み候補をディスクへ永続保存しません。
 
-   # PyInstallerでビルド
-   pyinstaller scripts\build\build.spec
-   ```
+細分類は複数選択画面に含まれないため、現在保存されている検索条件が小分類まで指定されている場合はバックグラウンドで先読みし、それ以外の枝は選択時に取得します。未取得の細分類を待つ間は対象の下位プルダウンだけに「読み込み中…」を表示します。同じ枝を再度選んだ場合は、アプリ内にある候補を再利用します。
 
-ビルドが完了すると、`dist/ippi-down.exe` が生成されます。
+複数選択画面の構造が変わった場合、候補コードがリスト検索画面と一致しない場合、または候補が含まれていない場合は、検索画面のWebFormsを使う従来経路へ自動的にフォールバックします。実際の検索送信時には、引き続きリスト検索画面を正本として条件を検証します。更新後の候補に保存済み選択が存在しないときは条件を黙って解除せず、「再選択が必要」と表示して実行を止めます。
 
-### ビルド結果
+「候補を再読み込み」を実行すると、発注機関4階層、地域、工事／業務区分を現在の検索対象について再取得します。全体の解析に成功した場合だけ新世代へ全置換し、失敗時は旧候補を参照表示用に残して「最新性未確認」とします。削除された保存値は画面に残りますが、最新候補から再選択するまで保存・検索・定期実行を停止します。設定、履歴、保存済み文書は変更しません。定期ポーリングは行いません。
 
-- 実行ファイル: `dist/ippi-down.exe`
-- 実行ファイルは単体で動作し、Python環境は不要です
-- 初回実行時は起動に数秒かかる場合があります
+### 工事／業務の検索対象
+
+`search_conditions.search_target`は`koji_keika`（工事・入札の経過）または`gyomu_keika`（業務・入札の経過）です。対象URLはそれぞれ`tab=4`、`tab=7`と完全一致させます。業務では契約方式8件と`gyomu_kubun`を使用します。`project_name`が共通案件名で、旧`koji_name`は業務でも同じ案件名を返す互換別名です。検索対象を持たない旧設定・旧定期スナップショットは工事として読み込みます。
+
+### 保存フォルダー構成
+
+保存先、分類、命名、履歴、旧構成との互換性に関する正本は、[ダウンロードフォルダー仕様](docs/download_folder_spec.md)です。変更時の版管理と移行判断も同書に従います。
+
+新規設定の`layout_version: 4`では、データルート直下を検索対象で分け、その中で通常ダウンロードと登録済みスケジュールを分けます。
+
+```text
+<save_paths.local>\
+├─ 工事の検索（入札の経過）\
+│  ├─ 01_通常ダウンロード\
+│  └─ 02_定期実行\S001_<設定の初回名称>\
+└─ 業務の検索（入札の経過）\
+   ├─ 01_通常ダウンロード\
+   └─ 02_定期実行\S002_<設定の初回名称>\
+```
+
+例えば通常実行の入札公告は次の場所へ保存されます。
+
+```text
+downloads\工事の検索（入札の経過）\01_通常ダウンロード\国の機関\国土交通省\東北地方整備局\山形河川国道事務所\国道１３号_金山第二トンネル工事\01_入札公告等\入札公告_20260730_1200.pdf
+```
+
+発注機関の大～小分類は公式の複数選択ツリーから取得し、細分類と送信値の検証には対象別の案件検索を使用します。確定できない分類は`99_分類未解決`へ保存し、存在しない階層は省略します。定期設定の保存フォルダーは表示名を変更しても変わりません。v3からv4への切替は設定保存時に確認し、既存ファイルと履歴は移動しません。同じ文書が新しい対象別ルートへ一度再取得される場合があります。
+
+設定画面の「データルート」にある「保存済みファイルを再分類...」では、通常実行と各定期実行の履歴から、`99_分類未解決`にある検証済みファイルの移動候補を確認できます。実行区分、定期設定名、案件・文書、現在位置、移動先、理由、可否をプレビューし、選択して確認した候補だけを同じ検索対象・実行ルート内で再分類します。移動先に同内容の検証済みファイルがある場合は移動先を正本として履歴化し、旧ファイルは削除せず保持します。ダウンロードまたは定期実行が実行中・順番待ちの場合は開始しません。検索、設定保存、プレビューだけでファイルを移動することはありません。安全条件と履歴更新は[ダウンロードフォルダー仕様](docs/download_folder_spec.md#73-分類診断と保存済みファイルの手動再分類)を参照してください。
+
+設定スキーマは次の構成です。対応中の既存キーは維持されます。旧Box設定、`search_conditions.hachu_multi`、`schedule.interval: custom`は警告付きで実行対象外となり、Box設定は次回保存時にローカル専用スキーマへ移行されます。
+
+| キー | 内容 |
+|---|---|
+| `target_urls` | 検索対象URLの配列 |
+| `download_conditions` | `file_types`、`keywords`、`date_range.start/end` |
+| `search_conditions` | 発注機関、工事名、場所、方式、各日付、種別、価格などの検索条件 |
+| `save_paths.local` | 通常実行と定期実行を格納するデータルート |
+| `save_paths.layout_version` | 保存構成の版。新規設定は`4`、明示されたv3は従来構成、キーがない旧設定は`2`として読み込み |
+| `save_paths.normal_folder` | v3/v4の通常ダウンロード用フォルダー名。既定は`01_通常ダウンロード` |
+| `save_paths.scheduled_folder` | v3/v4の定期実行用フォルダー名。既定は`02_定期実行` |
+| `save_paths.schedule_storage_key` | 定期設定ごとの不変キー。`S001`形式で登録・複製時に自動発行 |
+| `save_paths.schedule_storage_folder` | 定期設定ごとの固定フォルダー名。登録時のキーと初回名称から自動生成 |
+| `naming_rule` | ファイル名テンプレート |
+| `schedule` | 旧単一設定との互換値。複数の定期実行設定はGUIが管理する登録台帳と不変スナップショットを正本にします |
+| `logging` | `level`、`file`、`max_bytes`、`backup_count` |
+
+### 定期実行の登録と確認
+
+設定画面の「定期実行」タブでは、名前付きの実行設定を複数保存して一覧管理できます。1件の設定には、検索条件、取得する文書、命名規則、保存先、毎日／毎週／毎月の予定、再試行設定をまとめて保持します。一覧から追加、複製、編集、削除、有効化／無効化、今すぐ実行、履歴確認、修復を行います。同じ検索・保存条件は警告を確認したうえで、異なる時刻の別設定として保存できます。別の配置で登録した設定は「旧設定を取り込む」から明示的に移行します。追加・複製・編集・削除・有効切替は操作ごとに登録情報へ反映され、設定画面下部の「保存」は一般設定を保存します。すでに完了した定期実行操作は「キャンセル」では取り消されません。
+
+管理対象の設定は、実行中・順番待ち・再試行待機中でも複製、編集、削除、有効化／無効化できます。編集時は確認画面を表示し、開始済み・待機済みの実行は登録時のスナップショットで続け、変更後の条件は次回以降に使用します。削除や無効化でも進行中の実行は継続する旨を確認します。「今すぐ実行」は実行中・順番待ちには使用できません。管理外の旧Windowsタスクは通常の編集対象ではありません。
+
+設定画面の操作ボタンと保存・キャンセルはスクロールしても表示されます。画面が小さい場合は操作ボタンが折り返され、定期実行の一覧・登録内容・履歴はスクロールして確認できます。履歴の右側の列には水平スクロールで移動します。
+
+有効な設定ごとに`\ippi-down\Download-<task-namespace-id>-<schedule-id>`というWindowsタスクと、登録後に書き換えられない条件スナップショットを作成します。配置が所有する`task namespace ID`は`config/schedule-instance-id`へ保存し、別配置のタスクを自分の登録として扱いません。既存台帳がある配置では登録済みタスク名から従来IDを検証して継承するため、タスク名は変わりません。アプリのフォルダー一式を移動した場合は同じ配置として追従し、exeだけを別フォルダーへコピーした場合は新しい配置として新規IDを発行します。表示名や条件を編集しても内部の`schedule-id`は変わらないため、履歴は継続します。
+
+`%LOCALAPPDATA%\ippi-down\install-id`は、同じWindowsユーザーで動く全配置のFIFOとプロセス間排他に使用する`coordination ID`です。別配置のWindowsタスクを発見する目的にも使いますが、そのタスクの所有権を現在の配置へ移すものではありません。自配置の欠落・定義差分は「要修復」、別配置のタスクは設定画面の「管理外の旧Windowsタスク（通常の保存条件とは別管理）」に分けて表示します。メイン画面の通常一覧には管理外タスクを混在させず、「管理外の旧タスク」の件数だけを集計します。
+
+配置フォルダー一式を移動または改名した場合は、`config/install-location.json`と現在位置の差から起動時に検出します。旧配置が残っていて旧exeが存在していても正常とはみなさず、利用者の確認後に、旧配置内を指す保存先・ログと定期実行のexe・snapshot・作業フォルダーを現在位置へ付け替えます。封印済みsnapshotは直接編集せず新しいsnapshotを作成し、旧snapshot、既存文書、履歴、ログ、旧フォルダーは移動・削除しません。変更開始前に`config/installation-relocation-journal.json`を作成するため、途中でプロセスが終了しても非GUI実行を停止し、次回のGUI確認から残処理を再開します。旧配置には廃止済みの管理情報を残し、本版以降のプログラムを旧配置から誤起動した場合はGUI・CLIとも処理を開始しません。移行機能を持たない旧版exeはこの情報を解釈できないため、移行確認後は旧ショートカットを外し、旧配置を運用上の起動対象にしないでください。確認または付け替えが完了するまでダウンロードと設定保存を停止します。
+
+「旧設定を取り込む...」では、移行元の`config`フォルダーを明示的に選択し、封印済みスナップショット、ID、保存先、Windowsタスクを検証します。プレビューには設定名、有効状態、実行予定、実効保存先、取り込み可否、Windowsタスク名、診断を表示し、1件を選びます。現在の一覧と設定名が重複する候補は「要改名」となり、「取り込み後の設定名」へ1～80文字の一意な名前を入力します。移行先を一時的に無効で作成し、旧タスクを無効化してから、移行元が有効なら現在のexeをactionとする移行先を有効化し、移行元が無効なら移行先も無効のまま維持します。その後、移行元を`MIGRATED_OUT`として記録して旧タスクを削除します。削除できない場合も旧タスクは無効のまま残し、「旧設定の取り込み完了（後処理警告） `[EXTERNAL_TASK_CLEANUP_PENDING]`」と表示します。旧配置の同じ設定に属する実行履歴は現在の`logs/schedule-runs.jsonl`へ統合し、統合失敗は警告しますが所有権移行を取り消しません。台帳や検証可能なスナップショットがない純粋な孤立タスクは取り込めず、「選択した外部タスクを解除」から確認付きの解除だけを行えます。実行中の外部タスクは解除できません。取得済み文書、履歴、旧`config`は自動で移動、改名、削除しません。
+
+登録後はGUIを閉じてもWindowsタスクからダウンロードが開始され、開始済みの処理もGUI終了の影響を受けません。ただし、タスクはWindowsの`InteractiveToken`方式です。登録した同じWindowsユーザーがログオン中である必要があり、画面ロック中は実行できますが、サインアウト中は実行できません。
+
+`実行漏れ時にPC起動後1回だけ実行`（Windowsの`StartWhenAvailable`）がONなら、利用できなかった予定分を次回利用可能時に1回だけ補完します。`スリープを解除して実行`（`WakeToRun`）がOFFならPC復帰後に補完し、ONならWindowsとPCの電源ポリシーが許す範囲で予定時刻にスリープを解除します。ネットワーク利用可能時だけ開始し、スリープ解除の既定はOFFです。異なる設定が重なった場合は並列取得せずFIFOで待機し、待機上限2時間、実処理上限2時間、Windowsタスク全体の上限4時間とします。
+
+通知方針は設定ごとに「通知しない」「重要な結果のみ（新規保存・失敗など）」「すべての実行結果」「失敗時のみ」から選択できます。既存設定は互換性のためOFF、GUIで新規作成する設定は「重要な結果のみ」が既定です。「重要」は、新規保存が1件以上あるか、一部失敗、全件失敗、キャンセル、設定不正、キュー待機・実行上限、予期しないエラーのいずれかです。全件が保存済み、または正常な該当なしは通知しません。
+
+通知は再試行の途中やFIFO受付時ではなく、最終実行履歴の保存後に`run_id`ごと1回だけWindowsの通知領域へ送信します。表示内容は設定名、最終結果、新規・保存済み・失敗件数、先頭の理由コードに限定し、検索条件、URL、Cookie、保存先を含めません。通知にクリックアクションはありません。通知失敗はダウンロード結果や終了コードを変えず、`logs/app.log`の`NOTIFICATION_*`理由コードで診断できます。
+
+タスク、実行ファイル、引数、またはスナップショットが欠落・不一致なら「要修復」です。この場合は定期実行プロセス自体が起動できず、通知も表示できないため、GUIの「要修復」表示が診断経路です。
+
+メイン画面には保存設定数、有効数、実行中、順番待ち、要修復、前回失敗の集計と、各設定の状態、予定、次回日時、前回結果、件数を一覧表示します。定期実行欄には「GUI終了後も実行可」「Windowsログオンが必要」とスリープ解除の設定状態も表示します。一時障害の最終結果待ちは「再試行待機中」と表示し、再試行途中を完了とは扱いません。「今すぐ実行」は選択中の有効な設定の登録済みスナップショットをWindowsタスク経由で実行します。無効な設定は、先に有効化してタスクを登録してください。
+
+直近20回の結果は設定別または全設定でGUIと`logs/schedule-runs.jsonl`から確認できます。履歴には論理設定ID、実行時のスナップショットID、予定／開始／終了日時、起動種別、キュー待機時間、結果、件数、再試行、理由コード、終了コードを記録し、Cookieや検索条件の詳細は記録しません。Windowsタスクは元のトリガー日時を子プロセスへ渡さないため、予定日時を取得できない実行ではタスクの実行要求時刻を記録します。設定を削除しても、この診断用履歴だけは「削除済み設定」として残ります。
+
+画面なしの単発実行には`--run-once`、Windowsタスク内部からの実行には`--scheduled-run --schedule-id <id> --config <snapshot-path>`を使用します。`--scheduled-run`は登録機能が生成する内部コマンドであり、通常は手入力する必要がありません。`--background`は後方互換用の非推奨オプションです。
+
+### メモリと一時資源の上限
+
+履歴JSONLは全件を常駐させず、今回の対象または末尾の必要件数だけをストリーム処理します。GUIの通常ログ表示は5,000行または2 MiBまで、定期実行の詳細ログ表示は選択設定の直近200件または2 MiBまでです。画面上の定期実行一覧は従来どおり直近20件を要約します。完全な診断記録は削除せず、各JSONL／`logs/app.log`から確認できます。
+
+同時に発火した定期実行は、最初のプロセスだけがdispatcherとしてFIFOを処理し、後続はticketを登録して終了します。このdispatcherはジョブ処理中だけの短命プロセスです。常駐トレイ、常駐通知監視、Windowsサービスは起動せず、GUIを終了し、定期ジョブと通知処理がなければ、ippi-downのプロセスによるCPU、メモリ、ネットワーク使用はありません。期限切れの一時物は所有PIDと作成日時を確認でき、使用中ではない場合だけ回収します。保留スナップショットは、Windowsタスク・mutex・FIFO ticketから参照されなくなってから回収します。詳細は[メモリ・一時資源の運用仕様](docs/memory_resource_management.md)を参照してください。
+
+## 検索結果と保存済みファイル
+
+全検索結果と各工事の詳細ページを解析すると、メイン画面に次のような2行の集計を表示します。取得後は新規・更新件数と保存済み確認件数を確定値へ更新します。
+
+```text
+検索解析完了：案件13件 / 公開中データ14件 / 公開終了のみ7件
+今回の対象：14件（新規・更新0件 / 保存済み確認14件〈旧命名14件〉）
+保存先分類：確定13件 / 分類未解決0件
+```
+
+「案件・文書内訳」を開くと、対象となった案件ごとに発注機関階層、分類状態、分類理由、保存予定フォルダーと、文書名称、公開中・公開終了などの状態、最終更新日時、掲載終了日時、今回の判定を確認できます。判定には新規・更新、保存済み、旧命名を再利用、公開終了、ファイル種別対象外、キーワード・日付条件対象外、公開中リンクなしなどがあります。一覧は`すべて`、`DL対象あり`、`公開終了のみ`、`文書なし`、`確認不能`、`分類未解決`で絞り込め、案件名、文書名、発注機関階層、分類理由、保存予定フォルダーでも検索できます。
+
+検索条件で「公開中のみ」を有効にすると、HPが公開終了案件を検索結果から除外します。この場合は実際に0件だったとは断定せず、集計に`公開終了のみ集計対象外`と表示します。
+
+旧命名の保存済みファイルは物理的に改名しません。履歴のURLと期待形式、HPの文書最終更新日時と取得日時、実ファイルのサイズ、SHA-256、PDF署名・終端またはOOXML構造を検証できた場合に限り、旧名称のまま新しい予定名へ関連付けて再利用します。HPの最終更新日時が既存取得より新しい場合は、新しい命名規則で別ファイルを取得し、旧ファイルは残します。
+
+## 依存関係
+
+用途ごとに依存ファイルを分離しています。
+
+| ファイル | 用途 |
+|---|---|
+| `requirements/runtime.txt` | 通常実行 |
+| `requirements/test.txt` | テスト |
+| `requirements/build.txt` | PyInstallerビルド |
+| `requirements/tools.txt` | `scripts/utils`の保守ツール |
+| `requirements/windows-optional.txt` | 旧通知経路の互換用（定期実行通知はWindows標準APIのため不要） |
+| `requirements/constraints.txt` | CI・リリース向けバージョン固定 |
+| `requirements/windows-ci-py311.lock` | Windows/Python 3.11 CI向けwheel SHA-256固定 |
+
+ルートの`requirements.txt`は後方互換用で、runtimeだけを導入します。
 
 ## テスト
 
-pytestを使用したテストスイートが用意されています。
-
-### テスト環境のセットアップ
-
-テストを実行する前に、開発用依存関係をインストールしてください：
+プロジェクトルートで、テスト依存を導入して実行します。
 
 ```powershell
-# 開発用依存関係をインストール（pytest-timeout等を含む）
-pip install -r requirements-dev.txt
+.\scripts\setup.ps1 -WithTest
+.\.venv\Scripts\python.exe -m pytest tests -v
 ```
 
-**重要**: `pytest.ini` の `addopts` に `--timeout` オプションが含まれているため、`pytest-timeout` が必要です。  
-`requirements-dev.txt` をインストールすることで、必要な依存関係がすべてインストールされます。
-
-### テストの実行
-
-**推奨**: `python -m pytest` を使用してください（コマンドPATH依存を避けるため）
+`tests/conftest.py`の標準設定ではGUI、network、integrationマーカーを除外します。明示的に実行する場合は対応する環境変数を有効にし、対象サイトへの負荷を確認してください。
 
 ```powershell
-# すべてのテストを実行（GUI除外）
-python -m pytest -q -m "not gui"
+$env:RUN_INTEGRATION_TESTS = "1"
+.\.venv\Scripts\python.exe -m pytest tests -v -m integration
 
-# すべてのテストを実行（詳細表示）
-python -m pytest tests/ -v
+$env:RUN_GUI_TESTS = "1"
+.\.venv\Scripts\python.exe -m pytest tests -v -m gui
 
-# カバレッジレポート付きで実行
-python -m pytest tests/ --cov=src --cov-report=html
-
-# 特定のテストファイルを実行
-python -m pytest tests/test_file_utils.py -v
-
-# GUIテストを含むすべてのテストを実行
-python -m pytest tests/ -v
+$env:RUN_NETWORK_TESTS = "1"
+.\.venv\Scripts\python.exe -m pytest tests -v -m network
 ```
 
-**注意**: デフォルトでは `pytest.ini` の設定により、GUI依存テスト・ネットワーク依存テスト・統合テストはスキップされます。
+Windows CIはハッシュ固定wheelだけを導入し、依存関係検査、CycloneDX SBOM生成、
+構文検査、Ruff静的解析、実通信を遮断した標準テスト、PyInstallerビルド、
+Windows FirewallでexeとEdgeの外向き通信を止めた`--self-check`、ソース・exe
+配布zipの内容検査を行います。GitHub Actionsもcommit SHAへ固定しています。
 
-### 調査ツール（i-ppi サイト確認用）
-
-検索・HTML 構造・ファイル抽出をコマンドラインで確認する統合ツールです。
+`--self-check`はPython/Tkの読込に加え、内蔵PDF生成、同梱日本語フォント、生成PDFの再読込、WindowsのEdge用Job Object監視機構、PDF署名・終端・サイズ・SHA-256・A4縦MediaBox、一時ファイルの後処理をオフライン確認します。通常起動せずに確認する場合は次を実行してください。
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
-python scripts/investigate/investigate_i_ppi.py search
-python scripts/investigate/investigate_i_ppi.py paginate --output-json
-python scripts/investigate/investigate_i_ppi.py html
-python scripts/investigate/investigate_i_ppi.py extract-files --url "https://www.i-ppi.jp/.../Detail.aspx?..." --out result.json
+.\.venv\Scripts\python.exe -m src.main --self-check
 ```
 
-**サイト変更監視**（スナップショット取得・差分検知・影響範囲の特定）:
+内蔵PDF生成または必須内容の検証に失敗した場合、WindowsでEdge用の全プロセス監視機構を利用できない場合は終了コード1になります。Edge本体がないことだけでは失敗にしません。
+consoleなしのexe版では、成功・失敗の日本語理由と理由コードをexeと同じ場所の`self-check-result.txt`へ記録します。診断中は一意な名前のWindowsタスクを一時登録し、照会後に削除します（通常の定期実行タスクや検索条件は変更しません）。
+
+## ビルド
+
+ビルド用セットアップとビルドスクリプトは、どの作業フォルダーから呼び出してもプロジェクト内`.venv`を使用します。
 
 ```powershell
-# スナップショット取得（定期実行で変更検知に利用）
-python scripts/investigate/investigate_i_ppi.py snapshot "https://www.i-ppi.jp/.../Search.aspx?tab=4" --out-dir scripts/snapshots
-# 2 つのスナップショットを比較して差分レポート生成
-python scripts/investigate/investigate_i_ppi.py diff scripts/snapshots/旧ディレクトリ scripts/snapshots/新ディレクトリ -o report.md
-# 差分 JSON から Scraper/Parser の修正ポイントを列挙
-python scripts/investigate/investigate_i_ppi.py impact report.json -o impact.json
+.\scripts\setup.ps1 -WithBuild
+.\scripts\build\build_exe.ps1
 ```
 
-詳細は [調査ツールの使い方](./docs/archive/reports/INVESTIGATION_TOOL.md)（アーカイブ）と [サイト変更監視の使い方](./docs/SITE_CHANGE_MONITORING.md) を参照してください。
+コマンドプロンプトでは次を使用できます。
 
-### テストカバレッジ
-
-現在のテストカバレッジ:
-- FileUtils: ファイル名のサニタイズ、一意性確保、ファイルサイズフォーマット
-- ConfigModel: スケジュール設定の検証
-- HTTPClient: 初期化、タイムアウト設定
-
-## 設定項目の説明
-
-### 発注機関ごとのルートフォルダ（オプション）
-
-`save_paths.enable_agency_root_folders` を有効にすると、i-ppi の発注機関階層に沿って保存先フォルダが自動作成されます。**デフォルトは OFF** で、従来どおりの保存先（`save_paths.local` ＋ 実行単位フォルダ ＋ サブフォルダ）です。
-
-**ON 時の出力例（ツリー）:**
-
-```
-<保存先（local）>/
-  （実行単位フォルダがある場合はその直下）
-  発注機関/
-    国の機関/
-      国交省/
-        東北/
-          トンネル/
-            工事_入札公告等/    # または 業務_入札公告等
-              （日付分割する場合は 2025_02 など）
-                <naming_rule で命名されたファイル>
+```bat
+scripts\setup.bat -WithBuild
+scripts\build\build_exe.bat
 ```
 
-- **フォルダ階層**: 発注機関（大分類→中分類→小分類→細分類）・検索種別（工事/業務）・日付パーティション（任意）で決まります。メタデータが欠損している項目は `unknown` にフォールバックし、Windows 禁則文字は除去されます。
-- **ファイル名**: 従来どおり **naming_rule** のテンプレート（`{category}`, `{title}`, `{date}`, `{index}` 等）で決まります。フォルダ階層とファイル名は役割が分離されており、naming_rule は「そのフォルダ内のファイル名」にのみ適用されます。
-- 設定項目の詳細は `config/config.example.yaml` の `save_paths` コメントを参照してください。
+正常に完了すると`dist/ippi-down.exe`を生成します。
 
-### 使用される設定項目
+必要環境、通常ビルドと再ビルドの使い分け、`build.spec`の内容、自己診断、CIとの差異、トラブル対処は[PyInstallerビルド・検証手順（正本）](docs/pyinstaller_build.md)を参照してください。単純な`pyinstaller --onefile`コマンドでは、設定例や自己診断用fixtureなどの同梱条件が欠けるため、正式ビルドには使用しません。
 
-- **target_urls**: 対象URLリスト（使用中）
-- **download_conditions.file_types**: ファイルタイプフィルタ（使用中）
-- **download_conditions.keywords**: キーワードフィルタ（使用中）
-- **download_conditions.date_range**: 日付範囲フィルタ（**実装済み**）
-- **save_paths.local**: ローカル保存先（使用中）
-- **save_paths.enable_agency_root_folders**: 発注機関ごとにルートフォルダを自動作成（**実装済み**、デフォルト OFF）
-- **save_paths.agency_folder_levels / date_partition / include_search_tab_folder**: 発注機関フォルダ ON 時の階層・日付分割・工事/業務分け（**実装済み**）
-- **naming_rule**: ファイル命名規則テンプレート（**実装済み**）
-- **schedule.enabled**: スケジュール有効化（使用中）
-- **schedule.interval**: 実行間隔（daily/weekly/monthly/custom、**custom cron対応済み**）
-- **schedule.time**: 実行時刻（HH:MM形式、使用中）
-- **schedule.cron**: cron形式（interval="custom"の場合、**実装済み**）
-- **logging.level**: ログレベル（使用中）
-- **logging.file**: ログファイルパス（使用中）
-- **network.\***: 通信ポリシー（許可ホスト・robots・レート制限・監査ログ、**実装済み**）→ [ネットワークポリシー](#ネットワークポリシー)
+## 配布パッケージ
 
-### 使用されていない設定項目
-
-- **tqdm**: 進捗表示ライブラリ（現在未使用、requirements.txtでコメントアウト）
-
-## 定期実行（バッチ）
-
-Windows タスクスケジューラで定期実行できます。ローカル PC でも Azure VM でも同じスクリプトを使います。
+開発・監査用ソースと利用者向けexeを混在させません。
 
 ```powershell
-cd scripts\schedule
-.\register_task.ps1 -Time "09:30" -Interval Daily   # 登録
-.\status_task.ps1                                   # 状態と履歴の確認
-.\unregister_task.ps1                               # 削除
+# ソース配布。build.specは含み、実設定・ログ・ダウンロード・生成物を除外
+.\scripts\tools\make_source_release.ps1
+
+# exeをビルドした後、exe・README・正本仕様書・設定例・SHA-256だけを梱包
+.\scripts\tools\make_exe_release.ps1
 ```
 
-- CLI の `--report` により、実行ごとに `logs\reports\batch_*.json`（件数・失敗理由・所要時間）を出力
-- `network.allowed_hours` が実行時刻を含む必要があります（登録時に整合を検査して警告）
-- 詳細は [docs/batch-operation.md](docs/batch-operation.md)、Azure VM での運用は [../azure-batch-vm/docs/runbook.md](../azure-batch-vm/docs/runbook.md) を参照（Workspaces 直下の兄弟フォルダ）
-
-## ネットワークポリシー
-
-相手のサーバーは共有資源なので、「許可した宛先だけ」「robots.txt に従う」「負荷をかけない」
-「身元を明かす」の4点を設定ではなく仕組みとして強制しています。
-
-| 項目 | 既定値 |
-|---|---|
-| 許可ホスト / スキーム | `www.i-ppi.jp` / `https` のみ |
-| 内部ネットワーク宛（プライベート IP） | 遮断（SSRF 対策） |
-| 同一ホストへの最小間隔 / 同時接続 | 1.0 秒（`Crawl-delay` が長ければそちら） / 1 |
-| 1回の実行のリクエスト上限 | 500 |
-| robots.txt | 遵守（取得失敗時は既定でブロック） |
-| 監査ログ | `./logs/network.log`（allow / blocked / robots_denied / rate_limited） |
-
-- 許可外のホストは**名前解決の時点で**遮断されます（`src/utils/netguard.py`）。IP 直打ちでも回避できません。
-- `target_urls` のホストが `network.allowed_hosts` に無い場合、**起動時にエラーで停止**します。
-- 設定は `config/config.example.yaml` の `network` セクションを参照してください。
+互換ラッパーも利用できます。
 
 ```powershell
-# ガードレールのテストだけを実行
-.\scripts\check_guardrails.ps1
+.\scripts\tools\make_release_zip.ps1 -PackageType Source
+.\scripts\tools\make_release_zip.ps1 -PackageType Exe
 ```
 
-許可先の追加やレート緩和の手順、やらないこと（認証回避・CAPTCHA 回避・`Disallow` 領域の取得・
-取得データの再配布・過負荷）は [docs/network-policy.md](./docs/network-policy.md) にまとめています。
+出力先は既定で`release/`です。配布zipには`.venv`、`build`、`logs`、`downloads`、`config/config.yaml`、デバッグHTMLを含めません。
 
-## 最近の改善点
+## 運用上の注意
 
-### v0.3.0 (2025-01-XX)
+- 外向きHTTP通信は公式サイトの固定endpointだけを許可し、HTTPS・Method・
+  query形式・通信用途・各リダイレクトhopを送信前に検証します。暗黙／明示proxy、
+  TLS検証無効化、任意URL、telemetryは使用しません。許可先、起動時通信、
+  監査ログ、テスト方法の正本は[外向き通信・ローカル実行セキュリティ仕様](docs/network_security.md)です。
+- 対象サイトの利用条件、robots設定、組織の情報セキュリティ規程を確認してください。
+- 発注機関の未取得階層を読み込んでいる間は対象の下位プルダウンが一時的に無効になります。「読み込み中…」が消えた後に条件を確認してください。候補取得に失敗した場合や保存済み条件が現在の候補にない場合は、条件なしで実行せず再読み込みまたは再選択を求めます。
+- 既定の通信間隔を短くして対象サイトへ過大な負荷を与えないでください。
+- `config/config.yaml`、ログ、取得文書には業務情報が含まれる可能性があります。公開リポジトリや配布zipへ含めないでください。
+- 取得中に終了しても正式ファイルを破損させないよう、作業ファイルは`.part`で保存されます。
+- ファイル単位の失敗は、GUIに日本語理由と理由コードを表示し、`logs/app.log`には処理段階、URL、保存先、HTTP情報、試行回数などの診断項目を記録します。HTML本文、Cookie、HTTPヘッダー全体は記録しません。
+- 主な理由コードは`PDF_INTERNAL_RENDER_FAILED`（内蔵生成失敗）、`EDGE_SUPERVISION_UNAVAILABLE`（全プロセス監視不可）、`EDGE_GPU_PROCESS_CRASH`（GPUプロセス障害）、`EDGE_PROCESS_CRASH`（Edge異常終了）、`EDGE_OUTPUT_NOT_PRODUCED`（出力なし）、`CONVERSION_TIMEOUT`（変換時間超過）、`HTML_STRUCTURE_INVALID`（入札調書の必須項目不足）、`PROJECT_NAME_MISMATCH`（案件名不一致）です。直近200件はGUIの「PDF変換履歴」、完全な監視イベントは90日保持の日別JSONL、失敗時の無害化済み再変換データは30日保持の`logs/pdf-failures`で確認できます。
 
-- ✅ naming_rule テンプレート文字列の実装
-- ✅ date_range フィルタリングの実装
-- ✅ custom cron 形式のスケジュール対応（croniter導入）
-- ✅ PostBackリンク対応（javascript:__doPostBack形式）
-- ✅ リトライ設計の見直し（tenacity の実効性向上）
-- ✅ ログ設計の統一（handlers.clear の副作用排除）
-- ✅ Accept-Encoding の矛盾解消（br を削除）
-- ✅ 配布/レビューZIP作成スクリプトの不具合修正
+## ドキュメント
 
-### v0.2.0 (2026-01-08)
+- [ダウンロードフォルダー仕様（正本）](docs/download_folder_spec.md)
+- [メモリ・一時資源の運用仕様（正本）](docs/memory_resource_management.md)
+- [外向き通信・ローカル実行セキュリティ仕様（正本）](docs/network_security.md)
+- [PyInstallerビルド・検証手順（正本）](docs/pyinstaller_build.md)
+- [要件定義](docs/requirements.md)
+- [システム設計](docs/system_design.md)
+- [実装設計](docs/implementation_design.md)
+- [設定画面の現行仕様](docs/settings_requirements.md)
+- [デプロイ手順](docs/DEPLOYMENT.md)
+- [技術選定](docs/technology_selection.md)
 
-- ✅ HTTPステータス429（レート制限）の自動処理を追加
-- ✅ Windowsパス長制限（260文字）の自動対応
-- ✅ メタデータ抽出機能の改善（発注機関、工事名、日付など）
-- ✅ ダウンロード中のキャンセル機能を追加
-- ✅ スケジュール設定の検証機能を追加
-- ✅ pytestテストスイートの追加
-
-## 今後の予定
-
-- Box認証フローの実装
-- 並列ダウンロード機能
-- テストカバレッジの拡大
-- 実運用での検証と改善
-
-## 開発ステータス
-
-- [x] 要件定義
-- [x] 技術選定
-- [x] 設計
-- [x] 実装（基本機能）
-- [x] GUI実装
-- [x] 設定機能実装
-- [x] 実行ファイル化（PyInstaller）
-- [x] テストスイートの整備
-- [x] コードレビューと改善
-- [ ] テストカバレッジの拡大
-- [ ] ドキュメント整備
-
-## トラブルシューティング
-
-### HTTPレート制限エラー
-
-アプリケーションは自動的にHTTPステータス429（レート制限）を検出し、`Retry-After`ヘッダーに基づいて自動的にリトライします。最大3回までリトライを試みます。
-
-### Windowsパス長制限エラー
-
-Windowsのパス長制限（260文字）を超えるファイル名は自動的に短縮されます。ファイル名は拡張子を除いて200文字以内に制限されます。
-
-### ダウンロードのキャンセル
-
-ダウンロード中に「キャンセル」ボタンをクリックすると、現在のダウンロード処理が中断されます。既にダウンロード済みのファイルは保持されます。
-
-## リポジトリの管理
-
-### 設定ファイルの扱い
-
-**重要**: 
-- Gitで管理されるのは `config/config.example.yaml`（テンプレート）のみです
-- 実際に使用する `config/config.yaml` はローカルで作成し、Gitで追跡されません
-- `config/config.yaml` には機密情報を含める可能性があるため、Gitに含めません
-
-初回セットアップ時は、`config/config.example.yaml` をコピーして `config/config.yaml` を作成してください。
-
-### 不要なファイルの追跡解除
-
-過去に誤って以下のファイルがGitに追加されてしまった場合、追跡を解除できます。
-
-**重要**: これらのコマンドはローカルファイルを削除しません。Gitの追跡から外すだけです。
-
-詳細は [リポジトリクリーンアップ手順](./docs/dev/REPOSITORY_CLEANUP.md) を参照してください。
-
-```bash
-# 仮想環境の追跡解除
-git rm -r --cached .venv
-
-# ビルド生成物の追跡解除
-git rm -r --cached build dist
-
-# ログ・ダウンロード・キャッシュの追跡解除
-git rm -r --cached logs downloads .pytest_cache
-
-# 設定ファイルの追跡解除（ローカル設定のみ）
-git rm --cached config/config.yaml
-
-# Pythonキャッシュの追跡解除（すべての__pycache__と*.pyc）
-git rm -r --cached **/__pycache__
-find . -name "*.pyc" -exec git rm --cached {} \;
-```
-
-**PowerShellで一括実行する場合**:
-
-```powershell
-# PowerShellで実行（一括）
-git rm -r --cached .venv, build, dist, logs, downloads, .pytest_cache -ErrorAction SilentlyContinue
-git rm --cached config/config.yaml -ErrorAction SilentlyContinue
-Get-ChildItem -Recurse -Directory -Filter "__pycache__" | ForEach-Object { git rm -r --cached $_.FullName -ErrorAction SilentlyContinue }
-Get-ChildItem -Recurse -Filter "*.pyc" | ForEach-Object { git rm --cached $_.FullName -ErrorAction SilentlyContinue }
-```
-
-### リリース・レビュー用ZIPの作成（PowerShell コピペ可）
-
-梱包スクリプトは **`scripts/tools/`** に一本化しています。**`config/config.yaml` は同梱しません。** 含まれるのは `config.example.yaml` のみです。
-
-```powershell
-# プロジェクトルートで実行
-cd <プロジェクトのパス>
-
-# レビュー用ZIP作成（_review_pack に展開後、ippi-down_review.zip を出力）
-powershell -ExecutionPolicy Bypass -File .\scripts\tools\pack_for_review.ps1
-```
-
-- 出力: ルートに `ippi-down_review.zip`、一時フォルダ `_review_pack/`（ZIP作成後に削除可）
-- 除外: `.venv`, `build`, `dist`, `logs`, `downloads`, `config/config.yaml`, `__pycache__` 等
-
-**クリーンな配布用ZIP**（別名で出力したい場合）:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\tools\make_release_zip.ps1 -OutputName ippi-down-clean.zip
-```
-
-- 出力: `release/ippi-down-clean.zip`
-
-詳細は [リリース・梱包手順](./docs/RELEASE_AND_PACK.md) を参照してください。
-
-## 参考資料
-
-現行ドキュメントの一覧は [docs/README.md](./docs/README.md) を参照してください。
-
-- [要件定義書](./docs/requirements.md)
-- [要件トレーサビリティ表](./docs/REQUIREMENTS_TRACEABILITY.md)（FR/FR-SET と実装・テストの対応）
-- [サイト変更監視の使い方](./docs/SITE_CHANGE_MONITORING.md)（snapshot / diff / impact）
-- [デプロイ手順](./docs/DEPLOYMENT.md)
-- [リリース・梱包手順](./docs/RELEASE_AND_PACK.md)
-- [ネットワークポリシー](./docs/network-policy.md)
-- [定期バッチ運用](./docs/batch-operation.md)
-
-歴史文書（ギャップレポート・旧設計書・調査メモなど）は [docs/archive/](./docs/archive/) にあります。実装と一致しない可能性があります。
+設計書に将来案が含まれる場合、現バージョンの提供範囲は本READMEの機能ステータスを優先します。
 
 ## ライセンス
 
-（ライセンス情報を追加してください）
-
----
-
-**作成日**: 2025年12月17日  
-**最終更新**: 2026年2月15日
-
+ライセンスファイルは未整備です。ライセンスが明示されるまでは組織内利用に限定してください。

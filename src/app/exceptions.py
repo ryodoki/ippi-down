@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-﻿"""カスタム例外定義"""
-=======
 # -*- coding: utf-8 -*-
 
 """カスタム例外定義"""
->>>>>>> e3609c39835dfe38ae2925fb5dae86c473bfaa33
 
 
 class PpiDownloaderError(Exception):
@@ -22,23 +18,6 @@ class RateLimitError(PpiDownloaderError):
     def __init__(self, message: str = "", retry_after: int = None):
         super().__init__(message)
         self.retry_after = retry_after
-
-
-class BlockedRequestError(PpiDownloaderError):
-    """通信ポリシー違反（許可外URL、robots.txt の Disallow 等）で送信を止めた"""
-    def __init__(self, message: str = "", reason: str = ""):
-        super().__init__(message)
-        self.reason = reason
-
-
-class RequestBudgetExceededError(PpiDownloaderError):
-    """1回の実行で送れるリクエスト上限に達した"""
-    pass
-
-
-class OutsideAllowedHoursError(PpiDownloaderError):
-    """稼働を許可された時間帯の外側で送信しようとした"""
-    pass
 
 
 class FilesystemError(PpiDownloaderError):

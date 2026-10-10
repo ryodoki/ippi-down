@@ -1,0 +1,197 @@
+name: Windows CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.6.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements/windows-ci-py311.lock
+
+      - name: Install test and build dependencies
+        run: >-
+          python -m pip install
+          --disable-pip-version-check
+          --only-binary=:all:
+          --require-hashes
+          -r requirements/windows-ci-py311.lock
+
+      - name: Verify installed dependency graph
+        run: python -m pip check
+
+      - name: Generate dependency SBOM
+        run: >-
+          python scripts/security/generate_sbom.py
+          --output artifacts/sbom.cdx.json
+
+      - name: Compile sources
+        run: python -m compileall -q src tests scripts
+
+      - name: Run Ruff static analysis
+        run: ruff check src tests scripts --select E9,F63,F7,F82
+
+      - name: Run offline tests
+        run: pytest tests -v
+
+      - name: Build Windows executable
+        run: python -m PyInstaller scripts/build/build.spec
+
+      - name: Smoke test release package
+        shell: pwsh
+        run: |
+          function Assert-NoSecretArtifacts {
+            param(
+              [Parameter(Mandatory = $true)]
+              [string]$Root
+            )
+
+            $files = @(Get-ChildItem -LiteralPath $Root -Recurse -Force -File)
+            $secretNamedFiles = @(
+              $files | Where-Object {
+                $_.Name -match '(?i)^\.env(?:\.(?!example$|sample$|template$).+)?$' -or
+                $_.Name -match '(?i)^(?:credentials?|secrets?|tokens?)\.(?:json|ya?ml|toml|ini|cfg|txt)$' -or
+                $_.Name -match '(?i)^id_(?:rsa|dsa|ecdsa|ed25519)$' -or
+                $_.Extension -match '(?i)^\.(?:pem|pfx|p12|key)$'
+              }
+            )
+            if ($secretNamedFiles) {
+              $paths = ($secretNamedFiles.FullName | Sort-Object) -join "`n"
+              throw "release contains secret-like file names:`n$paths"
+            }
+
+            # High-confidence credential formats only. Placeholder values such as
+            # null/changeme and legitimate source names (for example
+            # secret_provider.py) do not match these patterns.
+            $secretContentPatterns = [ordered]@{
+              private_key = '-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----'
+              aws_key = '\bAKIA[0-9A-Z]{16}\b'
+              github_token = '\bgh[pousr]_[A-Za-z0-9]{36,255}\b'
+              slack_token = '\bxox[baprs]-[A-Za-z0-9-]{10,}\b'
+              jwt = '\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b'
+              bearer_token = '(?i)\bBearer\s+[A-Za-z0-9._~+/-]{32,}={0,2}\b'
+            }
+            $textExtensions = @(
+              ".bat", ".cfg", ".ini", ".json", ".md", ".ps1", ".py",
+              ".spec", ".txt", ".xml", ".yaml", ".yml", ".toml"
+            )
+            $contentFindings = [System.Collections.Generic.List[string]]::new()
+            foreach ($file in $files) {
+              if ($textExtensions -notcontains $file.Extension.ToLowerInvariant()) {
+                continue
+              }
+              try {
+                $content = [IO.File]::ReadAllText($file.FullName)
+              }
+              catch {
+                continue
+              }
+              foreach ($pattern in $secretContentPatterns.GetEnumerator()) {
+                if ($content -match $pattern.Value) {
+                  $contentFindings.Add("$($file.FullName) [$($pattern.Key)]")
+                }
+              }
+            }
+            if ($contentFindings.Count -gt 0) {
+              $details = ($contentFindings | Sort-Object -Unique) -join "`n"
+              throw "release contains credential-like content:`n$details"
+            }
+          }
+
+          if (-not (Test-Path -LiteralPath "dist/ippi-down.exe")) {
+            throw "dist/ippi-down.exe was not generated"
+          }
+          & scripts/security/run_offline_self_check.ps1 `
+            -ExePath "dist/ippi-down.exe"
+          & scripts/tools/make_source_release.ps1 -OutputDir release
+          & scripts/tools/make_exe_release.ps1 -OutputDir release
+          if (-not (Test-Path -LiteralPath "release/ippi-down-windows-x64.zip")) {
+            throw "release zip was not generated"
+          }
+          $sourceExtractDir = Join-Path $env:RUNNER_TEMP "ippi-down-source-check"
+          Expand-Archive -LiteralPath "release/ippi-down-source.zip" -DestinationPath $sourceExtractDir
+          $sourceForbidden = Get-ChildItem -LiteralPath $sourceExtractDir -Recurse -Force |
+            Where-Object {
+              $_.Name -in @(
+                "config.yaml", ".venv", "logs", "downloads", "debug",
+                ".ruff_cache", ".mypy_cache", ".tox", ".hypothesis",
+                ".agents", ".codex", ".idea", ".vscode", "__pycache__"
+              ) -or
+              $_.Extension -in @(".log", ".part", ".pyc", ".pyo", ".exe") -or
+              (
+                $_.Name -eq "test_detail_page.html" -and
+                $_.FullName -notmatch "[\\/]tests[\\/]fixtures[\\/]"
+              )
+            }
+          if ($sourceForbidden) {
+            throw "source release contains runtime or debug artifacts"
+          }
+          if (-not (Get-ChildItem -LiteralPath $sourceExtractDir -Recurse -File -Filter "build.spec")) {
+            throw "source release does not contain build.spec"
+          }
+          if (-not (
+            Get-ChildItem -LiteralPath $sourceExtractDir -Recurse -File -Filter "test_detail_page.html" |
+              Where-Object { $_.FullName -match "[\\/]tests[\\/]fixtures[\\/]" }
+          )) {
+            throw "source release does not contain the offline HTML fixture"
+          }
+          Assert-NoSecretArtifacts -Root $sourceExtractDir
+
+          $exeExtractDir = Join-Path $env:RUNNER_TEMP "ippi-down-exe-check"
+          Expand-Archive -LiteralPath "release/ippi-down-windows-x64.zip" -DestinationPath $exeExtractDir
+          if (-not (Get-ChildItem -LiteralPath $exeExtractDir -Recurse -File -Filter "ippi-down.exe")) {
+            throw "executable release does not contain ippi-down.exe"
+          }
+          $exeForbidden = Get-ChildItem -LiteralPath $exeExtractDir -Recurse -Force |
+            Where-Object {
+              $_.Name -in @("config.yaml", "test_detail_page.html", ".venv", "logs", "downloads", "debug") -or
+              $_.Extension -in @(".log", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".part")
+            }
+          if ($exeForbidden) {
+            throw "executable release contains runtime, downloaded-document, or debug artifacts"
+          }
+          $expectedExeManifest = @(
+            "ippi-down/config/config.example.yaml",
+            "ippi-down/download_folder_spec.md",
+            "ippi-down/ippi-down.exe",
+            "ippi-down/memory_resource_management.md",
+            "ippi-down/network_security.md",
+            "ippi-down/README.md",
+            "ippi-down/SHA256SUMS.txt"
+          ) | Sort-Object
+          $actualExeManifest = @(
+            Get-ChildItem -LiteralPath $exeExtractDir -Recurse -Force -File |
+              ForEach-Object {
+                $_.FullName.Substring($exeExtractDir.Length).TrimStart("\") -replace "\\", "/"
+              }
+          ) | Sort-Object
+          $manifestDifference = Compare-Object `
+            -ReferenceObject $expectedExeManifest `
+            -DifferenceObject $actualExeManifest
+          if ($manifestDifference) {
+            $details = ($manifestDifference | Out-String).Trim()
+            throw "executable release manifest is unexpected:`n$details"
+          }
+          Assert-NoSecretArtifacts -Root $exeExtractDir
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ippi-down-windows-x64
+          path: |
+            dist/ippi-down.exe
+            artifacts/sbom.cdx.json
+            release/ippi-down-windows-x64.zip
+            release/ippi-down-source.zip
+          if-no-files-found: error
