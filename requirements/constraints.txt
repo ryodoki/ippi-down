@@ -11,7 +11,7 @@ idna==3.18
 schedule==1.2.2
 PyYAML==6.0.2
 Pillow==12.3.0
-pypdf==6.16.2
+pypdf==6.19.0
 reportlab==5.0.1
 win10toast==0.9
 pypiwin32==223
